@@ -6,14 +6,13 @@
 <meta name="description" content="NOTARIUS — Sistem Manajemen Kantor Notaris Indonesia. Kelola klien, akta, repertorium, protokol, dan keuangan dengan aman."/>
 <title>{{.Title}} — NOTARIUS</title>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
-<link rel="stylesheet" href="/assets/notarius/notarius.css"/>
 <script src="/assets/vendor/htmx.min.js"></script>
 </head>{{end}}
 
-{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
 <div class="container-fluid">
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
-<h1 class="navbar-brand navbar-brand-autodark mt-2"><span style="color:var(--nt-gold)">N</span> NOTARIUS</h1>
+<h1 class="navbar-brand navbar-brand-autodark mt-2"><span class="text-yellow fw-bold">N</span> NOTARIUS</h1>
 <div class="collapse navbar-collapse" id="sidebar-menu">
 <form method="get" action="/search" class="px-3 mb-2"><input class="form-control" name="q" placeholder="Cari klien/akta…"/></form>
 <ul class="navbar-nav pt-lg-3">
@@ -58,12 +57,12 @@
 <div class="page">
 {{template "sidebar" .}}
 <div class="page-wrapper">
-<div class="topbar d-print-none"><div class="container-xl d-flex align-items-center gap-2 py-2">
-<form method="get" action="/search" class="flex-fill d-none d-md-block"><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…"/></form>
-<a class="btn btn-ghost-primary" href="/tasks" title="Tugas">☰</a>
-<form method="post" action="/notifications/read" class="d-inline">{{template "csrf" .}}<button class="btn btn-ghost-primary" type="submit" title="Notifikasi">🔔</button></form>
+<header class="navbar navbar-expand-md d-print-none"><div class="container-xl d-flex align-items-center gap-2 py-2">
+<form method="get" action="/search" class="flex-fill d-none d-md-block"><div class="input-icon"><span class="input-icon-addon">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…"/></div></form>
+<a class="btn btn-ghost-secondary" href="/tasks" title="Tugas">☰</a>
+<form method="post" action="/notifications/read" class="d-inline">{{template "csrf" .}}<button class="btn btn-ghost-secondary" type="submit" title="Notifikasi">🔔</button></form>
 <div class="dropdown">
-<a href="#" class="d-flex align-items-center gap-2 text-decoration-none text-dark" data-bs-toggle="dropdown"><span class="avatar-circle">{{if .UserName}}{{slice .UserName 0 1}}{{else}}?{{end}}</span><span class="d-none d-md-block"><strong>{{.UserName}}</strong><br/><span class="small text-secondary">{{.Role}}</span></span></a>
+<a href="#" class="d-flex align-items-center gap-2 text-decoration-none text-body" data-bs-toggle="dropdown"><span class="avatar avatar-rounded">{{if .UserName}}{{slice .UserName 0 1}}{{else}}?{{end}}</span><span class="d-none d-md-block"><strong>{{.UserName}}</strong><br/><span class="small text-secondary">{{.Role}}</span></span></a>
 <div class="dropdown-menu dropdown-menu-end">
 <a class="dropdown-item" href="/mfa">Keamanan (MFA)</a>
 <a class="dropdown-item" href="/office">Profil Kantor</a>
@@ -71,7 +70,7 @@
 <form method="post" action="/logout">{{template "csrf" .}}<button class="dropdown-item text-danger" type="submit">Keluar</button></form>
 </div>
 </div>
-</div></div>
+</div></header>
 <div class="page-header d-print-none"><div class="container-xl"><h2 class="page-title">{{.Title}}</h2></div></div>
 <div class="page-body"><div class="container-xl">
 {{template "flash" .}}{{end}}

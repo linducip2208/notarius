@@ -1,6 +1,7 @@
 # KNOWN_LIMITATIONS — jujur, tanpa klaim palsu
 
-1. Metronic: aset resmi TIDAK ADA di repo. UI aktif Tabler CDN. Migrasi diblokir lisensi; skeleton di `web/assets/metronic/`.
+1. Design system: 100% Tabler lokal (keputusan pemilik; jalur Metronic DIBATALKAN dan skeleton dihapus).
+   UI aktif Tabler vendor lokal, tanpa CDN. Klaim "Metronic" DILARANG.
 2. Integrasi pemerintah: TIDAK ADA API resmi AHU/OSS. Modul gov = asistensi manual + bukti. Jangan klaim integrasi.
 3. AI eksternal: mati by design tanpa kunci env + persetujuan.
 4. OCR: butuh binary Tesseract + OCR_BINARY; tanpa itu fallback Noop + entri manual. Hasil OCR TIDAK PERNAH auto-verify.
