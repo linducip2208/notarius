@@ -1,30 +1,46 @@
 {{define "dashboard"}}{{template "head" .}}{{template "page_open" .}}
-<div class="d-flex justify-content-between align-items-center mb-3">
-<div><h2 class="page-title mb-0">Dashboard</h2><p class="text-secondary mb-0">Selamat datang, {{.UserName}}</p></div>
-<form method="get" action="/appointments"><button class="btn btn-primary" type="submit">+ Jadwal Penghadap</button></form>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div><h2 class="page-title mb-0">Selamat datang kembali, {{.UserName}}</h2><p class="text-secondary mb-0">{{.OfficeName}} · {{.WIBDate}} · {{len .Data.Today}} janji hari ini, {{.Pending}} antrean menunggu</p></div>
+<div class="dropdown">
+<button class="btn btn-primary" data-bs-toggle="dropdown">+ Aksi Cepat</button>
+<div class="dropdown-menu dropdown-menu-end">
+{{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Tambah Klien</a>{{end}}
+<a class="dropdown-item" href="/requests">🧾 Buat Permohonan</a>
+{{if can .Role "deed.draft"}}<a class="dropdown-item" href="/deeds">📝 Buat Draft Akta</a>{{end}}
+{{if can .Role "legalization.process"}}<a class="dropdown-item" href="/legalisasi">✅ Catat Register</a>{{end}}
+{{if can .Role "finance.manage"}}<a class="dropdown-item" href="/finance">💰 Buat Invoice</a>{{end}}
+</div>
+</div>
 </div>
 <div class="row row-deck row-cards mb-3">
-<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-blue-lt">👥</span><div><div class="subheader">Total Klien</div><div class="h1 mb-0">{{.Data.Clients}}</div></div></div><div class="small text-success mt-1">↑ {{.Data.DReq}}%</div><a href="/clients">Lihat klien</a></div></div></div>
-<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-yellow-lt">📝</span><div><div class="subheader">Permohonan Layanan</div><div class="h1 mb-0">{{.Data.Pending}}</div></div></div><div class="small text-success mt-1">↑ {{.Data.DReq}}%</div><a href="/requests?status=SUBMITTED">Lihat antrean</a></div></div></div>
-<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-green-lt">📜</span><div><div class="subheader">Akta Diterbitkan</div><div class="h1 mb-0">{{.Data.Completed}}</div></div></div><div class="small text-success mt-1">↑ {{.Data.DDeed}}%</div><a href="/deeds">Lihat akta</a></div></div></div>
-<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-green-lt">💰</span><div><div class="subheader">Pendapatan Bulan Ini</div><div class="h1 mb-0">Rp {{.Data.Revenue}}</div></div></div><div class="small text-success mt-1">↑ {{.Data.DRev}}%</div><a href="/finance">Ke keuangan</a></div></div></div>
+<div class="col-sm-6 col-lg"><div class="card" title="Jumlah seluruh klien terdaftar di kantor ini"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-blue-lt">👥</span><div><div class="subheader">Total Klien</div><div class="h1 mb-0">{{.Data.Clients}}</div></div></div><div class="small text-secondary mt-1">Periode: keseluruhan</div><a href="/clients">Lihat klien</a></div></div></div>
+<div class="col-sm-6 col-lg"><div class="card" title="Permohonan berstatus SUBMITTED / IN_REVIEW / NEED_DOCS"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-yellow-lt">📝</span><div><div class="subheader">Permohonan Aktif</div><div class="h1 mb-0">{{.Pending}}</div></div></div><div class="small text-secondary mt-1">Periode: berjalan</div><a href="/requests?status=SUBMITTED">Lihat antrean</a></div></div></div>
+<div class="col-sm-6 col-lg"><div class="card" title="Akta dibuat pada bulan berjalan"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-green-lt">📜</span><div><div class="subheader">Akta Bulan Ini</div><div class="h1 mb-0">{{.Data.MonthDeeds}}</div></div></div><div class="small text-secondary mt-1">Periode: bulan berjalan</div><a href="/deeds">Lihat akta</a></div></div></div>
+<div class="col-sm-6 col-lg"><div class="card" title="Janji temu terjadwal hari ini"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-azure-lt">📅</span><div><div class="subheader">Jadwal Hari Ini</div><div class="h1 mb-0">{{len .Data.Today}}</div></div></div><div class="small text-secondary mt-1">Periode: hari ini</div><a href="/appointments">Lihat janji</a></div></div></div>
+<div class="col-sm-6 col-lg"><div class="card" title="Total invoice ISSUED/PARTIAL yang belum lunas"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-red-lt">💰</span><div><div class="subheader">Tagihan Belum Dibayar</div><div class="h1 mb-0">Rp {{.Data.Outstanding}}</div></div></div><div class="small text-secondary mt-1">Periode: berjalan</div><a href="/finance">Ke keuangan</a></div></div></div>
 </div>
 <div class="row g-3">
 <div class="col-lg-8">
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas 6 Bulan Terakhir</h3></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas {{.Data.RangeN}} Bulan Terakhir</h3><div class="ms-auto d-flex gap-1">
+<a class="btn btn-sm {{if ne .Data.Range "12"}}btn-primary{{else}}btn-ghost-secondary{{end}}" href="/app?range=6">6 bln</a>
+<a class="btn btn-sm {{if eq .Data.Range "12"}}btn-primary{{else}}btn-ghost-secondary{{end}}" href="/app?range=12">12 bln</a>
+</div></div>
 <div class="card-body">
-<svg viewBox="0 0 600 180" style="width:100%;height:auto" role="img" aria-label="Grafik aktivitas">
+{{if .Data.Months}}<svg viewBox="0 0 600 180" style="width:100%;height:auto" role="img" aria-label="Grafik aktivitas permohonan dan akta">
 <line x1="20" x2="580" y1="30" y2="30" stroke="#e7ebf2"/><line x1="20" x2="580" y1="70" y2="70" stroke="#e7ebf2"/><line x1="20" x2="580" y1="110" y2="110" stroke="#e7ebf2"/><line x1="20" x2="580" y1="150" y2="150" stroke="#e7ebf2"/>
 <polyline points="{{.Data.ReqPts}}" fill="none" stroke="#206bc4" stroke-width="3" stroke-linejoin="round"/>
 <polyline points="{{.Data.DeedPts}}" fill="none" stroke="#c9a844" stroke-width="3" stroke-linejoin="round"/>
+{{range .Data.ReqDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#206bc4"><title>{{.M}}: {{.V}} permohonan</title></circle>{{end}}
+{{range .Data.DeedDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#c9a844"><title>{{.M}}: {{.V}} akta</title></circle>{{end}}
 </svg>
 <div class="d-flex justify-content-between small text-secondary px-1">{{range .Data.Months}}<span>{{.}}</span>{{end}}</div>
-<div class="d-flex gap-3 small mt-2"><span><span class="badge" style="background:#206bc4">&nbsp;</span> Permohonan</span><span><span class="badge" style="background:#c9a844">&nbsp;</span> Akta</span></div>
+<div class="d-flex gap-3 small mt-2"><span><span class="badge" style="background:#206bc4">&nbsp;</span> Permohonan</span><span><span class="badge" style="background:#c9a844">&nbsp;</span> Akta disahkan</span></div>
+{{else}}<div class="empty"><p class="empty-title">Belum ada aktivitas</p><p class="empty-subtitle">Data muncul setelah permohonan pertama dibuat.</p><a class="btn btn-primary" href="/requests">Buat Permohonan</a></div>{{end}}
 </div></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Agenda Hari Ini</h3><div class="ms-auto"><a href="/appointments">Lihat Semua →</a></div></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><tbody>
-{{range .Data.Today}}<tr><td class="text-secondary">{{.At}}</td><td>{{.Purpose}} – {{.Client}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
-{{else}}<tr><td class="text-center text-secondary py-3">Tidak ada jadwal hari ini. <a href="/appointments">Buat janji →</a></td></tr>{{end}}
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jam</th><th>Penghadap</th><th>Keperluan</th><th>Status</th></tr></thead><tbody>
+{{range .Data.Today}}<tr><td class="text-secondary">{{.At}}</td><td>{{.Client}}</td><td>{{.Purpose}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Tidak ada jadwal hari ini. <a href="/appointments">Buat janji →</a></td></tr>{{end}}
 </tbody></table></div></div>
 </div>
 <div class="col-lg-4">
@@ -34,16 +50,14 @@
 <div class="d-flex flex-column gap-1 text-start">{{range .Data.Donut}}<div><span class="badge me-1" style="background:{{.Color}}">&nbsp;</span>{{.Label}} — {{.Pct}}%</div>{{end}}</div>
 {{else}}<p class="text-secondary">Belum ada data layanan.</p>{{end}}
 </div></div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Notifikasi Terbaru</h3><div class="ms-auto"><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Tandai dibaca</button></form></div></div>
+{{if .Data.Work}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Perlu Tindakan</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Work}}<a class="list-group-item" href="{{.URL}}"><span class="badge bg-red-lt me-2">{{.Kind}}</span>{{.Text}}</a>{{end}}</div></div>{{end}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas Terbaru</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Feed}}<div class="list-group-item"><div>{{if .URL}}<a href="{{.URL}}">{{.Action}}</a>{{else}}{{.Action}}{{end}} <span class="text-secondary">· {{.Entity}} #{{.EntityID}}</span></div><div class="small text-secondary">{{.Actor}} · {{.At}}</div></div>
+{{else}}<div class="list-group-item text-secondary">Belum ada aktivitas tercatat.</div>{{end}}</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Notifikasi</h3><div class="ms-auto"><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Tandai dibaca</button></form></div></div>
 <div class="list-group list-group-flush">{{range .Data.Notifs}}<div class="list-group-item"><div>🔔 {{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
 {{else}}<div class="list-group-item text-secondary">Belum ada notifikasi.</div>{{end}}</div></div>
-<div class="card"><div class="card-header"><h3 class="card-title">Aktivitas Terbaru</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter">
-<thead><tr><th>ID</th><th>Judul</th><th>Status</th><th></th></tr></thead>
-<tbody>{{range .Data.Recent}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
-<td><form method="post" action="/requests/{{.ID}}/move" class="d-inline">{{template "csrf" $}}<input type="hidden" name="to" value="IN_REVIEW"/><button class="btn btn-sm btn-ghost-secondary" type="submit">Proses</button></form></td></tr>
-{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada permohonan. Buat dari halaman Permohonan.</td></tr>{{end}}</tbody>
-</table></div></div>
 </div>
 </div>
 {{template "page_close" .}}{{end}}

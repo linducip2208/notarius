@@ -112,8 +112,8 @@ func (s *Store) Move(officeID, id int64, to string, actorID *int64, note string)
 	return tx.Commit()
 }
 
-// List returns requests newest first, optionally filtered by status.
-func (s *Store) List(officeID int64, status string) ([]Request, error) {
+// List returns requests newest first, optionally filtered by status and client.
+func (s *Store) List(officeID int64, status string, clientID int64) ([]Request, error) {
 	q := `SELECT r.id, r.office_id, r.client_id, c.full_name, r.service_id, sv.name, r.status, r.title, r.notes, r.assignee_id, r.created_at
 		FROM service_requests r JOIN clients c ON c.id=r.client_id JOIN services sv ON sv.id=r.service_id
 		WHERE r.office_id=?`
@@ -121,6 +121,10 @@ func (s *Store) List(officeID int64, status string) ([]Request, error) {
 	if status != "" {
 		q += ` AND r.status=?`
 		args = append(args, status)
+	}
+	if clientID != 0 {
+		q += ` AND r.client_id=?`
+		args = append(args, clientID)
 	}
 	q += ` ORDER BY r.id DESC LIMIT 200`
 	rows, err := s.db.Query(q, args...)

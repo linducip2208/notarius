@@ -1,0 +1,13 @@
+/* NOTARIUS design tokens — HANYA variabel, bukan komponen.
+   Semua komponen tetap kelas Tabler murni. Nilai warna terpusat di sini. */
+:root{
+  --nt-navy:#14264B; --nt-deep:#0D1B36; --nt-navy-2:#1C3159;
+  --nt-gold:#D6A844; --nt-gold-lt:#F3D58A; --nt-blue:#3978E8;
+  --nt-bg:#F5F7FB; --nt-surface:#FFFFFF;
+  --nt-text:#17233C; --nt-text-2:#69758B; --nt-border:#E7EBF2;
+  --nt-success:#16A37B; --nt-warning:#E9A23B; --nt-danger:#DC5252;
+  --nt-radius:12px; --nt-shadow:0 10px 30px -12px rgba(20,38,75,.18);
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+}

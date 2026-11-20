@@ -737,6 +737,15 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	vers, _ := a.deeds.Versions(a.officeOf(r), id)
 	clauses, _ := a.tpl.Clauses(a.officeOf(r))
+	// Panel properti: pembuat, tanggal, pengesah, hash, template.
+	type props struct {
+		Created, Creator, ApprovedBy, ApprovedAt, Hash, Template string
+	}
+	var pr props
+	_ = a.db.QueryRow(`SELECT d.created_at, COALESCE(u.name,''), COALESCE(a.name,''), COALESCE(d.approved_at,''), COALESCE(d.content_hash,''), COALESCE(t.name,'')
+		FROM deed_drafts d LEFT JOIN users u ON u.id=d.created_by LEFT JOIN users a ON a.id=d.approved_by
+		LEFT JOIN doc_templates t ON t.id=d.template_id WHERE d.id=?`, id).
+		Scan(&pr.Created, &pr.Creator, &pr.ApprovedBy, &pr.ApprovedAt, &pr.Hash, &pr.Template)
 	// Komparasi berdampingan: ?compare=N tampilkan vN vs vN-1 (jujur, tanpa diff palsu).
 	var cmpA, cmpB string
 	var cmpN int
@@ -752,7 +761,7 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
-		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses,
+		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN,
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 	})

@@ -70,12 +70,17 @@ type pendingAuth struct {
 
 // Page is template data for every Tabler page.
 type Page struct {
-	Title    string
-	Role     string
-	UserName string
-	Flash    string
-	CSRF     string
-	Data     any
+	Title      string
+	Role       string
+	UserName   string
+	OfficeName string
+	WIBDate    string
+	Pending    int
+	Unread     int
+	TopNotifs  []map[string]any
+	Flash      string
+	CSRF       string
+	Data       any
 }
 
 // New builds the app. db may be nil only in tests that never hit handlers.
@@ -158,13 +163,22 @@ func (a *App) officeOf(r *http.Request) int64 {
 
 func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title string, data any) {
 	role := mw.RoleOf(r)
-	username := ""
+	username, officeName := "", ""
+	pending, unread := 0, 0
+	var topNotifs []map[string]any
 	if id := a.uid(r); id != nil && a.db != nil {
-		_ = a.db.QueryRow(`SELECT name FROM users WHERE id=?`, *id).Scan(&username)
+		_ = a.db.QueryRow(`SELECT u.name, COALESCE(o.name,'') FROM users u LEFT JOIN offices o ON o.id=u.office_id WHERE u.id=?`, *id).Scan(&username, &officeName)
+		office := a.officeOf(r)
+		pending, _, _, _ = a.reqs.Counts(office)
+		unread = notify.Unread(a.db, *id)
+		topNotifs, _ = notify.List(a.db, *id)
+		if len(topNotifs) > 5 {
+			topNotifs = topNotifs[:5]
+		}
 	}
 	flash := r.URL.Query().Get("flash")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data}); err != nil {
+	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data}); err != nil {
 		a.log.Error("render", "page", name, "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
@@ -383,7 +397,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		outstanding, _ = a.fin.Outstanding(office)
 		monthRev, _ = a.fin.Revenue(office, month)
 	}
-	recent, _ := a.reqs.List(office, "")
+	recent, _ := a.reqs.List(office, "", 0)
 	if len(recent) > 8 {
 		recent = recent[:8]
 	}
@@ -406,25 +420,40 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// Aktivitas 6 bulan terakhir (permohonan + akta selesai) untuk grafik.
-	months, reqSeries, deedSeries := a.last6Months(office)
+	// Periode grafik: ?range=6|12 (default 6).
+	n := 6
+	if q := r.URL.Query().Get("range"); q == "12" {
+		n = 12
+	}
+	months, reqSeries, deedSeries := a.lastNMonths(office, n)
 	reqPts, deedPts := svgSeries(reqSeries, deedSeries)
-	// Total klien + delta bulanan (mockup: Total Klien, delta %).
-	var totalClients int
+	type dot struct {
+		X, Y, V int
+		M       string
+	}
+	mkDots := func(s []int) []dot {
+		max, span := 1, len(s)-1
+		if span < 1 {
+			span = 1
+		}
+		for _, v := range s {
+			if v > max {
+				max = v
+			}
+		}
+		var out []dot
+		for i, v := range s {
+			out = append(out, dot{X: 20 + i*(560/span), Y: 150 - v*130/max, V: v, M: months[i]})
+		}
+		return out
+	}
+	// Total klien + akta bulan ini + jadwal hari ini (kartu statistik, tanpa persenan).
+	var totalClients, monthDeeds int
 	if a.db != nil {
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE office_id=?`, office).Scan(&totalClients)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND DATE_FORMAT(created_at,'%Y-%m')=?`, office, month).Scan(&monthDeeds)
 	}
 	var conic string
-	deltaReq, deltaDeed, deltaRev := pct(reqSeries), pct(deedSeries), 0
-	{
-		ym, prev := month, time.Now().AddDate(0, -1, 0).Format("2006-01")
-		var cur, old int64
-		if a.db != nil {
-			_ = a.db.QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.office_id=? AND DATE_FORMAT(p.paid_at,'%Y-%m')=?`, office, ym).Scan(&cur)
-			_ = a.db.QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.office_id=? AND DATE_FORMAT(p.paid_at,'%Y-%m')=?`, office, prev).Scan(&old)
-		}
-		deltaRev = pct64(cur, old)
-	}
 	// Donat komposisi: Akta korporat vs Perjanjian vs Legalisasi vs Lainnya.
 	type seg struct {
 		Label, Color string
@@ -448,6 +477,67 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		conic = fmt.Sprintf("conic-gradient(#206bc4 0 %d%%,#e9a23b %d%% %d%%,#16a37b %d%% 100%%)", pc, pc, pc+pl, pc+pl)
 	}
+	// Pekerjaan menunggu tindakan: berkas kurang, draf review, invoice belum lunas, janji mendatang.
+	type work struct {
+		Kind, Text, URL string
+	}
+	var pendingWork []work
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT id, title FROM service_requests WHERE office_id=? AND status='NEED_DOCS' ORDER BY id DESC LIMIT 5`, office)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int64
+				var t string
+				_ = rows.Scan(&id, &t)
+				pendingWork = append(pendingWork, work{"Berkas", t + " — dokumen belum lengkap", "/requests/" + strconv.FormatInt(id, 10)})
+			}
+		}
+		rows2, _ := a.db.Query(`SELECT id, title FROM deed_drafts WHERE office_id=? AND status='IN_REVIEW' ORDER BY id DESC LIMIT 5`, office)
+		if rows2 != nil {
+			defer rows2.Close()
+			for rows2.Next() {
+				var id int64
+				var t string
+				_ = rows2.Scan(&id, &t)
+				pendingWork = append(pendingWork, work{"Review", t + " — menunggu persetujuan notaris", "/deeds/" + strconv.FormatInt(id, 10)})
+			}
+		}
+		rows3, _ := a.db.Query(`SELECT number FROM invoices WHERE office_id=? AND status IN ('ISSUED','PARTIAL') ORDER BY id DESC LIMIT 5`, office)
+		if rows3 != nil {
+			defer rows3.Close()
+			for rows3.Next() {
+				var num string
+				_ = rows3.Scan(&num)
+				pendingWork = append(pendingWork, work{"Bayar", "Invoice " + num + " — pembayaran tertunda", "/finance"})
+			}
+		}
+	}
+	// Aktivitas terbaru dari audit log (pelaku, waktu, objek, tautan).
+	type activity struct {
+		Action, Actor, At, Entity, EntityID string
+		URL                                 string
+	}
+	var feed []activity
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT a.action, COALESCE(u.name,'sistem'), a.created_at, a.entity, a.entity_id
+			FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 10`)
+		if rows != nil {
+			defer rows.Close()
+			link := map[string]string{"client": "/clients/", "service_request": "/requests/", "deed": "/deeds/", "invoice": "/finance", "will": "/wills", "gov_submission": "/gov"}
+			for rows.Next() {
+				var x activity
+				_ = rows.Scan(&x.Action, &x.Actor, &x.At, &x.Entity, &x.EntityID)
+				if base, ok := link[x.Entity]; ok {
+					x.URL = base
+					if x.Entity == "client" || x.Entity == "service_request" || x.Entity == "deed" {
+						x.URL += x.EntityID
+					}
+				}
+				feed = append(feed, x)
+			}
+		}
+	}
 	// Notifikasi terbaru pengguna.
 	var notifs []map[string]any
 	if id := a.uid(r); id != nil {
@@ -460,9 +550,10 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Pending": pending, "Active": active, "Completed": completed,
 		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
 		"Role": mw.RoleOf(r), "Today": today, "Notifs": notifs,
-		"Months": months, "ReqPts": reqPts, "DeedPts": deedPts,
-		"Clients": totalClients, "DReq": deltaReq, "DDeed": deltaDeed, "DRev": deltaRev,
-		"Donut": donut, "Conic": conic,
+		"Months": months, "ReqPts": reqPts, "DeedPts": deedPts, "RangeN": n,
+		"ReqDots": mkDots(reqSeries), "DeedDots": mkDots(deedSeries),
+		"Clients": totalClients, "MonthDeeds": monthDeeds, "Range": r.URL.Query().Get("range"),
+		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 	})
 }
 
@@ -474,10 +565,14 @@ func svgSeries(a, b []int) (string, string) {
 			max = v
 		}
 	}
+	span := len(a) - 1
+	if span < 1 {
+		span = 1
+	}
 	pts := func(s []int) string {
 		out := ""
 		for i, v := range s {
-			x := 20 + i*(560/5)
+			x := 20 + i*(560/span)
 			y := 150 - v*130/max
 			out += strconv.Itoa(x) + "," + strconv.Itoa(y) + " "
 		}
@@ -486,34 +581,13 @@ func svgSeries(a, b []int) (string, string) {
 	return pts(a), pts(b)
 }
 
-func pct(s []int) int {
-	if len(s) < 2 {
-		return 0
+// lastNMonths returns month labels + request counts + completed-deed counts.
+func (a *App) lastNMonths(office int64, n int) (labels []string, reqs []int, deeds []int) {
+	if n != 12 {
+		n = 6
 	}
-	old, cur := s[len(s)-2], s[len(s)-1]
-	if old == 0 {
-		if cur > 0 {
-			return 100
-		}
-		return 0
-	}
-	return (cur - old) * 100 / old
-}
-
-func pct64(cur, old int64) int {
-	if old == 0 {
-		if cur > 0 {
-			return 100
-		}
-		return 0
-	}
-	return int((cur - old) * 100 / old)
-}
-
-// last6Months returns month labels + request counts + completed-deed counts.
-func (a *App) last6Months(office int64) (labels []string, reqs []int, deeds []int) {
 	now := time.Now()
-	for i := 5; i >= 0; i-- {
+	for i := n - 1; i >= 0; i-- {
 		m := now.AddDate(0, -i, 0)
 		labels = append(labels, m.Format("Jan"))
 		ym := m.Format("2006-01")
@@ -537,22 +611,38 @@ func (a *App) clientList(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query().Get("q")
 	kind := r.URL.Query().Get("kind")
+	sort := r.URL.Query().Get("sort")
 	page := config.MustInt(r.URL.Query().Get("page"), 1)
 	if page < 1 {
 		page = 1
 	}
-	const perPage = 20
-	list, total, _ := a.clients.ListFiltered(a.officeOf(r), q, kind, perPage, (page-1)*perPage)
+	perPage := config.MustInt(r.URL.Query().Get("per_page"), 20)
+	if perPage != 10 && perPage != 20 && perPage != 50 {
+		perPage = 20
+	}
+	list, total, _ := a.clients.ListFiltered(a.officeOf(r), q, kind, perPage, (page-1)*perPage, sort)
 	pages := (total + perPage - 1) / perPage
 	if pages < 1 {
 		pages = 1
 	}
+	if page > pages {
+		page = pages
+	}
+	prev, next := page-1, page+1
+	if prev < 1 {
+		prev = 1
+	}
+	if next > pages {
+		next = pages
+	}
+	qs := "q=" + q + "&kind=" + kind + "&sort=" + sort + "&per_page=" + strconv.Itoa(perPage)
 	if r.Header.Get("HX-Request") == "true" {
 		_ = a.tmpl.ExecuteTemplate(w, "client_rows", list)
 		return
 	}
 	a.render(w, r, "clients", "Daftar Klien", map[string]any{
-		"List": list, "Q": q, "Kind": kind, "Page": page, "Pages": pages, "Total": total,
+		"List": list, "Q": q, "Kind": kind, "Sort": sort, "PerPage": perPage,
+		"Page": page, "Pages": pages, "Total": total, "Prev": prev, "Next": next, "QS": qs,
 	})
 }
 
@@ -562,7 +652,7 @@ func (a *App) clientExport(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	list, _, _ := a.clients.ListFiltered(a.officeOf(r), r.URL.Query().Get("q"), r.URL.Query().Get("kind"), 200, 0)
+	list, _, _ := a.clients.ListFiltered(a.officeOf(r), r.URL.Query().Get("q"), r.URL.Query().Get("kind"), 200, 0, r.URL.Query().Get("sort"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"klien.csv\"")
 	w.Write([]byte("\xef\xbb\xbf"))
@@ -648,10 +738,17 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 // ---- requests ----
 
 func (a *App) requestList(w http.ResponseWriter, r *http.Request) {
-	list, _ := a.reqs.List(a.officeOf(r), r.URL.Query().Get("status"))
+	clientID, _ := strconv.ParseInt(r.URL.Query().Get("client"), 10, 64)
+	list, _ := a.reqs.List(a.officeOf(r), r.URL.Query().Get("status"), clientID)
 	svcs, _ := a.reqs.Services()
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
-	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "Clients": cl})
+	var clientName string
+	if clientID != 0 {
+		if c, err := a.clients.Get(a.officeOf(r), clientID); err == nil {
+			clientName = c.FullName
+		}
+	}
+	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "Clients": cl, "ClientName": clientName})
 }
 
 func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
@@ -1003,6 +1100,6 @@ func (a *App) portal(w http.ResponseWriter, r *http.Request) {
 		a.render(w, r, "portal", "Portal Klien", map[string]any{"Mine": list})
 		return
 	}
-	list, _ := a.reqs.List(a.officeOf(r), "")
+	list, _ := a.reqs.List(a.officeOf(r), "", 0)
 	a.render(w, r, "portal", "Portal Klien", map[string]any{"Requests": list})
 }

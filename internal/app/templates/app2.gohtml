@@ -39,6 +39,16 @@
 </div></form></div>
 {{if .Data.Clauses}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Pustaka Klausul — klik untuk menyisipkan</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Clauses}}<div class="list-group-item"><strong>{{.Title}}</strong> <span class="text-secondary small">{{.Tags}}</span><textarea id="clause-{{.ID}}" class="d-none">{{.Body}}</textarea><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:100px;overflow:auto">{{.Body}}</pre><button class="btn btn-sm btn-outline-primary" type="button" onclick="document.getElementById('deedbody').value+=('\n\n'+document.getElementById('clause-{{.ID}}').value)">Sisipkan ↓</button></div>{{end}}</div></div>{{end}}
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Informasi Akta</h3></div>
+<div class="card-body p-0"><table class="table mb-0"><tbody>
+<tr><td class="text-secondary">Nomor</td><td><strong>{{.Data.Deed.Number}}</strong></td></tr>
+<tr><td class="text-secondary">Status</td><td><span class="badge bg-blue-lt">{{.Data.Deed.Status}}</span></td></tr>
+<tr><td class="text-secondary">Versi</td><td>v{{.Data.Deed.Version}} {{if .Data.Deed.Locked}}🔒 terkunci{{end}}</td></tr>
+<tr><td class="text-secondary">Template</td><td>{{.Data.Props.Template}}</td></tr>
+<tr><td class="text-secondary">Dibuat</td><td>{{.Data.Props.Created}} oleh {{.Data.Props.Creator}}</td></tr>
+<tr><td class="text-secondary">Disahkan</td><td>{{.Data.Props.ApprovedBy}} {{.Data.Props.ApprovedAt}}</td></tr>
+<tr><td class="text-secondary">Hash isi</td><td><code>{{.Data.Props.Hash}}</code></td></tr>
+</tbody></table></div></div>
 </div>
 <div class="col-lg-5"><div class="card"><div class="card-header"><h3 class="card-title">Riwayat Versi</h3></div>
 <div class="card-body">{{range .Data.Versions}}<div class="mb-3 pb-2 border-bottom"><strong>v{{.No}}</strong> <span class="text-secondary">{{.CreatedAt}} · {{.Hash}}</span><div class="small">{{.Note}}</div><div class="d-flex gap-2 mt-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{$.Data.Deed.ID}}?compare={{.No}}">Bandingkan</a></div><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{.Content}}</pre></div>{{else}}<p class="text-secondary">Belum ada revisi tersimpan.</p>{{end}}</div></div>

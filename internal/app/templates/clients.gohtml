@@ -2,15 +2,17 @@
 
 {{define "clients"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Daftar Klien</li></ol></nav>
-<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title">Daftar Klien ({{.Data.Total}})</h3><div class="d-flex gap-2"><a class="btn btn-outline-primary" href="/clients/export">Ekspor CSV</a><a class="btn btn-primary" href="/clients/new">+ Tambah Klien</a></div></div>
+<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title">Daftar Klien ({{.Data.Total}})</h3><div class="d-flex gap-2"><a class="btn btn-outline-primary" href="/clients/export?q={{.Data.Q}}&kind={{.Data.Kind}}&sort={{.Data.Sort}}">Ekspor CSV</a><a class="btn btn-primary" href="/clients/new">+ Tambah Klien</a></div></div>
 <form method="get" action="/clients"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
-<input class="form-control" style="max-width:280px" type="search" name="q" placeholder="Cari nama / telepon / email…" value="{{.Data.Q}}"/>
-<select class="form-select" style="max-width:180px" name="kind"><option value="">Semua Jenis</option><option value="individual" {{if eq .Data.Kind "individual"}}selected{{end}}>Perorangan</option><option value="corporate" {{if eq .Data.Kind "corporate"}}selected{{end}}>Badan Hukum</option></select>
+<input class="form-control" style="max-width:240px" type="search" name="q" placeholder="Cari nama / telepon / email…" value="{{.Data.Q}}"/>
+<select class="form-select" style="max-width:150px" name="kind"><option value="">Semua Jenis</option><option value="individual" {{if eq .Data.Kind "individual"}}selected{{end}}>Perorangan</option><option value="corporate" {{if eq .Data.Kind "corporate"}}selected{{end}}>Badan Hukum</option></select>
+<select class="form-select" style="max-width:150px" name="sort"><option value="">Terbaru</option><option value="name_asc" {{if eq .Data.Sort "name_asc"}}selected{{end}}>Nama A–Z</option><option value="name_desc" {{if eq .Data.Sort "name_desc"}}selected{{end}}>Nama Z–A</option></select>
+<select class="form-select" style="max-width:110px" name="per_page"><option value="10" {{if eq .Data.PerPage 10}}selected{{end}}>10</option><option value="20" {{if eq .Data.PerPage 20}}selected{{end}}>20</option><option value="50" {{if eq .Data.PerPage 50}}selected{{end}}>50</option></select>
 <button class="btn btn-primary" type="submit">Filter</button>
 </div></form>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Jenis</th><th>Telepon</th><th>Email</th><th>Dibuat</th></tr></thead>
 <tbody>{{range .Data.List}}<tr><td><a href="/clients/{{.ID}}">{{.FullName}}</a></td><td><span class="badge bg-azure-lt">{{.Kind}}</span></td><td>{{.Phone}}</td><td>{{.Email}}</td><td class="text-secondary">{{.CreatedAt}}</td></tr>{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Tidak ada klien. <a href="/clients/new">Tambah klien pertama →</a></td></tr>{{end}}</tbody></table></div>
-{{if gt .Data.Pages 1}}<div class="card-footer text-secondary">Halaman {{.Data.Page}} dari {{.Data.Pages}} · {{.Data.Total}} klien</div>{{end}}</div>
+{{if gt .Data.Pages 1}}<div class="card-footer d-flex gap-2 align-items-center flex-wrap"><span class="text-secondary">Halaman {{.Data.Page}} dari {{.Data.Pages}} · {{.Data.Total}} klien</span><ul class="pagination mb-0 ms-auto"><li class="page-item {{if eq .Data.Page 1}}disabled{{end}}"><a class="page-link" href="/clients?{{.Data.QS}}&page={{.Data.Prev}}">«</a></li><li class="page-item active"><a class="page-link" href="#">{{.Data.Page}}</a></li><li class="page-item {{if eq .Data.Page .Data.Pages}}disabled{{end}}"><a class="page-link" href="/clients?{{.Data.QS}}&page={{.Data.Next}}">»</a></li></ul></div>{{end}}</div>
 {{template "page_close" .}}{{end}}
 
 {{define "client_new"}}{{template "head" .}}{{template "page_open" .}}
@@ -28,49 +30,63 @@
 
 {{define "client_detail"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients">Daftar Klien</a></li><li class="breadcrumb-item active">{{.Data.Client.FullName}}</li></ol></nav>
-<div class="row"><div class="col-md-7"><div class="card"><div class="card-header"><h3 class="card-title">{{.Data.Client.FullName}}</h3></div>
-<div class="card-body"><dl class="row">
+<div class="card mb-3"><div class="card-body"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="d-flex align-items-center gap-3"><span class="avatar avatar-lg">{{slice .Data.Client.FullName 0 1}}</span><div><h2 class="mb-0">{{.Data.Client.FullName}}</h2><span class="badge bg-azure-lt">{{.Data.Client.Kind}}</span> <span class="text-secondary small">{{.Data.Client.Phone}} · {{.Data.Client.Email}}</span></div></div>
+<div class="d-flex gap-2"><a class="btn btn-outline-primary" href="/requests?client={{.Data.Client.ID}}">+ Permohonan</a><button class="btn btn-primary" type="button" onclick="document.querySelector('a[href=\'#tab-doc\']').click();document.getElementById('tab-doc').scrollIntoView()">Unggah Berkas</button></div>
+</div></div></div>
+<div class="card"><div class="card-header"><ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+<li class="nav-item"><a href="#tab-info" class="nav-link active" data-bs-toggle="tab">Overview</a></li>
+<li class="nav-item"><a href="#tab-id" class="nav-link" data-bs-toggle="tab">Identitas</a></li>
+<li class="nav-item"><a href="#tab-doc" class="nav-link" data-bs-toggle="tab">Dokumen</a></li>
+<li class="nav-item"><a href="#tab-svc" class="nav-link" data-bs-toggle="tab">Layanan</a></li>
+<li class="nav-item"><a href="#tab-act" class="nav-link" data-bs-toggle="tab">Aktivitas</a></li>
+</ul></div>
+<div class="card-body"><div class="tab-content">
+<div class="tab-pane active" id="tab-info">
+<div class="row"><div class="col-md-6"><dl class="row">
 <dt class="col-4">Jenis</dt><dd class="col-8">{{.Data.Client.Kind}}</dd>
 <dt class="col-4">Telepon</dt><dd class="col-8">{{.Data.Client.Phone}}</dd>
 <dt class="col-4">Email</dt><dd class="col-8">{{.Data.Client.Email}}</dd>
 <dt class="col-4">Alamat</dt><dd class="col-8">{{.Data.Client.Address}}</dd>
 <dt class="col-4">NPWP</dt><dd class="col-8">{{.Data.Client.NPWP}}</dd>
-</dl></div></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Identitas (verifikasi manusia wajib)</h3></div>
-<div class="table-responsive"><table class="table card-table"><thead><tr><th>Jenis</th><th>Nama</th><th>NIK akhir</th><th>Terverifikasi</th><th></th></tr></thead>
-<tbody>{{range .Data.Identities}}<tr><td>{{.IDType}}</td><td>{{.FullName}}</td><td>•••• {{.NIKLast4}}</td><td>{{.Verified}}</td>
-<td>{{if $.Data.CanVerify}}{{if not .Verified}}<form method="post" action="/identities/{{.ID}}/verify">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">Verifikasi</button></form>{{end}}{{end}}</td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Belum ada identitas.</td></tr>{{end}}</tbody></table></div>
-<form method="post" action="/clients/{{.Data.Client.ID}}/identities"><div class="card-body row">
-{{template "csrf" .}}
-<div class="col-md-3 mb-2"><select class="form-select" name="id_type"><option value="KTP">KTP</option><option value="KK">KK</option><option value="NPWP">NPWP</option><option value="PASSPORT">Paspor</option><option value="OTHER">Lainnya</option></select></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="nik" placeholder="NIK/NPWP (terenkripsi)"/></div>
-<div class="col-md-4 mb-2"><input class="form-control" name="full_name" placeholder="Nama sesuai identitas" required/></div>
-<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Tambah</button></div>
-</div></form></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Berkas (privat, maks PDF/JPG/PNG)</h3></div>
-<div class="table-responsive"><table class="table card-table"><thead><tr><th>Nama</th><th>Ukuran</th><th>OCR</th><th></th></tr></thead>
-<tbody>{{range .Data.Files}}<tr><td><a href="/files/{{.ID}}">{{.Name}}</a></td><td>{{.Size}}</td><td>{{.OCRStatus}}</td>
-<td><div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/files/{{.ID}}">Unduh</a><form method="post" action="/files/{{.ID}}/ocr">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-primary" type="submit">Jalankan OCR</button></form></div></td></tr>
-{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada berkas.</td></tr>{{end}}</tbody></table></div>
-<form method="post" action="/clients/{{.Data.Client.ID}}/files" enctype="multipart/form-data"><div class="card-body d-flex gap-2">
-{{template "csrf" .}}<input class="form-control" type="file" name="file" required/><button class="btn btn-primary" type="submit">Unggah</button>
-</div></form></div>
-</div>
-<div class="col-md-5">
-<div class="card"><div class="card-header"><h3 class="card-title">Kemungkinan duplikat</h3></div>
-<div class="card-body">{{range .Data.Duplicates}}<div class="alert alert-warning"><a href="/clients/{{.ID}}">{{.FullName}}</a> — {{.Reason}}</div>{{else}}<p class="text-secondary">Tidak ada indikasi duplikat.</p>{{end}}</div></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Perwakilan</h3></div>
-<div class="card-body">{{range .Data.Reps}}<div class="mb-2"><strong>{{.Name}}</strong> <span class="text-secondary">{{.Position}} · {{.Phone}}</span></div>{{else}}<p class="text-secondary">Belum ada perwakilan.</p>{{end}}
+</dl></div>
+<div class="col-md-6"><h4>Kemungkinan duplikat</h4>{{range .Data.Duplicates}}<div class="alert alert-warning"><a href="/clients/{{.ID}}">{{.FullName}}</a> — {{.Reason}}</div>{{else}}<p class="text-secondary">Tidak ada indikasi duplikat.</p>{{end}}
+<h4 class="mt-3">Perwakilan</h4>{{range .Data.Reps}}<div class="mb-2"><strong>{{.Name}}</strong> <span class="text-secondary">{{.Position}} · {{.Phone}}</span></div>{{else}}<p class="text-secondary">Belum ada perwakilan.</p>{{end}}
 <form method="post" action="/clients/{{.Data.Client.ID}}/reps">{{template "csrf" .}}
 <div class="mb-2"><input class="form-control" name="name" placeholder="Nama" required/></div>
 <div class="row"><div class="col-6 mb-2"><input class="form-control" name="position" placeholder="Jabatan"/></div>
 <div class="col-6 mb-2"><input class="form-control" name="phone" placeholder="Telepon"/></div></div>
 <div class="mb-2"><input class="form-control" name="authority" placeholder="Dasar kewenangan"/></div>
 <button class="btn btn-primary w-100" type="submit">Tambah Perwakilan</button></form></div></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Riwayat Layanan</h3></div>
-<div class="list-group list-group-flush">{{range .Data.Services}}<a class="list-group-item" href="/requests/{{.ID}}"><span class="badge bg-blue-lt me-2">{{.Status}}</span>{{.Title}} <span class="text-secondary">· {{.Service}}</span></a>{{else}}<div class="list-group-item text-secondary">Belum ada permohonan.</div>{{end}}</div></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Jejak Audit</h3></div>
-<div class="list-group list-group-flush">{{range .Data.Trail}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.Action}}</span><span class="text-secondary small">{{.At}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada jejak audit.</div>{{end}}</div></div>
-</div></div>
+</div>
+<div class="tab-pane" id="tab-id">
+<p class="text-secondary">Identitas terverifikasi manusia — OCR tidak pernah dianggap terverifikasi otomatis.</p>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Jenis</th><th>Nama</th><th>NIK akhir</th><th>Terverifikasi</th><th></th></tr></thead>
+<tbody>{{range .Data.Identities}}<tr><td>{{.IDType}}</td><td>{{.FullName}}</td><td>•••• {{.NIKLast4}}</td><td>{{.Verified}}</td>
+<td>{{if $.Data.CanVerify}}{{if not .Verified}}<form method="post" action="/identities/{{.ID}}/verify">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">Verifikasi</button></form>{{end}}{{end}}</td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Belum ada identitas.</td></tr>{{end}}</tbody></table></div>
+<form method="post" action="/clients/{{.Data.Client.ID}}/identities"><div class="row">
+{{template "csrf" .}}
+<div class="col-md-3 mb-2"><select class="form-select" name="id_type"><option value="KTP">KTP</option><option value="KK">KK</option><option value="NPWP">NPWP</option><option value="PASSPORT">Paspor</option><option value="OTHER">Lainnya</option></select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="nik" placeholder="NIK/NPWP (terenkripsi)"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="full_name" placeholder="Nama sesuai identitas" required/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Tambah</button></div>
+</div></form>
+</div>
+<div class="tab-pane" id="tab-doc">
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Nama</th><th>Ukuran</th><th>OCR</th><th></th></tr></thead>
+<tbody>{{range .Data.Files}}<tr><td><a href="/files/{{.ID}}">{{.Name}}</a></td><td>{{.Size}}</td><td>{{.OCRStatus}}</td>
+<td><div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/files/{{.ID}}">Unduh</a><form method="post" action="/files/{{.ID}}/ocr">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Jalankan OCR</button></form></div></td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada berkas.</td></tr>{{end}}</tbody></table></div>
+<form method="post" action="/clients/{{.Data.Client.ID}}/files" enctype="multipart/form-data"><div class="d-flex gap-2">
+{{template "csrf" .}}<input class="form-control" type="file" name="file" required/><button class="btn btn-primary" type="submit">Unggah</button>
+</div></form>
+</div>
+<div class="tab-pane" id="tab-svc">
+<div class="list-group list-group-flush">{{range .Data.Services}}<a class="list-group-item" href="/requests/{{.ID}}"><span class="badge bg-blue-lt me-2">{{.Status}}</span>{{.Title}} <span class="text-secondary">· {{.Service}}</span></a>{{else}}<div class="list-group-item text-secondary">Belum ada permohonan.</div>{{end}}</div>
+</div>
+<div class="tab-pane" id="tab-act">
+<div class="list-group list-group-flush">{{range .Data.Trail}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.Action}}</span><span class="text-secondary small">{{.At}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada jejak audit.</div>{{end}}</div>
+</div>
+</div></div></div>
 {{template "page_close" .}}{{end}}

@@ -6,6 +6,7 @@
 <meta name="description" content="NOTARIUS — Sistem Manajemen Kantor Notaris Indonesia. Kelola klien, akta, repertorium, protokol, dan keuangan dengan aman."/>
 <title>{{.Title}} — NOTARIUS</title>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
+<link rel="stylesheet" href="/assets/notarius/tokens.css"/>
 <script src="/assets/vendor/htmx.min.js"></script>
 </head>{{end}}
 
@@ -17,32 +18,34 @@
 <form method="get" action="/search" class="px-3 mb-2"><input class="form-control" name="q" placeholder="Cari klien/akta…"/></form>
 <ul class="navbar-nav pt-lg-3" id="mainnav">
 <li class="nav-item"><span class="nav-link disabled text-uppercase small">Workspace</span></li>
-<li class="nav-item"><a class="nav-link" href="/app">Dashboard</a></li>
-<li class="nav-item"><a class="nav-link" href="/appointments">Janji Temu</a></li>
-<li class="nav-item"><a class="nav-link" href="/tasks">Tugas</a></li>
-<li class="nav-item"><a class="nav-link" href="/documents">Dokumen</a></li>
-{{if can .Role "client.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Klien</span></li>
-<li class="nav-item"><a class="nav-link" href="/clients">Klien</a></li>
-<li class="nav-item"><a class="nav-link" href="/portal">Portal Klien</a></li>{{end}}
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Layanan & Akta</span></li>
-<li class="nav-item"><a class="nav-link" href="/requests">Permohonan</a></li>
-<li class="nav-item"><a class="nav-link" href="/deeds">Akta</a></li>
-{{if can .Role "template.manage"}}<li class="nav-item"><a class="nav-link" href="/templates">Template</a></li>{{end}}
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Register</span></li>
-{{if can .Role "repertorium.manage"}}<li class="nav-item"><a class="nav-link" href="/repertorium">Repertorium</a></li>{{end}}
-{{if can .Role "protocol.view"}}<li class="nav-item"><a class="nav-link" href="/protocols">Protokol</a></li>{{end}}
-{{if can .Role "legalization.process"}}<li class="nav-item"><a class="nav-link" href="/legalisasi">Legalisasi</a></li>{{end}}
-<li class="nav-item"><a class="nav-link" href="/wills">Wasiat</a></li>
-<li class="nav-item"><a class="nav-link" href="/gov">AHU &amp; OSS</a></li>
+<li class="nav-item"><a class="nav-link" href="/app">🏠 Dashboard</a></li>
+<li class="nav-item"><a class="nav-link" href="/appointments">📅 Janji Temu</a></li>
+<li class="nav-item"><a class="nav-link" href="/tasks">☰ Tugas</a></li>
+<li class="nav-item"><a class="nav-link" href="/documents">📁 Dokumen</a></li>
+{{if can .Role "client.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Manajemen Klien</span></li>
+<li class="nav-item"><a class="nav-link" href="/clients">👥 Daftar Klien{{if .Pending}}<span class="badge bg-yellow text-dark ms-auto">{{.Pending}}</span>{{end}}</a></li>
+<li class="nav-item"><a class="nav-link" href="/portal">🖥 Portal Klien</a></li>{{end}}
+<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Layanan Notaris</span></li>
+<li class="nav-item"><a class="nav-link" href="/requests">🧾 Permohonan{{if .Pending}}<span class="badge bg-red ms-auto">{{.Pending}}</span>{{end}}</a></li>
+<li class="nav-item"><a class="nav-link" href="/deeds">📝 Akta</a></li>
+{{if can .Role "template.manage"}}<li class="nav-item"><a class="nav-link" href="/templates">📄 Template</a></li>{{end}}
+<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Register & Protokol</span></li>
+{{if can .Role "repertorium.manage"}}<li class="nav-item"><a class="nav-link" href="/repertorium">📚 Repertorium</a></li>{{end}}
+{{if can .Role "protocol.view"}}<li class="nav-item"><a class="nav-link" href="/protocols">🗄 Arsip Protokol</a></li>{{end}}
+{{if can .Role "legalization.process"}}<li class="nav-item"><a class="nav-link" href="/legalisasi">✅ Legalisasi</a></li>{{end}}
+<li class="nav-item"><a class="nav-link" href="/wills">🕊 Wasiat</a></li>
+<li class="nav-item"><a class="nav-link" href="/gov">🏛 AHU &amp; OSS</a></li>
 {{if can .Role "finance.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Keuangan</span></li>
-<li class="nav-item"><a class="nav-link" href="/finance">Keuangan</a></li>
-<li class="nav-item"><a class="nav-link" href="/expenses">Pengeluaran</a></li>
-<li class="nav-item"><a class="nav-link" href="/tariffs">Tarif</a></li>{{end}}
-{{if can .Role "reports.view"}}<li class="nav-item"><a class="nav-link" href="/reports">Laporan</a></li>
-<li class="nav-item"><a class="nav-link" href="/audit">Audit Log</a></li>{{end}}
-{{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">Kantor</a></li>{{end}}
-<li class="nav-item"><a class="nav-link" href="/settings">Pengaturan</a></li>
-{{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">Role & Permission</a></li>{{end}}
+<li class="nav-item"><a class="nav-link" href="/finance">💰 Invoice</a></li>
+<li class="nav-item"><a class="nav-link" href="/expenses">💸 Pengeluaran</a></li>
+<li class="nav-item"><a class="nav-link" href="/tariffs">🏷 Tarif</a></li>{{end}}
+{{if can .Role "reports.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Laporan</span></li>
+<li class="nav-item"><a class="nav-link" href="/reports">📊 Laporan</a></li>
+<li class="nav-item"><a class="nav-link" href="/audit">📜 Audit Log</a></li>{{end}}
+<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Pengaturan</span></li>
+{{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">🏢 Kantor</a></li>{{end}}
+<li class="nav-item"><a class="nav-link" href="/settings">⚙ Pengaturan</a></li>
+{{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">🔑 Role & Permission</a></li>{{end}}
 </ul>
 <div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>
 <form method="post" action="/logout" class="px-3 pb-3">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>
@@ -59,9 +62,29 @@
 {{template "sidebar" .}}
 <div class="page-wrapper">
 <header class="navbar navbar-expand-md d-print-none"><div class="container-xl d-flex align-items-center gap-2 py-2">
+<nav aria-label="breadcrumb" class="d-none d-lg-block"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/app">Beranda</a></li><li class="breadcrumb-item active">{{.Title}}</li></ol></nav>
 <form method="get" action="/search" class="flex-fill d-none d-md-block"><div class="input-icon"><span class="input-icon-addon">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…"/></div></form>
+<div class="dropdown">
+<button class="btn btn-primary" data-bs-toggle="dropdown">+ Buat</button>
+<div class="dropdown-menu dropdown-menu-end">
+{{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Klien Baru</a>{{end}}
+<a class="dropdown-item" href="/requests">🧾 Permohonan Baru</a>
+{{if can .Role "deed.draft"}}<a class="dropdown-item" href="/deeds">📝 Draft Akta</a>{{end}}
+{{if can .Role "legalization.process"}}<a class="dropdown-item" href="/legalisasi">✅ Register Baru</a>{{end}}
+{{if can .Role "finance.manage"}}<a class="dropdown-item" href="/finance">💰 Invoice Baru</a>{{end}}
+</div>
+</div>
 <a class="btn btn-ghost-secondary" href="/tasks" title="Tugas">☰</a>
-<form method="post" action="/notifications/read" class="d-inline">{{template "csrf" .}}<button class="btn btn-ghost-secondary" type="submit" title="Notifikasi">🔔</button></form>
+<div class="dropdown">
+<a href="#" class="btn btn-ghost-secondary position-relative" data-bs-toggle="dropdown" title="Notifikasi">🔔{{if .Unread}}<span class="badge bg-red position-absolute top-0 start-100 translate-middle">{{.Unread}}</span>{{end}}</a>
+<div class="dropdown-menu dropdown-menu-end" style="width:320px">
+<div class="dropdown-header">Notifikasi</div>
+{{range .TopNotifs}}<div class="dropdown-item-text"><div>{{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
+{{else}}<div class="dropdown-item-text text-secondary">Tidak ada notifikasi.</div>{{end}}
+<div class="dropdown-divider"></div>
+<form method="post" action="/notifications/read" class="px-3 pb-2">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary w-100" type="submit">Tandai semua dibaca</button></form>
+</div>
+</div>
 <div class="dropdown">
 <a href="#" class="d-flex align-items-center gap-2 text-decoration-none text-body" data-bs-toggle="dropdown"><span class="avatar avatar-rounded">{{if .UserName}}{{slice .UserName 0 1}}{{else}}?{{end}}</span><span class="d-none d-md-block"><strong>{{.UserName}}</strong><br/><span class="small text-secondary">{{.Role}}</span></span></a>
 <div class="dropdown-menu dropdown-menu-end">

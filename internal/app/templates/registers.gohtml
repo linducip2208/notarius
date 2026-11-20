@@ -1,4 +1,6 @@
 {{define "requests"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Permohonan Layanan</li></ol></nav>
+{{if .Data.ClientName}}<div class="alert alert-info">Filter klien: <strong>{{.Data.ClientName}}</strong> <a href="/requests">✕ tampilkan semua</a></div>{{end}}
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Baru</h3></div>
 <form method="post" action="/requests">{{template "csrf" .}}<div class="card-body row">
 <div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>

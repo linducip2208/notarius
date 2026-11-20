@@ -84,14 +84,15 @@ func (s *Store) FindDuplicates(officeID int64, name, phone string) ([]DuplicateC
 
 // List returns clients with optional search, newest first.
 func (s *Store) List(officeID int64, q string, limit int) ([]Client, error) {
-	out, _, _ := s.ListFiltered(officeID, q, "", limit, 0)
+	out, _, _ := s.ListFiltered(officeID, q, "", limit, 0, "")
 	return out, nil
 }
 
 // ListFiltered adds kind filter + offset pagination. Returns rows + total.
-func (s *Store) ListFiltered(officeID int64, q, kind string, limit, offset int) ([]Client, int, error) {
+// sort: "" (newest), "name_asc", "name_desc".
+func (s *Store) ListFiltered(officeID int64, q, kind string, limit, offset int, sort string) ([]Client, int, error) {
 	if limit <= 0 || limit > 200 {
-		limit = 50
+		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
@@ -109,8 +110,15 @@ func (s *Store) ListFiltered(officeID int64, q, kind string, limit, offset int) 
 	}
 	var total int
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM clients`+where, args...).Scan(&total)
-	rows, err := s.db.Query(`SELECT id, office_id, kind, full_name, email, phone, address, npwp, created_at
-		FROM clients`+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, append(args, limit, offset)...)
+	order := ` ORDER BY id DESC`
+	if sort == "name_asc" {
+		order = ` ORDER BY full_name ASC`
+	} else if sort == "name_desc" {
+		order = ` ORDER BY full_name DESC`
+	}
+	rows, err := s.db.Query(`SELECT id, office_id, kind, full_name, email, phone, address, npwp,
+		DATE_FORMAT(CONVERT_TZ(created_at,'+00:00','+07:00'),'%d %b %Y %H:%i')
+		FROM clients`+where+order+` LIMIT ? OFFSET ?`, append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
