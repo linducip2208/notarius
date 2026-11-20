@@ -1,0 +1,136 @@
+-- 002_clients.sql — clients, identities, service catalog, requests, appointments, companies
+CREATE TABLE IF NOT EXISTS clients (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  office_id BIGINT UNSIGNED NOT NULL,
+  kind ENUM('individual','corporate') NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(50) NOT NULL,
+  address TEXT NULL,
+  npwp VARCHAR(32) NULL,
+  consent_at TIMESTAMP NULL,
+  consent_note VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE RESTRICT,
+  INDEX idx_clients_name (full_name),
+  INDEX idx_clients_phone (phone)
+);
+
+CREATE TABLE IF NOT EXISTS identities (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  client_id BIGINT UNSIGNED NOT NULL,
+  id_type ENUM('KTP','KK','NPWP','PASSPORT','OTHER') NOT NULL,
+  -- Encrypted at application layer (AES-256-GCM); never plaintext NIK in prod.
+  nik_cipher TEXT NULL,
+  nik_last4 CHAR(4) NULL,
+  full_name VARCHAR(255) NOT NULL,
+  birth_place VARCHAR(100) NULL,
+  birth_date DATE NULL,
+  verified TINYINT(1) NOT NULL DEFAULT 0,
+  verified_by BIGINT UNSIGNED NULL,
+  verified_at TIMESTAMP NULL,
+  ocr_result_id VARCHAR(100) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_identities_client (client_id)
+);
+
+CREATE TABLE IF NOT EXISTS client_representatives (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  client_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  position VARCHAR(150) NULL,
+  phone VARCHAR(50) NULL,
+  authority_note VARCHAR(500) NULL,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS services (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  category ENUM('corporate','agreement','will','legalization','deed','other') NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  base_price DECIMAL(18,2) NOT NULL DEFAULT 0,
+  requirements JSON NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS service_requests (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  office_id BIGINT UNSIGNED NOT NULL,
+  client_id BIGINT UNSIGNED NOT NULL,
+  service_id BIGINT UNSIGNED NOT NULL,
+  status ENUM('DRAFT','SUBMITTED','IN_REVIEW','NEED_DOCS','APPROVED','IN_PROGRESS','COMPLETED','REJECTED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
+  title VARCHAR(255) NOT NULL,
+  notes TEXT NULL,
+  assignee_id BIGINT UNSIGNED NULL,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE RESTRICT,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE RESTRICT,
+  FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT,
+  FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_req_status (status),
+  INDEX idx_req_client (client_id)
+);
+
+CREATE TABLE IF NOT EXISTS request_events (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  request_id BIGINT UNSIGNED NOT NULL,
+  actor_id BIGINT UNSIGNED NULL,
+  from_status VARCHAR(30) NULL,
+  to_status VARCHAR(30) NOT NULL,
+  note VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (request_id) REFERENCES service_requests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS appointments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  office_id BIGINT UNSIGNED NOT NULL,
+  client_id BIGINT UNSIGNED NOT NULL,
+  request_id BIGINT UNSIGNED NULL,
+  scheduled_at TIMESTAMP NOT NULL,
+  purpose VARCHAR(255) NOT NULL,
+  status ENUM('SCHEDULED','DONE','CANCELLED','NOSHOW') NOT NULL DEFAULT 'SCHEDULED',
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE RESTRICT,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  INDEX idx_appt_time (scheduled_at)
+);
+
+CREATE TABLE IF NOT EXISTS companies (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  request_id BIGINT UNSIGNED NULL,
+  entity_type ENUM('PT','CV','Firma','Yayasan','Koperasi','Perkumpulan') NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  domicile VARCHAR(255) NULL,
+  address TEXT NULL,
+  authorized_capital DECIMAL(18,2) NOT NULL DEFAULT 0,
+  issued_capital DECIMAL(18,2) NOT NULL DEFAULT 0,
+  paid_capital DECIMAL(18,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (request_id) REFERENCES service_requests(id) ON DELETE SET NULL,
+  INDEX idx_company_name (name)
+);
+
+CREATE TABLE IF NOT EXISTS shareholders (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT UNSIGNED NOT NULL,
+  client_id BIGINT UNSIGNED NULL,
+  name VARCHAR(255) NOT NULL,
+  shares INT NOT NULL DEFAULT 0,
+  nominal_per_share DECIMAL(18,2) NOT NULL DEFAULT 0,
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS company_officers (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  company_id BIGINT UNSIGNED NOT NULL,
+  role ENUM('DIREKTUR','KOMISARIS','PENGURUS','PENGAWAS','SEKUTU') NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  title VARCHAR(150) NULL,
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+);

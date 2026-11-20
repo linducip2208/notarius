@@ -1,0 +1,16 @@
+{{define "login"}}{{template "head" .}}
+<body class="d-flex flex-column">
+<div class="page page-center"><div class="container container-tight py-4">
+<div class="text-center mb-4"><h1>NOTARYOS</h1><p class="text-secondary">Sistem Manajemen Kantor Notaris Indonesia</p></div>
+<form class="card card-md" method="post" action="/login">
+<div class="card-body">
+<h2 class="card-title text-center mb-4">Masuk ke akun Anda</h2>
+{{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
+<div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{if .Data}}{{.Data.Email}}{{end}}" required/></div>
+<div class="mb-3"><label class="form-label">Kata sandi</label><input class="form-control" type="password" name="password" required/></div>
+<button class="btn btn-primary w-100" type="submit">Masuk</button>
+</div>
+</form>
+<p class="text-center text-secondary mt-3">Akses dilindungi RBAC &amp; audit log. Sesi kedaluwarsa otomatis.</p>
+</div></div>
+</body></html>{{end}}

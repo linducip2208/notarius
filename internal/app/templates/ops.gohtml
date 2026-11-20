@@ -1,0 +1,135 @@
+{{define "legalisasi"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Register Baru</h3></div>
+<form method="post" action="/legalisasi">{{template "csrf" .}}<div class="card-body row">
+<div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="LEGALISASI">Legalisasi</option><option value="WAARMERKING">Waarmerking</option><option value="SALINAN">Salinan</option><option value="KUTIPAN">Kutipan</option></select></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="register_no" placeholder="No. register" required/></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="doc_title" placeholder="Judul dokumen" required/></div>
+<div class="col-md-1 mb-2"><input class="form-control" name="fee" placeholder="Biaya" value="0"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Buku Register</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jenis</th><th>No. Register</th><th>Dokumen</th><th>Biaya</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.Kind}}</td><td>{{.Reg}}</td><td>{{.Title}}</td><td>{{.Fee}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada register.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "gov"}}{{template "head" .}}{{template "page_open" .}}
+<div class="alert alert-info">Alur <strong>asistensi</strong>: data disiapkan di NOTARYOS, pengisian dilakukan manual oleh staf berwenang di portal resmi, lalu bukti diarsipkan di sini. Tidak ada endpoint pemerintah yang diinventarisasi.</div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pengajuan Baru</h3></div>
+<form method="post" action="/gov"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><select class="form-select" name="channel"><option value="AHU">AHU</option><option value="OSS">OSS</option></select></div>
+<div class="col-md-7 mb-2"><input class="form-control" name="reference" placeholder="Referensi (mis. PT Maju Jaya — pendirian)" required/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Pengajuan AHU / OSS</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Kanal</th><th>Referensi</th><th>Status</th><th>Bukti</th><th>Ubah</th></tr></thead>
+<tbody>{{range .Data.Subs}}<tr><td>{{.ID}}</td><td>{{.Channel}}</td><td>{{.Reference}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td>{{.ReceiptNo}}</td>
+<td><form method="post" action="/gov/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}
+<select class="form-select form-select-sm" name="to"><option value="READY">READY</option><option value="SUBMITTED">SUBMITTED</option><option value="ACCEPTED">ACCEPTED</option><option value="REJECTED">REJECTED</option></select>
+<input class="form-control form-control-sm" name="receipt_no" placeholder="No. bukti"/>
+<button class="btn btn-sm btn-primary" type="submit">OK</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengajuan.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "finance"}}{{template "head" .}}{{template "page_open" .}}
+<div class="row row-deck row-cards mb-3">
+<div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Piutang berjalan</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
+<div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Penerimaan {{.Data.Month}}</div><div class="h1">Rp {{.Data.Revenue}}</div></div></div></div>
+</div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Invoice Baru</h3></div>
+<form method="post" action="/invoices">{{template "csrf" .}}<div class="card-body">
+<div class="row"><div class="col-md-4 mb-2"><input class="form-control" name="number" placeholder="Nomor invoice" required/></div>
+<div class="col-md-4 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="date" name="due_date"/></div></div>
+<div class="row"><div class="col-md-6 mb-2"><input class="form-control" name="desc[]" placeholder="Uraian baris 1"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="qty[]" placeholder="Qty" value="1"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="price[]" placeholder="Harga satuan" value="0"/></div></div>
+<div class="row"><div class="col-md-6 mb-2"><input class="form-control" name="desc[]" placeholder="Uraian baris 2"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="qty[]" placeholder="Qty" value=""/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="price[]" placeholder="Harga satuan" value=""/></div></div>
+<div class="row"><div class="col-md-6 mb-2"><input class="form-control" name="desc[]" placeholder="Uraian baris 3"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="qty[]" placeholder="Qty" value=""/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="price[]" placeholder="Harga satuan" value=""/></div></div>
+<div class="text-end"><button class="btn btn-primary" type="submit">Terbitkan (PPN 11%)</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Daftar Invoice</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nomor</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Status</th><th>Bayar</th></tr></thead>
+<tbody>{{range .Data.Invoices}}<tr><td>{{.Number}}</td><td>{{.Total}}</td><td>{{.Paid}}</td><td>{{.Outstanding}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
+<td><form method="post" action="/payments" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal"/><select class="form-select form-select-sm" name="method"><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="QRIS">QRIS</option><option value="OTHER">OTHER</option></select><button class="btn btn-sm btn-primary" type="submit">Catat</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada invoice.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "templates"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru</h3></div>
+<form method="post" action="/templates"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><input class="form-control" name="name" placeholder="Nama template" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="category" placeholder="Kategori" value="Umum"/></div>
+<div class="col-md-5 mb-2"><input class="form-control" name="body" placeholder='Isi dengan {{"{{"}}nama{{"}}"}} …'/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Template Dokumen</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Kategori</th><th>Versi</th><th>Disetujui</th><th></th></tr></thead>
+<tbody>{{range .Data.Templates}}<tr><td><a href="/templates/{{.ID}}">{{.Name}}</a></td><td>{{.Category}}</td><td>{{.Version}}</td><td>{{.Approved}}</td><td><a class="btn btn-sm btn-ghost-primary" href="/templates/{{.ID}}">Editor</a></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada template. Template hanya berlaku setelah disetujui notaris.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Klausul Baku</h3></div>
+<div class="card-body">{{range .Data.Clauses}}<div class="mb-2"><strong>{{.Title}}</strong> <span class="text-secondary">{{.Tags}} · approved={{.Approved}}</span></div>{{else}}<p class="text-secondary">Belum ada klausul.</p>{{end}}
+<form method="post" action="/clauses" class="row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><input class="form-control" name="title" placeholder="Judul klausul" required/></div>
+<div class="col-md-5 mb-2"><input class="form-control" name="body" placeholder="Isi klausul" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="tags" placeholder="tag1,tag2"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div></form></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "reports"}}{{template "head" .}}{{template "page_open" .}}
+<div class="row row-deck row-cards">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu</div><div class="h1">{{.Data.Pending}}</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Aktif</div><div class="h1">{{.Data.Active}}</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Selesai</div><div class="h1">{{.Data.Completed}}</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Piutang</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
+</div>
+<p class="text-secondary mt-3">Seluruh angka dihitung dari query database — tanpa data fabrikasi.</p>
+{{template "page_close" .}}{{end}}
+
+{{define "settings"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-header"><h3 class="card-title">Pengguna Kantor</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Aktif</th><th>Taut klien</th></tr></thead>
+<tbody>{{range .Data.Users}}<tr><td>{{.Name}}</td><td>{{.Email}}</td><td>{{.Role}}</td><td>{{.IsActive}}</td>
+<td><form method="post" action="/users/{{.ID}}/link" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="client_id" placeholder="ID klien"/><button class="btn btn-sm btn-ghost-primary" type="submit">Taut</button></form></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada pengguna.</td></tr>{{end}}</tbody></table></div>
+<div class="card-body border-top"><h4>Tambah Pengguna</h4>
+<form method="post" action="/users" class="row">{{template "csrf" .}}
+<div class="col-md-2 mb-2"><input class="form-control" name="name" placeholder="Nama" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" type="email" name="email" placeholder="Email" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="phone" placeholder="Telepon"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="password" name="password" placeholder="Kata sandi (min 8)" required/></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="role">{{range $.Data.Roles}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div></form></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Peran tersedia</h3></div><div class="card-body">{{range .Data.Roles}}<span class="badge bg-azure-lt me-1">{{.}}</span>{{end}}</div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Keamanan Akun</h3></div><div class="card-body"><a class="btn btn-outline-primary" href="/mfa">Aktifkan / Kelola MFA (TOTP)</a></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "wills"}}{{template "head" .}}{{template "page_open" .}}
+<div class="alert alert-warning">Data wasiat bersifat <strong>terbatas</strong> — hanya notaris, notaris pengganti, dan auditor.</div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pendaftaran Wasiat</h3></div>
+<form method="post" action="/wills"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-5 mb-2"><select class="form-select" name="client_id" required><option value="">— Pewasiat —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-5 mb-2"><input class="form-control" name="register_no" placeholder="Nomor register wasiat" required/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Daftar</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Register Wasiat</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Klien</th><th>No. Register</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.Wills}}<tr><td>{{.ID}}</td><td>{{.ClientID}}</td><td>{{.RegisterNo}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "portal"}}{{template "head" .}}{{template "page_open" .}}
+<div class="alert alert-info">Portal klien: setiap akun hanya dapat melihat dokumen dan permohonannya sendiri (penegakan di sisi server).</div>
+{{if .Data.Mine}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan Saya</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.Mine}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>{{end}}</tbody></table></div></div>
+{{else if .Data.Requests}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan (staf)</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Klien</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.Requests}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td>{{.ClientName}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>{{end}}</tbody></table></div></div>
+{{else}}<div class="card"><div class="card-body"><p class="text-secondary">{{.Data.Note}}</p></div></div>{{end}}
+{{template "page_close" .}}{{end}}

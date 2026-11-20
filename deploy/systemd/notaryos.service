@@ -1,0 +1,17 @@
+[Unit]
+Description=NOTARYOS Notary Office Management
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=notaryos
+WorkingDirectory=/opt/notaryos
+EnvironmentFile=/etc/notaryos/env
+ExecStart=/opt/notaryos/bin/notaryos
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

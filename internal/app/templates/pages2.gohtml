@@ -1,0 +1,95 @@
+{{define "mfa"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-header"><h3 class="card-title">Autentikasi Dua Faktor (TOTP)</h3></div>
+<div class="card-body">
+{{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
+{{if .Data.Enabled}}<div class="alert alert-success">MFA sudah aktif untuk akun Anda.</div>{{end}}
+<p class="text-secondary">Pindai ke aplikasi autentikator (Google/Microsoft Authenticator), lalu masukkan 6 digit kode.</p>
+{{if .Data.Secret}}<p>Secret (bila QR tak terbaca): <code>{{.Data.Secret}}</code></p>
+<p class="text-secondary small">otpauth URI: <code>{{.Data.URI}}</code></p>{{end}}
+<form method="post" action="/mfa">{{template "csrf" .}}
+<input type="hidden" name="secret" value="{{.Data.Secret}}"/>
+<div class="mb-3"><label class="form-label">Kode 6 digit</label><input class="form-control" name="code" maxlength="6" required/></div>
+<button class="btn btn-primary" type="submit">Aktifkan MFA</button></form>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "mfa_verify"}}{{template "head" .}}
+<body class="d-flex flex-column"><div class="page page-center"><div class="container container-tight py-4">
+<form class="card card-md" method="post" action="/mfa/verify"><div class="card-body">
+<h2 class="card-title text-center mb-4">Verifikasi MFA</h2>
+{{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
+<div class="mb-3"><label class="form-label">Kode autentikator</label><input class="form-control" name="code" maxlength="6" required/></div>
+<button class="btn btn-primary w-100" type="submit">Verifikasi</button>
+</div></form></div></div></body></html>{{end}}
+
+{{define "request_detail"}}{{template "head" .}}{{template "page_open" .}}
+<div class="row"><div class="col-md-7">
+<div class="card"><div class="card-header"><h3 class="card-title">#{{.Data.Req.ID}} — {{.Data.Req.Title}}</h3></div>
+<div class="card-body"><dl class="row">
+<dt class="col-4">Klien</dt><dd class="col-8"><a href="/clients/{{.Data.Req.ClientID}}">{{.Data.Req.ClientName}}</a></dd>
+<dt class="col-4">Layanan</dt><dd class="col-8">{{.Data.Req.Service}}</dd>
+<dt class="col-4">Status</dt><dd class="col-8"><span class="badge bg-blue-lt">{{.Data.Req.Status}}</span></dd>
+<dt class="col-4">Catatan</dt><dd class="col-8">{{.Data.Req.Notes}}</dd>
+</dl>
+<form method="post" action="/requests/{{.Data.Req.ID}}/move" class="d-flex gap-1">{{template "csrf" .}}
+<select class="form-select" name="to"><option value="SUBMITTED">SUBMITTED</option><option value="IN_REVIEW">IN_REVIEW</option><option value="NEED_DOCS">NEED_DOCS</option><option value="APPROVED">APPROVED</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="CANCELLED">CANCELLED</option></select>
+<input class="form-control" name="note" placeholder="Catatan perubahan"/>
+<button class="btn btn-primary" type="submit">Ubah Status</button></form></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Data Korporat</h3></div>
+<form method="post" action="/requests/{{.Data.Req.ID}}/corp"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><select class="form-select" name="entity_type"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Yayasan">Yayasan</option><option value="Koperasi">Koperasi</option><option value="Perkumpulan">Perkumpulan</option></select></div>
+<div class="col-md-8 mb-2"><input class="form-control" name="name" placeholder="Nama badan usaha" value="{{.Data.Company.Name}}" required/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="domicile" placeholder="Kedudukan" value="{{.Data.Company.Domicile}}"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="address" placeholder="Alamat" value="{{.Data.Company.Address}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="authorized" placeholder="Modal dasar" value="{{.Data.Company.Authorized}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="issued" placeholder="Modal ditempatkan" value="{{.Data.Company.Issued}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="paid" placeholder="Modal disetor" value="{{.Data.Company.Paid}}"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan Korporat</button></div>
+</div></form></div>
+<div class="row"><div class="col-md-6"><div class="card mt-3"><div class="card-header"><h3 class="card-title">Pemegang Saham</h3></div>
+<div class="card-body">{{range .Data.Shareholders}}<div class="mb-1">{{.Name}} — {{.Shares}} lbr @ {{.Nominal}}</div>{{else}}<p class="text-secondary">Belum ada.</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/shareholders">{{template "csrf" .}}
+<div class="mb-2"><input class="form-control" name="name" placeholder="Nama" required/></div>
+<div class="row"><div class="col-6 mb-2"><input class="form-control" name="shares" placeholder="Lembar" value="1"/></div>
+<div class="col-6 mb-2"><input class="form-control" name="nominal" placeholder="Nominal/lbr" value="0"/></div></div>
+<button class="btn btn-sm btn-primary w-100" type="submit">Tambah</button></form></div></div></div>
+<div class="col-md-6"><div class="card mt-3"><div class="card-header"><h3 class="card-title">Pengurus</h3></div>
+<div class="card-body">{{range .Data.Officers}}<div class="mb-1"><span class="badge bg-azure-lt">{{.Role}}</span> {{.Name}} {{.Title}}</div>{{else}}<p class="text-secondary">Belum ada.</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/officers">{{template "csrf" .}}
+<div class="mb-2"><select class="form-select" name="role"><option value="DIREKTUR">DIREKTUR</option><option value="KOMISARIS">KOMISARIS</option><option value="PENGURUS">PENGURUS</option><option value="PENGAWAS">PENGAWAS</option><option value="SEKUTU">SEKUTU</option></select></div>
+<div class="mb-2"><input class="form-control" name="name" placeholder="Nama" required/></div>
+<div class="mb-2"><input class="form-control" name="title" placeholder="Jabatan (Dir. Utama, dsb)"/></div>
+<button class="btn btn-sm btn-primary w-100" type="submit">Tambah</button></form></div></div></div>
+</div>
+<div class="col-md-5">
+<div class="card"><div class="card-header"><h3 class="card-title">Linimasa</h3></div>
+<div class="card-body">{{range .Data.Req.Events}}<div class="mb-2"><span class="badge bg-blue-lt">{{.From}} → {{.To}}</span> <span class="text-secondary">{{.Actor}} · {{.At}}</span><div>{{.Note}}</div></div>{{else}}<p class="text-secondary">Belum ada peristiwa.</p>{{end}}</div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Pengajuan AHU/OSS terkait</h3></div>
+<div class="card-body">{{range .Data.Gov}}<div class="mb-1">{{.Channel}} — {{.Reference}} ({{.Status}})</div>{{else}}<p class="text-secondary">Belum ada. Buat dari halaman AHU &amp; OSS.</p>{{end}}</div></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "appointments"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Jadwalkan Kunjungan</h3></div>
+<form method="post" action="/appointments"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="datetime-local" name="scheduled_at" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="purpose" placeholder="Keperluan" required/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Janji Temu</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jadwal</th><th>Klien</th><th>Keperluan</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.List}}<tr><td>{{.At}}</td><td>{{.ClientID}}</td><td>{{.Purpose}}</td><td>{{.Status}}</td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada janji.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "template_edit"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-header"><h3 class="card-title">{{.Data.T.Name}} (v{{.Data.T.Version}} · approved={{.Data.T.Approved}})</h3></div>
+<div class="card-body">
+<div class="alert alert-info">Variabel tersedia: {{range .Data.Vars}}<code>{{.}}</code> {{end}}</div>
+{{if .Data.Missing}}<div class="alert alert-warning">Variabel contoh belum diisi: {{range .Data.Missing}}<code>{{.}}</code> {{end}}</div>{{end}}
+<h4>Pratinjau (DRAFT)</h4>
+<pre class="p-3 bg-light border rounded">{{.Data.Preview}}</pre>
+<form method="post" action="/templates/{{.Data.T.ID}}/approve">{{template "csrf" .}}<button class="btn btn-success" type="submit">Setujui sebagai Notaris</button></form>
+</div></div>
+{{template "page_close" .}}{{end}}

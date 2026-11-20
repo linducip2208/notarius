@@ -1,0 +1,223 @@
+// Package integration runs against a REAL MySQL test database.
+// Set NOTARYOS_TEST_DSN (e.g. "user:pass@tcp(127.0.0.1:3306)/notaryos_test?parseTime=true&loc=UTC").
+// Without it, tests skip. Mocked DBs are never accepted as MySQL proof.
+package integration
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"testing"
+
+	_ "github.com/go-sql-driver/mysql"
+	"notaryos/internal/clients"
+	"notaryos/internal/deeds"
+	"notaryos/internal/finance"
+	"notaryos/internal/gov"
+	"notaryos/internal/requests"
+	"notaryos/internal/users"
+)
+
+var db *sql.DB
+
+func TestMain(m *testing.M) {
+	dsn := os.Getenv("NOTARYOS_TEST_DSN")
+	if dsn == "" {
+		fmt.Println("SKIP: NOTARYOS_TEST_DSN not set")
+		os.Exit(0)
+	}
+	var err error
+	db, err = sql.Open("mysql", dsn)
+	if err != nil {
+		fmt.Println("SKIP: cannot open test db:", err)
+		os.Exit(0)
+	}
+	if err := db.Ping(); err != nil {
+		fmt.Println("SKIP: cannot ping test db:", err)
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+func clean(t *testing.T) {
+	t.Helper()
+	if _, err := db.Exec("SET FOREIGN_KEY_CHECKS=0"); err != nil {
+		t.Fatal(err)
+	}
+	tables := []string{"payments", "invoice_lines", "invoices", "deed_versions", "signatures",
+		"deed_drafts", "gov_submissions", "request_events", "appointments", "service_requests",
+		"shareholders", "company_officers", "companies", "identities", "client_representatives",
+		"user_client_links", "ai_results", "files", "legalizations", "wills", "notifications",
+		"login_attempts", "audit_logs", "users", "clients", "offices"}
+	for _, tb := range tables {
+		if _, err := db.Exec("DELETE FROM " + tb); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec("SET FOREIGN_KEY_CHECKS=1"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedOffice(t *testing.T) int64 {
+	t.Helper()
+	res, err := db.Exec(`INSERT INTO offices(name, notary_name, sk_number, address, phone, email)
+		VALUES('T-Office','T Notaris','SK-T','Jl T','021','t@t.id')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _ := res.LastInsertId()
+	return id
+}
+
+func TestUsersAuthenticate(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	us := users.NewStore(db)
+	uid, err := us.Create(&office, "office_admin", "Test Admin", "testadmin@t.id", "", "Rahasia123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := us.Authenticate("testadmin@t.id", "Rahasia123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.ID != uid || u.Role != "office_admin" {
+		t.Fatalf("wrong user: %+v", u)
+	}
+	if _, err := us.Authenticate("testadmin@t.id", "salah"); err == nil {
+		t.Fatal("wrong password must fail")
+	}
+	if err := us.LinkClient(uid, 999999); err != nil {
+		t.Fatal("link should ignore-missing gracefully:", err)
+	}
+}
+
+func TestClientsDuplicates(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := clients.NewStore(db)
+	id, err := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "Budi Santoso", Phone: "0811000011"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dups, err := cs.FindDuplicates(office, "Budi Santoso", "0811000011")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dups) == 0 {
+		t.Fatal("expected duplicate by same phone")
+	}
+	iid, err := cs.AddIdentity(id, "KTP", "3174051209900001", "Budi Santoso")
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := users.NewStore(db).Create(&office, "staff", "Verifier", "ver@t.id", "", "Rahasia123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cs.VerifyIdentity(iid, uid); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := cs.Identities(id)
+	if err != nil || len(ids) != 1 || !ids[0].Verified {
+		t.Fatalf("identity verify broken: %+v %v", ids, err)
+	}
+}
+
+func TestRequestWorkflow(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs, rs := clients.NewStore(db), requests.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "Citra", Phone: "0822000022"})
+	var sid int64
+	if err := db.QueryRow(`SELECT id FROM services WHERE code='PT-DIRIAN'`).Scan(&sid); err != nil {
+		t.Skip("seed services missing in test db")
+	}
+	rid, err := rs.Create(office, cid, sid, "PT Maju", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, to := range []string{"SUBMITTED", "IN_REVIEW", "APPROVED", "IN_PROGRESS", "COMPLETED"} {
+		if err := rs.Move(office, rid, to, nil, ""); err != nil {
+			t.Fatal("move to", to, err)
+		}
+	}
+	if err := rs.Move(office, rid, "DRAFT", nil, ""); err == nil {
+		t.Fatal("backward move must fail")
+	}
+	p, a, c, err := rs.Counts(office)
+	if err != nil || c != 1 || p != 0 || a != 0 {
+		t.Fatalf("counts wrong: %d %d %d %v", p, a, c, err)
+	}
+}
+
+func TestDeedVersionLock(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	ds := deeds.NewStore(db)
+	id, err := ds.CreateDraft(office, nil, "Akta T", "PT", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.SaveVersion(id, "isi v2", nil, "revisi"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.Approve(id, "1/2026", 1); err == nil {
+		t.Fatal("approve from DRAFT status must fail (needs IN_REVIEW)")
+	}
+	if _, err := db.Exec(`UPDATE deed_drafts SET status='IN_REVIEW' WHERE id=?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.Approve(id, "1/2026", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.SaveVersion(id, "ubah final", nil, "x"); err == nil {
+		t.Fatal("locked final must reject version writes")
+	}
+}
+
+func TestFinanceOverpay(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs, fs := clients.NewStore(db), finance.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "Dana", Phone: "0833000033"})
+	invid, err := fs.CreateInvoice(office, cid, nil, "INV-T1", []finance.Line{
+		{Description: "Jasa", Qty: 2, UnitPrice: 1000000},
+		{Description: "Biaya", Qty: 1, UnitPrice: 500000},
+	}, 1100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// subtotal 2.5jt, PPN 275rb, total 2.775jt
+	if err := fs.RecordPayment(invid, 2775000, "TRANSFER", "R1", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := fs.RecordPayment(invid, 1, "CASH", "R2", nil); err == nil {
+		t.Fatal("overpay must fail")
+	}
+	out, err := fs.Outstanding(office)
+	if err != nil || out != 0 {
+		t.Fatalf("outstanding=%d err=%v", out, err)
+	}
+}
+
+func TestGovAssisted(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	gs := gov.NewStore(db)
+	id, err := gs.Create(office, gov.ChannelAHU, "PT Uji")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gs.Advance(id, gov.StatusReady, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := gs.Advance(id, gov.StatusDraft, "", "", ""); err == nil {
+		t.Fatal("backward must fail")
+	}
+	subs, err := gs.List(office)
+	if err != nil || len(subs) == 0 {
+		t.Fatalf("list broken: %v", subs)
+	}
+}

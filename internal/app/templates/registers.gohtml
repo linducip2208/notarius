@@ -1,0 +1,45 @@
+{{define "requests"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Baru</h3></div>
+<form method="post" action="/requests">{{template "csrf" .}}<div class="card-body row">
+<div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="service_id" required><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="title" placeholder="Judul permohonan" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="notes" placeholder="Catatan"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Daftar Permohonan</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Klien</th><th>Layanan</th><th>Status</th><th>Aksi</th></tr></thead>
+<tbody>{{range .Data.Requests}}<tr><td><a href="/requests/{{.ID}}">{{.ID}}</a></td><td><a href="/requests/{{.ID}}">{{.Title}}</a></td><td>{{.ClientName}}</td><td>{{.Service}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
+<td><form method="post" action="/requests/{{.ID}}/move" class="d-flex gap-1">{{template "csrf" $}}
+<select class="form-select form-select-sm" name="to"><option value="SUBMITTED">SUBMITTED</option><option value="IN_REVIEW">IN_REVIEW</option><option value="NEED_DOCS">NEED_DOCS</option><option value="APPROVED">APPROVED</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="CANCELLED">CANCELLED</option></select>
+<button class="btn btn-sm btn-primary" type="submit">OK</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada permohonan.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "deeds"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Draf Akta Baru</h3></div>
+<form method="post" action="/deeds">{{template "csrf" .}}<div class="card-body row">
+<div class="col-md-5 mb-2"><input class="form-control" name="title" placeholder="Judul akta" required/></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="kind"><option value="PT">PT</option><option value="CV">CV</option><option value="Yayasan">Yayasan</option><option value="Agreement">Perjanjian</option><option value="Will">Wasiat</option><option value="POA">Kuasa</option><option value="Prenup">Prenup/Postnup</option><option value="Other">Lainnya</option></select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="request_id" placeholder="ID permohonan (opsional)"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Daftar Akta</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nomor</th><th>Judul</th><th>Jenis</th><th>Status</th><th>Ver</th><th>Terkunci</th><th>Ekspor</th></tr></thead>
+<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Number}}</td><td>{{.Title}}</td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a></td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada akta.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "repertorium"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-header"><h3 class="card-title">Buku Repertorium</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Para pihak</th></tr></thead>
+<tbody>{{range .Data}}<tr><td>{{.No}}</td><td>{{.Date}}</td><td>{{.Desc}}</td><td>{{.Parties}}</td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada entri repertorium.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "protocols"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-header"><h3 class="card-title">Arsip Protokol Notaris</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Bendel</th><th>Tahun</th><th>Referensi minuta</th></tr></thead>
+<tbody>{{range .Data}}<tr><td>{{.Bundle}}</td><td>{{.Year}}</td><td>{{.Ref}}</td></tr>
+{{else}}<tr><td colspan="3" class="text-center text-secondary py-4">Belum ada bendel protokol.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}

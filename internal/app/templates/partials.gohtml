@@ -1,0 +1,56 @@
+{{define "head"}}<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{.Title}} — NOTARYOS</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css"/>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>{{end}}
+
+{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+<div class="container-fluid">
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
+<h1 class="navbar-brand navbar-brand-autodark mt-2">NOTARYOS</h1>
+<div class="collapse navbar-collapse" id="sidebar-menu">
+<ul class="navbar-nav pt-lg-3">
+<li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+<li class="nav-item"><a class="nav-link" href="/clients">Klien</a></li>
+<li class="nav-item"><a class="nav-link" href="/requests">Permohonan</a></li>
+<li class="nav-item"><a class="nav-link" href="/appointments">Janji Temu</a></li>
+<li class="nav-item"><a class="nav-link" href="/deeds">Akta</a></li>
+<li class="nav-item"><a class="nav-link" href="/repertorium">Repertorium</a></li>
+<li class="nav-item"><a class="nav-link" href="/protocols">Protokol</a></li>
+<li class="nav-item"><a class="nav-link" href="/legalisasi">Legalisasi</a></li>
+<li class="nav-item"><a class="nav-link" href="/wills">Wasiat</a></li>
+<li class="nav-item"><a class="nav-link" href="/gov">AHU &amp; OSS</a></li>
+<li class="nav-item"><a class="nav-link" href="/finance">Keuangan</a></li>
+<li class="nav-item"><a class="nav-link" href="/templates">Template</a></li>
+<li class="nav-item"><a class="nav-link" href="/reports">Laporan</a></li>
+<li class="nav-item"><a class="nav-link" href="/portal">Portal Klien</a></li>
+<li class="nav-item"><a class="nav-link" href="/settings">Pengaturan</a></li>
+</ul>
+<div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>
+<form method="post" action="/logout" class="px-3 pb-3">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>
+</div>
+</div>
+</aside>{{end}}
+
+{{define "csrf"}}<input type="hidden" name="csrf" value="{{.CSRF}}"/>{{end}}
+
+{{define "flash"}}{{if .Flash}}<div class="alert alert-success" role="alert">{{.Flash}}</div>{{end}}{{end}}
+
+{{define "page_open"}}<body>
+<div class="page">
+{{template "sidebar" .}}
+<div class="page-wrapper">
+<div class="page-header d-print-none"><div class="container-xl"><h2 class="page-title">{{.Title}}</h2></div></div>
+<div class="page-body"><div class="container-xl">
+{{template "flash" .}}{{end}}
+
+{{define "page_close"}}</div></div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js"></script>
+</body>
+</html>{{end}}
