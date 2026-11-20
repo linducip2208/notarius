@@ -3,9 +3,70 @@ package middleware
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
+
+// trustedNets holds CIDR/IP ranges whose X-Forwarded-For we honor.
+// Default: trust none — XFF from untrusted sources is ignored (anti-spoof).
+var (
+	trustedMu   sync.RWMutex
+	trustedNets []*net.IPNet
+	trustedIPs  []net.IP
+)
+
+// SetTrustedProxies configures which proxy addresses may set X-Forwarded-For.
+// Entries may be CIDR ("127.0.0.1/32", "::1/128") or plain IP ("127.0.0.1").
+func SetTrustedProxies(entries []string) {
+	trustedMu.Lock()
+	defer trustedMu.Unlock()
+	trustedNets = nil
+	trustedIPs = nil
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+		if strings.Contains(e, "/") {
+			if _, n, err := net.ParseCIDR(e); err == nil {
+				trustedNets = append(trustedNets, n)
+			}
+			continue
+		}
+		if ip := net.ParseIP(e); ip != nil {
+			trustedIPs = append(trustedIPs, ip)
+		}
+	}
+}
+
+func remoteIP(r *http.Request) net.IP {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	return net.ParseIP(strings.TrimSpace(host))
+}
+
+func fromTrustedProxy(r *http.Request) bool {
+	rip := remoteIP(r)
+	if rip == nil {
+		return false
+	}
+	trustedMu.RLock()
+	defer trustedMu.RUnlock()
+	for _, ip := range trustedIPs {
+		if ip.Equal(rip) {
+			return true
+		}
+	}
+	for _, n := range trustedNets {
+		if n.Contains(rip) {
+			return true
+		}
+	}
+	return false
+}
 
 // RateLimiter is a simple per-IP token bucket for sensitive endpoints (login).
 type RateLimiter struct {
@@ -19,10 +80,18 @@ func NewRateLimiter(max int, window time.Duration) *RateLimiter {
 	return &RateLimiter{hits: map[string][]time.Time{}, max: max, window: window}
 }
 
-// clientIP extracts the host part (no port) preferring X-Forwarded-For.
+// clientIP extracts the host part (no port), honoring X-Forwarded-For
+// ONLY when the direct peer is an explicitly trusted proxy.
 func clientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return fwd
+	if fromTrustedProxy(r) {
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			// Leftmost = original client; take first valid IP.
+			for _, part := range strings.Split(fwd, ",") {
+				if ip := strings.TrimSpace(part); ip != "" {
+					return ip
+				}
+			}
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

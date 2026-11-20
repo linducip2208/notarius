@@ -95,6 +95,8 @@ func (s *Store) SaveVersion(deedID int64, content string, createdBy *int64, note
 
 // Approve locks the deed with notary approval, assigns a number, and writes
 // the automatic repertorium entry (UUJN tertib administrasi).
+// Concurrency-safe: the deed row is locked with FOR UPDATE; entry_no is
+// MAX+1 inside the same tx (UNIQUE(office,entry_no) as backstop).
 func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	if number == "" {
 		return errors.New("nomor akta wajib diisi saat pengesahan")
@@ -107,7 +109,7 @@ func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	var status string
 	var officeID int64
 	var title string
-	if err := tx.QueryRow(`SELECT status, office_id, title FROM deed_drafts WHERE id=?`, deedID).
+	if err := tx.QueryRow(`SELECT status, office_id, title FROM deed_drafts WHERE id=? FOR UPDATE`, deedID).
 		Scan(&status, &officeID, &title); err != nil {
 		return err
 	}
@@ -193,6 +195,70 @@ func (s *Store) AdvanceLegalization(officeID, id int64, to string) error {
 	}
 	_, err := s.db.Exec(`UPDATE legalizations SET status=?, completed_at=IF(?='COMPLETED',UTC_TIMESTAMP(),completed_at) WHERE id=?`, to, to, id)
 	return err
+}
+
+// Version is one saved deed content revision.
+type Version struct {
+	No        int
+	Content   string
+	Hash      string
+	Note      string
+	CreatedBy *int64
+	CreatedAt string
+}
+
+// Versions lists content revisions for a deed (office-scoped).
+func (s *Store) Versions(officeID, deedID int64) ([]Version, error) {
+	var oid int64
+	if err := s.db.QueryRow(`SELECT office_id FROM deed_drafts WHERE id=?`, deedID).Scan(&oid); err != nil {
+		return nil, err
+	}
+	if oid != officeID {
+		return nil, errors.New("akta tidak ditemukan")
+	}
+	rows, err := s.db.Query(`SELECT version, content, content_hash, created_by, created_at, note FROM deed_versions WHERE deed_id=? ORDER BY version`, deedID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Version
+	for rows.Next() {
+		var v Version
+		var note sql.NullString
+		if err := rows.Scan(&v.No, &v.Content, &v.Hash, &v.CreatedBy, &v.CreatedAt, &note); err != nil {
+			return nil, err
+		}
+		if note.Valid {
+			v.Note = note.String
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+// Get loads one deed (office-scoped).
+func (s *Store) Get(officeID, deedID int64) (Deed, string, error) {
+	var d Deed
+	var num, content sql.NullString
+	var req sql.NullInt64
+	err := s.db.QueryRow(`SELECT id, office_id, request_id, number, title, kind, status, version, content, locked
+		FROM deed_drafts WHERE id=? AND office_id=?`, deedID, officeID).
+		Scan(&d.ID, &d.OfficeID, &req, &num, &d.Title, &d.Kind, &d.Status, &d.Version, &content, &d.Locked)
+	if err != nil {
+		return Deed{}, "", err
+	}
+	if req.Valid {
+		v := req.Int64
+		d.RequestID = &v
+	}
+	if num.Valid {
+		d.Number = num.String
+	}
+	body := ""
+	if content.Valid {
+		body = content.String
+	}
+	return d, body, nil
 }
 
 // CreateProtocol records a protocol bundle (office-scoped, unique per year).

@@ -29,6 +29,7 @@ import (
 	"notaryos/internal/requests"
 	"notaryos/internal/storage"
 	"notaryos/internal/users"
+	"notaryos/internal/wib"
 	"notaryos/internal/workers"
 	"sync"
 )
@@ -78,7 +79,11 @@ type Page struct {
 
 // New builds the app. db may be nil only in tests that never hit handlers.
 func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
-	tmpl, err := template.ParseFS(tmplFS, "templates/*.gohtml")
+	tmpl, err := template.New("").Funcs(template.FuncMap{
+		"can":     func(role, perm string) bool { return rbac.Has(role, perm) },
+		"wib":     func(t time.Time) string { return wib.Format(t) },
+		"wibdate": func(t time.Time) string { return wib.Date(t) },
+	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +100,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		pool:     workers.New(4, log),
 		pending:  map[string]pendingAuth{},
 	}
+	mw.SetTrustedProxies(cfg.TrustedProxies)
 	if tp, err := ocr.NewTesseract(cfg.OCRBinary); err != nil {
 		a.ocr = ocr.NoopProvider{Reason: "atur OCR_BINARY di .env setelah menginstal Tesseract (lihat docs/BLOCKERS.md)"}
 		log.Warn("ocr disabled", "err", err)
@@ -162,6 +168,22 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 	}
 }
 
+// forbidden renders 403 with guidance instead of plain text.
+func (a *App) forbidden(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusForbidden)
+	a.render(w, r, "forbidden", "Akses Ditolak", map[string]string{
+		"Role": mw.RoleOf(r),
+	})
+}
+
+// notFound renders 404.
+func (a *App) notFound(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	a.render(w, r, "notfound", "Halaman Tidak Ditemukan", map[string]string{
+		"Path": r.URL.Path,
+	})
+}
+
 // Router builds all routes.
 func (a *App) Router() http.Handler {
 	r := chi.NewRouter()
@@ -173,13 +195,13 @@ func (a *App) Router() http.Handler {
 	r.Get("/readyz", a.readyz)
 	r.Get("/login", a.loginForm)
 	r.With(limiter.Limit).Post("/login", a.login)
-	r.Post("/logout", a.logout)
 	r.Get("/mfa/verify", a.mfaVerifyForm)
 	r.With(limiter.Limit).Post("/mfa/verify", a.mfaVerify)
 
 	r.Group(func(p chi.Router) {
 		p.Use(mw.RequireAuth)
 		p.Use(mw.CSRF(a.sessions, a.cfg.SessionName))
+		p.Post("/logout", a.logout)
 		p.Get("/", a.dashboard)
 		p.Get("/clients", a.clientList)
 		p.Post("/clients", a.clientCreate)
@@ -204,6 +226,8 @@ func (a *App) Router() http.Handler {
 		p.Post("/appointments/{id}/status", a.appointmentStatus)
 		p.Get("/deeds", a.deedList)
 		p.Post("/deeds", a.deedCreate)
+		p.Get("/deeds/{id}", a.deedDetail)
+		p.Post("/deeds/{id}/version", a.deedSaveVersion)
 		p.Post("/deeds/{id}/approve", a.deedApprove)
 		p.Post("/deeds/{id}/review", a.deedToReview)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
@@ -238,7 +262,20 @@ func (a *App) Router() http.Handler {
 		p.Get("/portal", a.portal)
 		p.Post("/notifications/read", a.notifRead)
 		p.Get("/metrics", a.metrics)
+		p.Get("/documents", a.documents)
+		p.Get("/audit", a.auditPage)
+		p.Get("/office", a.officePage)
+		p.Post("/office", a.officeSave)
+		p.Get("/tasks", a.tasksPage)
+		p.Post("/tasks", a.taskCreate)
+		p.Post("/tasks/{id}/done", a.taskDone)
+		p.Get("/expenses", a.expensesPage)
+		p.Post("/expenses", a.expenseCreate)
+		p.Get("/tariffs", a.tariffsPage)
+		p.Post("/tariffs", a.tariffSave)
+		p.Get("/search", a.search)
 	})
+	r.NotFound(a.notFound)
 	return r
 }
 
@@ -547,6 +584,7 @@ func (a *App) legalisasiCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "legalisasi.create", Entity: "legalization", EntityID: r.FormValue("register_no")})
 	http.Redirect(w, r, "/legalisasi?flash=Register+tersimpan", http.StatusSeeOther)
 }
 
@@ -598,6 +636,7 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "invoice.create", Entity: "invoice", EntityID: r.FormValue("number")})
 	http.Redirect(w, r, "/finance?flash=Invoice+dibuat", http.StatusSeeOther)
 }
 
@@ -614,6 +653,7 @@ func (a *App) paymentCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "payment.create", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10)})
 	http.Redirect(w, r, "/finance?flash=Pembayaran+dicatat", http.StatusSeeOther)
 }
 

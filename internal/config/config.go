@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all runtime configuration. Secrets come from env only.
 type Config struct {
-	Addr        string
-	DSN         string
-	SessionName string
-	TLSCookie   bool
-	StorageDir  string
-	S3Endpoint  string
-	S3Bucket    string
-	AIBaseURL   string
-	OCRBinary   string
+	Addr           string
+	DSN            string
+	SessionName    string
+	TLSCookie      bool
+	StorageDir     string
+	S3Endpoint     string
+	S3Bucket       string
+	AIBaseURL      string
+	OCRBinary      string
+	TrustedProxies []string
 }
 
 func getenv(key, def string) string {
@@ -36,16 +38,25 @@ func Load() Config {
 	tls := getenv("DB_TLS", "false")
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=UTC&tls=%s&interpolateParams=false",
 		user, pass, host, dbport, name, tls)
+	var proxies []string
+	if v := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES")); v != "" {
+		for _, p := range strings.Split(v, ",") {
+			if s := strings.TrimSpace(p); s != "" {
+				proxies = append(proxies, s)
+			}
+		}
+	}
 	return Config{
-		Addr:        getenv("ADDR", ":"+port),
-		DSN:         getenv("DB_DSN", dsn),
-		SessionName: getenv("SESSION_NAME", "notaryos_sess"),
-		TLSCookie:   getenv("COOKIE_SECURE", "false") == "true",
-		StorageDir:  getenv("STORAGE_DIR", "./storage"),
-		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
-		S3Bucket:    os.Getenv("S3_BUCKET"),
-		AIBaseURL:   os.Getenv("AI_BASE_URL"),
-		OCRBinary:   getenv("OCR_BINARY", ""),
+		Addr:           getenv("ADDR", ":"+port),
+		DSN:            getenv("DB_DSN", dsn),
+		SessionName:    getenv("SESSION_NAME", "notaryos_sess"),
+		TLSCookie:      getenv("COOKIE_SECURE", "false") == "true",
+		StorageDir:     getenv("STORAGE_DIR", "./storage"),
+		S3Endpoint:     os.Getenv("S3_ENDPOINT"),
+		S3Bucket:       os.Getenv("S3_BUCKET"),
+		AIBaseURL:      os.Getenv("AI_BASE_URL"),
+		OCRBinary:      getenv("OCR_BINARY", ""),
+		TrustedProxies: proxies,
 	}
 }
 

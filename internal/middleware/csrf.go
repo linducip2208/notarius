@@ -19,7 +19,7 @@ func CSRF(store auth.SessionStore, cookieName string) func(http.Handler) http.Ha
 				next.ServeHTTP(w, r)
 				return
 			}
-			if r.URL.Path == "/login" || r.URL.Path == "/logout" {
+			if r.URL.Path == "/login" {
 				next.ServeHTTP(w, r)
 				return
 			}

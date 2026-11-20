@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -67,6 +68,34 @@ func (s *Store) SaveUpload(officeID int64, ownerType string, ownerID int64, name
 	if cerr != nil {
 		os.Remove(tmpName)
 		return 0, cerr
+	}
+	// Magic-byte sniff: don't trust client Content-Type alone.
+	sniffed := ""
+	if fh, err := os.Open(tmpName); err == nil {
+		head := make([]byte, 512)
+		n, _ := fh.Read(head)
+		fh.Close()
+		sniffed = http.DetectContentType(head[:n])
+		if i := strings.IndexByte(sniffed, ';'); i >= 0 {
+			sniffed = strings.TrimSpace(sniffed[:i])
+		}
+	}
+	mime = strings.ToLower(strings.TrimSpace(mime))
+	if sniffed != "" && sniffed != "application/octet-stream" {
+		// Trust the sniffed bytes over the header, except generic fallback.
+		if allowedMIME[sniffed] {
+			mime = sniffed
+		} else if !allowedMIME[mime] {
+			os.Remove(tmpName)
+			return 0, errors.New("tipe file tidak diizinkan (terdeteksi: " + sniffed + ")")
+		} else {
+			// Header says allowed but bytes disagree → reject (anti-spoof).
+			os.Remove(tmpName)
+			return 0, errors.New("isi file tidak sesuai tipe yang dinyatakan (" + sniffed + ")")
+		}
+	} else if !allowedMIME[mime] {
+		os.Remove(tmpName)
+		return 0, errors.New("tipe file tidak diizinkan (hanya JPG/PNG/WebP/PDF)")
 	}
 	f, err := os.Open(tmpName)
 	if err != nil {

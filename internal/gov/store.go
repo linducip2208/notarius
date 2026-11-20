@@ -25,9 +25,18 @@ func (s *Store) Create(officeID int64, ch Channel, ref string) (int64, error) {
 
 // Advance moves status forward with optional receipt evidence.
 func (s *Store) Advance(id int64, to Status, receiptNo, receiptRef, notes string) error {
+	return s.AdvanceScoped(0, id, to, receiptNo, receiptRef, notes)
+}
+
+// AdvanceScoped is Advance with office isolation (0 = skip check, legacy).
+func (s *Store) AdvanceScoped(officeID, id int64, to Status, receiptNo, receiptRef, notes string) error {
 	var cur string
-	if err := s.db.QueryRow(`SELECT status FROM gov_submissions WHERE id=?`, id).Scan(&cur); err != nil {
+	var oid int64
+	if err := s.db.QueryRow(`SELECT status, office_id FROM gov_submissions WHERE id=?`, id).Scan(&cur, &oid); err != nil {
 		return err
+	}
+	if officeID != 0 && oid != officeID {
+		return errors.New("pengajuan tidak ditemukan")
 	}
 	tmp := Submission{Status: Status(cur)}
 	if err := tmp.Advance(to); err != nil {
@@ -40,9 +49,18 @@ func (s *Store) Advance(id int64, to Status, receiptNo, receiptRef, notes string
 
 // ToggleCheck flips one checklist item and persists the JSON.
 func (s *Store) ToggleCheck(id int64, index int) error {
+	return s.ToggleCheckScoped(0, id, index)
+}
+
+// ToggleCheckScoped is ToggleCheck with office isolation.
+func (s *Store) ToggleCheckScoped(officeID, id int64, index int) error {
 	var raw sql.NullString
-	if err := s.db.QueryRow(`SELECT checklist FROM gov_submissions WHERE id=?`, id).Scan(&raw); err != nil {
+	var oid int64
+	if err := s.db.QueryRow(`SELECT checklist, office_id FROM gov_submissions WHERE id=?`, id).Scan(&raw, &oid); err != nil {
 		return err
+	}
+	if officeID != 0 && oid != officeID {
+		return errors.New("pengajuan tidak ditemukan")
 	}
 	var items []CheckItem
 	if raw.Valid && raw.String != "" {

@@ -1,9 +1,12 @@
 package app
 
 import (
+	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -182,6 +185,15 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var oid int64
+	if err := a.db.QueryRow(`SELECT office_id FROM files WHERE id=?`, id).Scan(&oid); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if oid != a.officeOf(r) {
+		http.NotFound(w, r)
+		return
+	}
 	_, err := a.uploads.RunOCR(id, "")
 	if err != nil {
 		// Honest failure: engine not installed (B-01). Staff falls back to manual entry.
@@ -194,7 +206,7 @@ func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
 // fileDownload streams a private file after office-scope authorization (F-024).
 func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) && !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		a.forbidden(w, r)
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -204,8 +216,12 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rc.Close()
+	name := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(m.Name, `"`, "_"), "\r", "_"), "\n", "_")
+	if strings.TrimSpace(name) == "" {
+		name = "berkas"
+	}
 	w.Header().Set("Content-Type", m.MIME)
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+m.Name+"\"")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = io.Copy(w, rc)
 }
@@ -364,9 +380,13 @@ func (a *App) govCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) govAdvance(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermGovSubmit) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	err := a.govs.Advance(id, gov.Status(r.FormValue("to")), r.FormValue("receipt_no"), r.FormValue("receipt_ref"), r.FormValue("notes"))
+	err := a.govs.AdvanceScoped(a.officeOf(r), id, gov.Status(r.FormValue("to")), r.FormValue("receipt_no"), r.FormValue("receipt_ref"), r.FormValue("notes"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -376,7 +396,7 @@ func (a *App) govAdvance(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) govCheck(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermGovSubmit) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		a.forbidden(w, r)
 		return
 	}
 	_ = r.ParseForm()
@@ -386,7 +406,7 @@ func (a *App) govCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "index checklist tidak valid", http.StatusBadRequest)
 		return
 	}
-	if err := a.govs.ToggleCheck(id, idx); err != nil {
+	if err := a.govs.ToggleCheckScoped(a.officeOf(r), id, idx); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -693,7 +713,7 @@ func (a *App) willCreate(w http.ResponseWriter, r *http.Request) {
 func (a *App) willHandover(w http.ResponseWriter, r *http.Request) {
 	role := mw.RoleOf(r)
 	if role != rbac.RoleNotary && role != rbac.RoleSuperAdmin && role != rbac.RoleSubstitute {
-		http.Error(w, "Forbidden: serah-terima hanya oleh notaris", http.StatusForbidden)
+		a.forbidden(w, r)
 		return
 	}
 	_ = r.ParseForm()
@@ -704,6 +724,311 @@ func (a *App) willHandover(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.handover", Entity: "will", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("handed_to")})
 	http.Redirect(w, r, "/wills?flash=Serah-terima+wasiat+dicatat", http.StatusSeeOther)
+}
+
+// ---- deed detail + versioning ----
+
+func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	d, body, err := a.deeds.Get(a.officeOf(r), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	vers, _ := a.deeds.Versions(a.officeOf(r), id)
+	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
+		"Deed": d, "Body": body, "Versions": vers,
+		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
+	})
+}
+
+func (a *App) deedSaveVersion(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) && !rbac.Has(mw.RoleOf(r), rbac.PermEditDeed) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	// office check via Get
+	if _, _, err := a.deeds.Get(a.officeOf(r), id); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := a.deeds.SaveVersion(id, r.FormValue("content"), a.uid(r), r.FormValue("note")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "deed.version", Entity: "deed", EntityID: strconv.FormatInt(id, 10)})
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Revisi+tersimpan", http.StatusSeeOther)
+}
+
+// ---- documents center (global file list) ----
+
+func (a *App) documents(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	rows, err := a.db.Query(`SELECT f.id, f.owner_type, f.owner_id, f.original_name, f.mime, f.size_bytes, f.ocr_status, f.created_at
+		FROM files f WHERE f.office_id=? AND (?='' OR f.original_name LIKE CONCAT('%',?,'%'))
+		ORDER BY f.id DESC LIMIT 100`, a.officeOf(r), q, q)
+	if err != nil {
+		http.Error(w, "gagal memuat dokumen", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type doc struct {
+		ID, OwnerID                int64
+		Owner, Name, MIME, OCR, At string
+		Size                       int64
+	}
+	var out []doc
+	for rows.Next() {
+		var d doc
+		_ = rows.Scan(&d.ID, &d.Owner, &d.OwnerID, &d.Name, &d.MIME, &d.Size, &d.OCR, &d.At)
+		out = append(out, d)
+	}
+	a.render(w, r, "documents", "Document Center", map[string]any{"Docs": out, "Q": q})
+}
+
+// ---- audit log ----
+
+func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewReports) {
+		a.forbidden(w, r)
+		return
+	}
+	rows, err := a.db.Query(`SELECT a.id, u.name, a.action, a.entity, a.entity_id, a.created_at
+		FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id
+		ORDER BY a.id DESC LIMIT 200`)
+	if err != nil {
+		http.Error(w, "gagal memuat audit", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type entry struct {
+		ID, Actor, Action, Entity, EntityID, At string
+	}
+	var out []entry
+	for rows.Next() {
+		var e entry
+		var actor sql.NullString
+		var id int64
+		_ = rows.Scan(&id, &actor, &e.Action, &e.Entity, &e.EntityID, &e.At)
+		e.ID = strconv.FormatInt(id, 10)
+		if actor.Valid {
+			e.Actor = actor.String
+		}
+		out = append(out, e)
+	}
+	a.render(w, r, "audit", "Audit Log", out)
+}
+
+// ---- office profile ----
+
+func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
+	var name, notary, sk, addr, phone, email string
+	_ = a.db.QueryRow(`SELECT o.name, o.notary_name, o.sk_number, o.address, o.phone, o.email
+		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email)
+	a.render(w, r, "office", "Profil Kantor", map[string]string{
+		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email,
+	})
+}
+
+func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageOffice) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	_, err := a.db.Exec(`UPDATE offices o JOIN users u ON u.office_id=o.id SET o.name=?, o.notary_name=?, o.sk_number=?, o.address=?, o.phone=?, o.email=? WHERE u.id=?`,
+		r.FormValue("name"), r.FormValue("notary"), r.FormValue("sk"), r.FormValue("address"), r.FormValue("phone"), r.FormValue("email"), *a.uid(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.update", Entity: "office", EntityID: "self"})
+	http.Redirect(w, r, "/office?flash=Profil+kantor+disimpan", http.StatusSeeOther)
+}
+
+// ---- tasks ----
+
+func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
+	rows, _ := a.db.Query(`SELECT id, title, due_date, status FROM tasks WHERE office_id=? ORDER BY status, due_date LIMIT 200`, a.officeOf(r))
+	type task struct {
+		ID                 int64
+		Title, Due, Status string
+	}
+	var out []task
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var t task
+			var due sql.NullString
+			_ = rows.Scan(&t.ID, &t.Title, &due, &t.Status)
+			if due.Valid {
+				t.Due = due.String
+			}
+			out = append(out, t)
+		}
+	}
+	a.render(w, r, "tasks", "Tugas", out)
+}
+
+func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	if r.FormValue("title") == "" {
+		http.Error(w, "judul tugas wajib diisi", http.StatusBadRequest)
+		return
+	}
+	var due any
+	if r.FormValue("due") != "" {
+		due = r.FormValue("due")
+	}
+	_, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,?,?)`,
+		a.officeOf(r), r.FormValue("title"), due, a.uid(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/tasks?flash=Tugas+ditambah", http.StatusSeeOther)
+}
+
+func (a *App) taskDone(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	_, _ = a.db.Exec(`UPDATE tasks SET status='DONE' WHERE id=? AND office_id=?`, id, a.officeOf(r))
+	http.Redirect(w, r, "/tasks?flash=Tugas+selesai", http.StatusSeeOther)
+}
+
+// ---- expenses + tariffs ----
+
+func (a *App) expensesPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewFinance) {
+		a.forbidden(w, r)
+		return
+	}
+	rows, _ := a.db.Query(`SELECT id, category, description, amount, spent_at FROM expenses WHERE office_id=? ORDER BY spent_at DESC LIMIT 200`, a.officeOf(r))
+	type exp struct {
+		ID            int64
+		Cat, Desc, At string
+		Amount        float64
+	}
+	var out []exp
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var e exp
+			_ = rows.Scan(&e.ID, &e.Cat, &e.Desc, &e.Amount, &e.At)
+			out = append(out, e)
+		}
+	}
+	a.render(w, r, "expenses", "Pengeluaran & Kas", out)
+}
+
+func (a *App) expenseCreate(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageFinance) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	var amount float64
+	_, _ = fmt.Sscanf(r.FormValue("amount"), "%f", &amount)
+	if amount <= 0 || r.FormValue("description") == "" {
+		http.Error(w, "nominal dan uraian wajib diisi", http.StatusBadRequest)
+		return
+	}
+	spent := r.FormValue("spent_at")
+	if spent == "" {
+		spent = time.Now().Format("2006-01-02")
+	}
+	_, err := a.db.Exec(`INSERT INTO expenses(office_id, category, description, amount, spent_at, created_by)
+		VALUES(?,?,?,?,?,?)`, a.officeOf(r), r.FormValue("category"), r.FormValue("description"), amount, spent, a.uid(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "expense.create", Entity: "expense", EntityID: r.FormValue("description")})
+	http.Redirect(w, r, "/expenses?flash=Pengeluaran+dicatat", http.StatusSeeOther)
+}
+
+func (a *App) tariffsPage(w http.ResponseWriter, r *http.Request) {
+	rows, _ := a.db.Query(`SELECT id, name, amount, is_active FROM price_items ORDER BY name LIMIT 200`)
+	type tariff struct {
+		ID     int64
+		Name   string
+		Amount float64
+		Active bool
+	}
+	var out []tariff
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var t tariff
+			_ = rows.Scan(&t.ID, &t.Name, &t.Amount, &t.Active)
+			out = append(out, t)
+		}
+	}
+	svcs, _ := a.reqs.Services()
+	a.render(w, r, "tariffs", "Tarif Layanan", map[string]any{"Tariffs": out, "Services": svcs})
+}
+
+func (a *App) tariffSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageFinance) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	var amount float64
+	_, _ = fmt.Sscanf(r.FormValue("amount"), "%f", &amount)
+	if r.FormValue("name") == "" || amount < 0 {
+		http.Error(w, "nama dan tarif tidak valid", http.StatusBadRequest)
+		return
+	}
+	var sid any
+	if r.FormValue("service_id") != "" {
+		sid = r.FormValue("service_id")
+	}
+	_, err := a.db.Exec(`INSERT INTO price_items(service_id, name, amount) VALUES(?,?,?)`, sid, r.FormValue("name"), amount)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/tariffs?flash=Tarif+disimpan", http.StatusSeeOther)
+}
+
+// ---- global search ----
+
+func (a *App) search(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	cl, _ := a.clients.List(a.officeOf(r), q, 20)
+	type hit struct {
+		Kind, Title, URL string
+	}
+	var out []hit
+	for _, c := range cl {
+		out = append(out, hit{"Klien", c.FullName + " — " + c.Phone, "/clients/" + strconv.FormatInt(c.ID, 10)})
+	}
+	if a.db != nil && q != "" {
+		rows, _ := a.db.Query(`SELECT id, title, status FROM service_requests WHERE office_id=? AND (title LIKE CONCAT('%',?,'%')) ORDER BY id DESC LIMIT 20`, a.officeOf(r), q)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int64
+				var title, status string
+				_ = rows.Scan(&id, &title, &status)
+				out = append(out, hit{"Permohonan", title + " (" + status + ")", "/requests/" + strconv.FormatInt(id, 10)})
+			}
+		}
+		rows2, _ := a.db.Query(`SELECT id, title, status FROM deed_drafts WHERE office_id=? AND (title LIKE CONCAT('%',?,'%')) ORDER BY id DESC LIMIT 20`, a.officeOf(r), q)
+		if rows2 != nil {
+			defer rows2.Close()
+			for rows2.Next() {
+				var id int64
+				var title, status string
+				_ = rows2.Scan(&id, &title, &status)
+				out = append(out, hit{"Akta", title + " (" + status + ")", "/deeds/" + strconv.FormatInt(id, 10)})
+			}
+		}
+	}
+	a.render(w, r, "search", "Pencarian", map[string]any{"Q": q, "Hits": out})
 }
 
 func (a *App) notifRead(w http.ResponseWriter, r *http.Request) {
