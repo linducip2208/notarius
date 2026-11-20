@@ -42,6 +42,7 @@
 <li class="nav-item"><a class="nav-link" href="/audit">Audit Log</a></li>{{end}}
 {{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">Kantor</a></li>{{end}}
 <li class="nav-item"><a class="nav-link" href="/settings">Pengaturan</a></li>
+{{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">Role & Permission</a></li>{{end}}
 </ul>
 <div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>
 <form method="post" action="/logout" class="px-3 pb-3">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>

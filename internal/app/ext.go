@@ -1054,6 +1054,65 @@ func (a *App) notifRead(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
+// ---- roles & permissions (matrix audit) ----
+
+// rolesPage shows the effective permission matrix (code-enforced, DB-mirrored)
+// plus users per role. Read-only: permission changes require code + migration.
+func (a *App) rolesPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageUsers) {
+		a.forbidden(w, r)
+		return
+	}
+	var roles []string
+	rrows, _ := a.db.Query(`SELECT name FROM roles ORDER BY name`)
+	if rrows != nil {
+		defer rrows.Close()
+		for rrows.Next() {
+			var n string
+			_ = rrows.Scan(&n)
+			roles = append(roles, n)
+		}
+	}
+	var perms []string
+	prows, _ := a.db.Query(`SELECT name FROM permissions ORDER BY name`)
+	if prows != nil {
+		defer prows.Close()
+		for prows.Next() {
+			var n string
+			_ = prows.Scan(&n)
+			perms = append(perms, n)
+		}
+	}
+	granted := map[string]bool{}
+	grows, _ := a.db.Query(`SELECT r.name, p.name FROM role_permissions rp
+		JOIN roles r ON r.id=rp.role_id JOIN permissions p ON p.id=rp.permission_id`)
+	if grows != nil {
+		defer grows.Close()
+		for grows.Next() {
+			var rn, pn string
+			_ = grows.Scan(&rn, &pn)
+			granted[rn+"|"+pn] = true
+		}
+	}
+	type urow struct {
+		Name, Email, Role string
+	}
+	var users []urow
+	urows, _ := a.db.Query(`SELECT u.name, u.email, r.name FROM users u
+		JOIN roles r ON r.id=u.role_id ORDER BY r.name, u.name`)
+	if urows != nil {
+		defer urows.Close()
+		for urows.Next() {
+			var u urow
+			_ = urows.Scan(&u.Name, &u.Email, &u.Role)
+			users = append(users, u)
+		}
+	}
+	a.render(w, r, "roles", "Role & Permission", map[string]any{
+		"Roles": roles, "Perms": perms, "Granted": granted, "Users": users,
+	})
+}
+
 // notifCount is a template helper wired in render below.
 func (a *App) unreadCount(r *http.Request) int {
 	if id := a.uid(r); id != nil {

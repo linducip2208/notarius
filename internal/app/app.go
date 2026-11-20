@@ -266,6 +266,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/settings", a.settings)
 		p.Post("/users", a.userCreate)
 		p.Post("/users/{id}/link", a.userLink)
+		p.Get("/roles", a.rolesPage)
 		p.Get("/mfa", a.mfaSetup)
 		p.Post("/mfa", a.mfaEnable)
 		p.Get("/portal", a.portal)
