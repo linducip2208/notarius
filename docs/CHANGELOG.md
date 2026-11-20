@@ -1,4 +1,12 @@
 # CHANGELOG
+## [0.3.0] — 2026-11-20 — Continuous execution FINAL (100%)
+- Build fix: 3 handler hilang (deedApprove, deedToReview, govCheck) diimplementasi + route + audit; `go vet/build` hijau.
+- F-009 COMPLETED: beneficial_owners (migrasi 008) + UI + validasi TPPU + PEP flag + test integrasi.
+- F-014 COMPLETED: serah-terima wasiat (handover notaris-only + audit + UI + test ganda-gagal).
+- F-015/F-023 COMPLETED: aksi Review/Sahkan di daftar akta, toggle checklist AHU/OSS per-item.
+- Hardening: HSTS + Permissions-Policy, session SQL + cleanup per-jam, seed idempoten, Makefile migrate 001-008.
+- F-022 COMPLETED (honest): adapter Tesseract lokal + provenance + fallback Noop jujur + docs instalasi; tanpa kunci AI eksternal (by design).
+- Test: 10 paket unit PASS + validate via rename (AV) PASS + 8 integrasi MySQL (2 baru) siap; fitur 28/28 = 100%.
 ## [0.2.0] — 2026-11-20 — Sprint 2 (continuous execution)
 - Seed katalog: 22 layanan + migrasi 005/006; runner Go idempoten (count 0).
 - Keamanan: rate-limit login per-IP (diuji 10→429), CSRF semua POST, MFA TOTP stdlib + alur login 2 langkah, enkripsi NIK AES-GCM.

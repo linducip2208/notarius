@@ -61,6 +61,15 @@
 <div class="mb-2"><input class="form-control" name="title" placeholder="Jabatan (Dir. Utama, dsb)"/></div>
 <button class="btn btn-sm btn-primary w-100" type="submit">Tambah</button></form></div></div></div>
 </div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Beneficial Owner (pemilik manfaat)</h3></div>
+<div class="card-body">{{range .Data.BOs}}<div class="mb-1">{{.Name}} — {{.OwnershipPct}}% {{if .IsPEP}}<span class="badge bg-red-lt">PEP</span>{{end}} <span class="text-secondary">•••• {{.NIKLast4}}</span></div>{{else}}<p class="text-secondary">Belum ada BO. Wajib untuk PT/CV (TPPU).</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/bo">{{template "csrf" .}}
+<div class="row"><div class="col-5 mb-2"><input class="form-control" name="name" placeholder="Nama pemilik manfaat" required/></div>
+<div class="col-3 mb-2"><input class="form-control" name="nik" placeholder="NIK (terenkripsi parsial)"/></div>
+<div class="col-2 mb-2"><input class="form-control" name="pct" placeholder="%" value="25"/></div>
+<div class="col-2 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="pep" value="1"/> PEP</label></div></div>
+<button class="btn btn-sm btn-primary w-100" type="submit">Catat BO</button></form></div></div>
+</div>
 <div class="col-md-5">
 <div class="card"><div class="card-header"><h3 class="card-title">Linimasa</h3></div>
 <div class="card-body">{{range .Data.Req.Events}}<div class="mb-2"><span class="badge bg-blue-lt">{{.From}} → {{.To}}</span> <span class="text-secondary">{{.Actor}} · {{.At}}</span><div>{{.Note}}</div></div>{{else}}<p class="text-secondary">Belum ada peristiwa.</p>{{end}}</div></div>

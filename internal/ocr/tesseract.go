@@ -47,10 +47,10 @@ func (t *TesseractProvider) Extract(ctx context.Context, filePath string) (Resul
 		return Result{}, err
 	}
 	return Result{
-		DocType:   Classify(filePath),
-		Fields:    map[string]string{"text": string(out)},
-		Provider:  t.Name(),
+		DocType:    Classify(filePath),
+		Fields:     map[string]string{"text": string(out)},
+		Provider:   t.Name(),
 		Provenance: t.Version,
-		CreatedAt: time.Now().UTC(),
+		CreatedAt:  time.Now().UTC(),
 	}, nil
 }

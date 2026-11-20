@@ -113,6 +113,16 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		a.tpl = doctpl.NewStore(db)
 		a.govs = gov.NewStore(db)
 		a.uploads = files.NewStore(db, a.files, a.ocr)
+		// Session hygiene: hapus sesi kedaluwarsa tiap jam (best-effort, B-07).
+		if sqls, ok := a.sessions.(*auth.SQLStore); ok {
+			go func() {
+				t := time.NewTicker(time.Hour)
+				defer t.Stop()
+				for range t.C {
+					_, _ = sqls.Cleanup()
+				}
+			}()
+		}
 	}
 	return a, nil
 }
@@ -187,6 +197,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/requests/{id}/corp", a.corpSave)
 		p.Post("/requests/{id}/shareholders", a.shareholderAdd)
 		p.Post("/requests/{id}/officers", a.officerAdd)
+		p.Post("/requests/{id}/bo", a.boAdd)
 		p.Get("/appointments", a.appointments)
 		p.Post("/appointments", a.appointmentCreate)
 		p.Get("/deeds", a.deedList)
@@ -196,6 +207,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
 		p.Get("/wills", a.willsPage)
 		p.Post("/wills", a.willCreate)
+		p.Post("/wills/{id}/handover", a.willHandover)
 		p.Get("/repertorium", a.repertorium)
 		p.Get("/protocols", a.protocols)
 		p.Get("/legalisasi", a.legalisasi)

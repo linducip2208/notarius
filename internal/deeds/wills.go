@@ -52,3 +52,27 @@ func (s *WillStore) List(officeID int64) ([]Will, error) {
 	}
 	return out, rows.Err()
 }
+
+// Handover records serah-terima minuta wasiat (F-014: hanya notaris, tercatat + audit).
+func (s *WillStore) Handover(willID int64, handedTo, note string) error {
+	if handedTo == "" {
+		return errors.New("penerima serah-terima wajib diisi")
+	}
+	res, err := s.db.Exec(`UPDATE wills SET status='ARCHIVED', handed_over=1, handed_to=?, handed_at=UTC_TIMESTAMP(), handover_note=?
+		WHERE id=? AND handed_over=0`, handedTo, nullStr(note), willID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return errors.New("wasiat tidak ditemukan atau sudah diserahterimakan")
+	}
+	return nil
+}
+
+func nullStr(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}

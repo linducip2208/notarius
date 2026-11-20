@@ -24,17 +24,28 @@ func main() {
 	}
 	defer db.Close()
 	office := env("SEED_OFFICE", "Kantor Notaris Contoh")
-	res, err := db.Exec(`INSERT INTO offices(name, notary_name, sk_number, address, phone, email)
-		VALUES(?,?,?,?,?,?)`, office, env("SEED_NOTARY", "Nama Notaris, S.H."),
-		env("SEED_SK", "SK-000"), env("SEED_ADDR", "Jl. Contoh 1"),
-		env("SEED_PHONE", "021-000"), env("SEED_EMAIL", "office@contoh.id"))
+	adminEmail := env("SEED_ADMIN_EMAIL", "admin@contoh.id")
+	var oid int64
+	err = db.QueryRow(`SELECT id FROM offices WHERE name=? LIMIT 1`, office).Scan(&oid)
 	if err != nil {
-		log.Fatal(err)
+		res, err := db.Exec(`INSERT INTO offices(name, notary_name, sk_number, address, phone, email)
+			VALUES(?,?,?,?,?,?)`, office, env("SEED_NOTARY", "Nama Notaris, S.H."),
+			env("SEED_SK", "SK-000"), env("SEED_ADDR", "Jl. Contoh 1"),
+			env("SEED_PHONE", "021-000"), env("SEED_EMAIL", "office@contoh.id"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		oid, _ = res.LastInsertId()
 	}
-	oid, _ := res.LastInsertId()
 	var roleID int64
 	if err := db.QueryRow(`SELECT id FROM roles WHERE name='super_admin'`).Scan(&roleID); err != nil {
 		log.Fatal(err)
+	}
+	var exists int64
+	_ = db.QueryRow(`SELECT id FROM users WHERE email=?`, adminEmail).Scan(&exists)
+	if exists != 0 {
+		fmt.Println("admin sudah ada, lewati seed:", adminEmail)
+		return
 	}
 	h, err := auth.HashPassword(env("SEED_ADMIN_PASS", "Admin123!"))
 	if err != nil {

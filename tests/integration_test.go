@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"notaryos/internal/clients"
+	"notaryos/internal/corp"
 	"notaryos/internal/deeds"
 	"notaryos/internal/finance"
 	"notaryos/internal/gov"
@@ -46,7 +47,7 @@ func clean(t *testing.T) {
 	}
 	tables := []string{"payments", "invoice_lines", "invoices", "deed_versions", "signatures",
 		"deed_drafts", "gov_submissions", "request_events", "appointments", "service_requests",
-		"shareholders", "company_officers", "companies", "identities", "client_representatives",
+		"beneficial_owners", "shareholders", "company_officers", "companies", "identities", "client_representatives",
 		"user_client_links", "ai_results", "files", "legalizations", "wills", "notifications",
 		"login_attempts", "audit_logs", "users", "clients", "offices"}
 	for _, tb := range tables {
@@ -216,8 +217,67 @@ func TestGovAssisted(t *testing.T) {
 	if err := gs.Advance(id, gov.StatusDraft, "", "", ""); err == nil {
 		t.Fatal("backward must fail")
 	}
+	// Checklist toggle (F-023): index 0 flip twice kembali semula.
+	if err := gs.ToggleCheck(id, 0); err != nil {
+		t.Fatal(err)
+	}
 	subs, err := gs.List(office)
 	if err != nil || len(subs) == 0 {
 		t.Fatalf("list broken: %v", subs)
+	}
+	if len(subs[0].Checklist) == 0 || !subs[0].Checklist[0].Done {
+		t.Fatal("toggle check tidak tercatat")
+	}
+	if err := gs.ToggleCheck(id, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := gs.ToggleCheck(id, 99); err == nil {
+		t.Fatal("index liar harus gagal")
+	}
+}
+
+func TestBeneficialOwnerAndWillHandover(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := clients.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "BO Tester", Phone: "0844000044"})
+	// Company via request minimal.
+	var sid int64
+	if err := db.QueryRow(`SELECT id FROM services WHERE code='PT-DIRIAN'`).Scan(&sid); err != nil {
+		t.Skip("seed services missing in test db")
+	}
+	rs := requests.NewStore(db)
+	rid, err := rs.Create(office, cid, sid, "PT BO", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO companies(request_id, entity_type, name) VALUES(?,'PT','PT BO Uji')`, rid); err != nil {
+		t.Fatal(err)
+	}
+	var coID int64
+	if err := db.QueryRow(`SELECT id FROM companies WHERE request_id=?`, rid).Scan(&coID); err != nil {
+		t.Fatal(err)
+	}
+	corpStore := corp.NewStore(db)
+	if err := corpStore.AddBeneficialOwner(coID, "Pemilik Asli", "3174051209900001", 60, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := corpStore.AddBeneficialOwner(coID, "X", "123", 0, false); err == nil {
+		t.Fatal("BO invalid harus gagal")
+	}
+	bos, err := corpStore.BeneficialOwners(coID)
+	if err != nil || len(bos) != 1 || !bos[0].IsPEP {
+		t.Fatalf("BO list broken: %+v %v", bos, err)
+	}
+	ws := deeds.NewWillStore(db)
+	wid, err := ws.Register(office, cid, nil, "W-TEST-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Handover(wid, "Ahli Waris A", "diserahkan di kantor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Handover(wid, "X", ""); err == nil {
+		t.Fatal("handover ganda harus gagal")
 	}
 }

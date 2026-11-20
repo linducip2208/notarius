@@ -159,3 +159,60 @@ func (s *Store) AddOfficer(companyID int64, role, name, title string) error {
 		companyID, role, name, title)
 	return err
 }
+
+// BeneficialOwner is the ultimate natural-person owner (UU TPPU/beneficial ownership).
+type BeneficialOwner struct {
+	ID           int64
+	Name         string
+	NIKLast4     string
+	OwnershipPct float64
+	IsPEP        bool
+}
+
+// AddBeneficialOwner records a PEP-flagged ultimate owner (F-009 complete).
+func (s *Store) AddBeneficialOwner(companyID int64, name, nik string, pct float64, pep bool) error {
+	if name == "" {
+		return errors.New("nama beneficial owner wajib diisi")
+	}
+	if pct <= 0 || pct > 100 {
+		return errors.New("persentase kepemilikan harus 1-100")
+	}
+	var last4 any
+	if len(nik) >= 4 {
+		last4 = nik[len(nik)-4:]
+	}
+	_, err := s.db.Exec(`INSERT INTO beneficial_owners(company_id, name, nik_last4, ownership_pct, is_pep)
+		VALUES(?,?,?,?,?)`, companyID, name, last4, pct, boolToInt(pep))
+	return err
+}
+
+// BeneficialOwners lists ultimate owners for a company.
+func (s *Store) BeneficialOwners(companyID int64) ([]BeneficialOwner, error) {
+	rows, err := s.db.Query(`SELECT id, name, nik_last4, ownership_pct, is_pep FROM beneficial_owners WHERE company_id=? ORDER BY id`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BeneficialOwner
+	for rows.Next() {
+		var b BeneficialOwner
+		var last4 sql.NullString
+		var pep int
+		if err := rows.Scan(&b.ID, &b.Name, &last4, &b.OwnershipPct, &pep); err != nil {
+			return nil, err
+		}
+		if last4.Valid {
+			b.NIKLast4 = last4.String
+		}
+		b.IsPEP = pep == 1
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}

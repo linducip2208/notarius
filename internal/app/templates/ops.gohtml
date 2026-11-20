@@ -23,13 +23,14 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Pengajuan AHU / OSS</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Kanal</th><th>Referensi</th><th>Status</th><th>Bukti</th><th>Ubah</th></tr></thead>
-<tbody>{{range .Data.Subs}}<tr><td>{{.ID}}</td><td>{{.Channel}}</td><td>{{.Reference}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td>{{.ReceiptNo}}</td>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Kanal</th><th>Referensi</th><th>Status</th><th>Bukti</th><th>Checklist</th><th>Ubah</th></tr></thead>
+<tbody>{{range .Data.Subs}}{{$sid := .ID}}<tr><td>{{$sid}}</td><td>{{.Channel}}</td><td>{{.Reference}}<div class="small text-secondary">{{range $i, $c := .Checklist}}{{if $c.Done}}✓{{else}}○{{end}} {{$c.Label}}<form method="post" action="/gov/{{$sid}}/check" class="d-inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"/><input type="hidden" name="index" value="{{$i}}"/><button class="btn btn-sm btn-ghost-primary py-0" type="submit">toggle</button></form><br/>{{end}}</div></td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td>{{.ReceiptNo}}</td>
+<td><span class="text-secondary small">{{len .Checklist}} item</span></td>
 <td><form method="post" action="/gov/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}
 <select class="form-select form-select-sm" name="to"><option value="READY">READY</option><option value="SUBMITTED">SUBMITTED</option><option value="ACCEPTED">ACCEPTED</option><option value="REJECTED">REJECTED</option></select>
 <input class="form-control form-control-sm" name="receipt_no" placeholder="No. bukti"/>
 <button class="btn btn-sm btn-primary" type="submit">OK</button></form></td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengajuan.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada pengajuan.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "finance"}}{{template "head" .}}{{template "page_open" .}}
@@ -118,9 +119,9 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Daftar</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Register Wasiat</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Klien</th><th>No. Register</th><th>Status</th></tr></thead>
-<tbody>{{range .Data.Wills}}<tr><td>{{.ID}}</td><td>{{.ClientID}}</td><td>{{.RegisterNo}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td></tr>
-{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Klien</th><th>No. Register</th><th>Status</th><th>Serah-terima</th></tr></thead>
+<tbody>{{range .Data.Wills}}<tr><td>{{.ID}}</td><td>{{.ClientID}}</td><td>{{.RegisterNo}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td><form method="post" action="/wills/{{.ID}}/handover" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="handed_to" placeholder="Diserahkan ke" style="width:120px"/><button class="btn btn-sm btn-outline-primary" type="submit">Serahkan</button></form></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "portal"}}{{template "head" .}}{{template "page_open" .}}

@@ -199,9 +199,13 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	co, shs, offs, _ := a.corp.GetByRequest(id)
+	var bos []corp.BeneficialOwner
+	if co.ID != 0 {
+		bos, _ = a.corp.BeneficialOwners(co.ID)
+	}
 	subs, _ := a.govs.List(a.officeOf(r))
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
-		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "Gov": subs,
+		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
 	})
 }
 
@@ -269,6 +273,28 @@ func (a *App) officerAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pengurus+ditambah", http.StatusSeeOther)
+}
+
+func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) && !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	co, _, _, _ := a.corp.GetByRequest(reqID)
+	if co.ID == 0 {
+		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
+		return
+	}
+	pct, _ := strconv.ParseFloat(r.FormValue("pct"), 64)
+	pep := r.FormValue("pep") == "1" || r.FormValue("pep") == "on"
+	if err := a.corp.AddBeneficialOwner(co.ID, r.FormValue("name"), r.FormValue("nik"), pct, pep); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.bo.add", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10)})
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Beneficial+owner+dicatat", http.StatusSeeOther)
 }
 
 // ---- appointments ----
@@ -568,6 +594,22 @@ func (a *App) willCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.register", Entity: "will", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/wills?flash=Wasiat+terdaftar", http.StatusSeeOther)
+}
+
+func (a *App) willHandover(w http.ResponseWriter, r *http.Request) {
+	role := mw.RoleOf(r)
+	if role != rbac.RoleNotary && role != rbac.RoleSuperAdmin && role != rbac.RoleSubstitute {
+		http.Error(w, "Forbidden: serah-terima hanya oleh notaris", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err := a.wills.Handover(id, r.FormValue("handed_to"), r.FormValue("note")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.handover", Entity: "will", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("handed_to")})
+	http.Redirect(w, r, "/wills?flash=Serah-terima+wasiat+dicatat", http.StatusSeeOther)
 }
 
 func (a *App) notifRead(w http.ResponseWriter, r *http.Request) {
