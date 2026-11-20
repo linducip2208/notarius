@@ -9,14 +9,15 @@ import (
 
 // Client is an individual or corporate client of the office.
 type Client struct {
-	ID       int64
-	OfficeID int64
-	Kind     string // individual | corporate
-	FullName string
-	Email    string
-	Phone    string
-	Address  string
-	NPWP     string
+	ID        int64
+	OfficeID  int64
+	Kind      string // individual | corporate
+	FullName  string
+	Email     string
+	Phone     string
+	Address   string
+	NPWP      string
+	CreatedAt string
 }
 
 // DuplicateCandidate is a possible duplicate found by name/phone match.
@@ -83,29 +84,44 @@ func (s *Store) FindDuplicates(officeID int64, name, phone string) ([]DuplicateC
 
 // List returns clients with optional search, newest first.
 func (s *Store) List(officeID int64, q string, limit int) ([]Client, error) {
+	out, _, _ := s.ListFiltered(officeID, q, "", limit, 0)
+	return out, nil
+}
+
+// ListFiltered adds kind filter + offset pagination. Returns rows + total.
+func (s *Store) ListFiltered(officeID int64, q, kind string, limit, offset int) ([]Client, int, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	query := `SELECT id, office_id, kind, full_name, email, phone, address, npwp FROM clients WHERE office_id=?`
+	if offset < 0 {
+		offset = 0
+	}
+	where := ` WHERE office_id=?`
 	args := []any{officeID}
 	if strings.TrimSpace(q) != "" {
-		query += ` AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?)`
+		where += ` AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?)`
 		like := "%" + strings.TrimSpace(q) + "%"
 		args = append(args, like, like, like)
 	}
-	query += ` ORDER BY id DESC LIMIT ?`
-	args = append(args, limit)
-	rows, err := s.db.Query(query, args...)
+	if kind == "individual" || kind == "corporate" {
+		where += ` AND kind=?`
+		args = append(args, kind)
+	}
+	var total int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM clients`+where, args...).Scan(&total)
+	rows, err := s.db.Query(`SELECT id, office_id, kind, full_name, email, phone, address, npwp, created_at
+		FROM clients`+where+` ORDER BY id DESC LIMIT ? OFFSET ?`, append(args, limit, offset)...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []Client
 	for rows.Next() {
 		var c Client
 		var email, addr, npwp sql.NullString
-		if err := rows.Scan(&c.ID, &c.OfficeID, &c.Kind, &c.FullName, &email, &c.Phone, &addr, &npwp); err != nil {
-			return nil, err
+		var created string
+		if err := rows.Scan(&c.ID, &c.OfficeID, &c.Kind, &c.FullName, &email, &c.Phone, &addr, &npwp, &created); err != nil {
+			return nil, 0, err
 		}
 		if email.Valid {
 			c.Email = email.String
@@ -116,9 +132,10 @@ func (s *Store) List(officeID int64, q string, limit int) ([]Client, error) {
 		if npwp.Valid {
 			c.NPWP = npwp.String
 		}
+		c.CreatedAt = created
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 // Get fetches one client scoped to the office (prevents cross-office access).

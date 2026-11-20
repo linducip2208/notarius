@@ -64,7 +64,7 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1})
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
 		Expires: sess.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
 func (a *App) mfaSetup(w http.ResponseWriter, r *http.Request) {
@@ -736,8 +736,24 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vers, _ := a.deeds.Versions(a.officeOf(r), id)
+	clauses, _ := a.tpl.Clauses(a.officeOf(r))
+	// Komparasi berdampingan: ?compare=N tampilkan vN vs vN-1 (jujur, tanpa diff palsu).
+	var cmpA, cmpB string
+	var cmpN int
+	if c := r.URL.Query().Get("compare"); c != "" {
+		fmt.Sscanf(c, "%d", &cmpN)
+		contents := map[int]string{1: body}
+		for _, v := range vers {
+			contents[v.No] = v.Content
+		}
+		if aStr, ok := contents[cmpN]; ok {
+			cmpA = aStr
+			cmpB = contents[cmpN-1]
+		}
+	}
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
-		"Deed": d, "Body": body, "Versions": vers,
+		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses,
+		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN,
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 	})
 }
@@ -1035,7 +1051,7 @@ func (a *App) notifRead(w http.ResponseWriter, r *http.Request) {
 	if id := a.uid(r); id != nil {
 		_ = notify.ReadAll(a.db, *id)
 	}
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
 // notifCount is a template helper wired in render below.

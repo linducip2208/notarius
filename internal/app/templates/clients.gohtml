@@ -1,10 +1,16 @@
 {{define "client_rows"}}{{range .}}<tr><td><a href="/clients/{{.ID}}">{{.FullName}}</a></td><td>{{.Kind}}</td><td>{{.Phone}}</td><td>{{.Email}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Tidak ada klien.</td></tr>{{end}}{{end}}
 
 {{define "clients"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card"><div class="card-header d-flex justify-content-between"><h3 class="card-title">Daftar Klien</h3><a class="btn btn-primary" href="/clients/new">Klien Baru</a></div>
-<div class="card-body border-bottom"><input class="form-control" type="search" name="q" placeholder="Cari nama / telepon / email…" hx-get="/clients" hx-target="#rows" hx-trigger="keyup changed delay:300ms" hx-swap="innerHTML"/></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Jenis</th><th>Telepon</th><th>Email</th></tr></thead>
-<tbody id="rows">{{template "client_rows" .Data}}</tbody></table></div></div>
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Daftar Klien</li></ol></nav>
+<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title">Daftar Klien ({{.Data.Total}})</h3><div class="d-flex gap-2"><a class="btn btn-outline-primary" href="/clients/export">Ekspor CSV</a><a class="btn btn-primary" href="/clients/new">+ Tambah Klien</a></div></div>
+<form method="get" action="/clients"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
+<input class="form-control" style="max-width:280px" type="search" name="q" placeholder="Cari nama / telepon / email…" value="{{.Data.Q}}"/>
+<select class="form-select" style="max-width:180px" name="kind"><option value="">Semua Jenis</option><option value="individual" {{if eq .Data.Kind "individual"}}selected{{end}}>Perorangan</option><option value="corporate" {{if eq .Data.Kind "corporate"}}selected{{end}}>Badan Hukum</option></select>
+<button class="btn btn-primary" type="submit">Filter</button>
+</div></form>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Jenis</th><th>Telepon</th><th>Email</th><th>Dibuat</th></tr></thead>
+<tbody>{{range .Data.List}}<tr><td><a href="/clients/{{.ID}}">{{.FullName}}</a></td><td><span class="badge bg-azure-lt">{{.Kind}}</span></td><td>{{.Phone}}</td><td>{{.Email}}</td><td class="text-secondary">{{.CreatedAt}}</td></tr>{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Tidak ada klien. <a href="/clients/new">Tambah klien pertama →</a></td></tr>{{end}}</tbody></table></div>
+{{if gt .Data.Pages 1}}<div class="card-footer text-secondary">Halaman {{.Data.Page}} dari {{.Data.Pages}} · {{.Data.Total}} klien</div>{{end}}</div>
 {{template "page_close" .}}{{end}}
 
 {{define "client_new"}}{{template "head" .}}{{template "page_open" .}}
@@ -21,6 +27,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "client_detail"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients">Daftar Klien</a></li><li class="breadcrumb-item active">{{.Data.Client.FullName}}</li></ol></nav>
 <div class="row"><div class="col-md-7"><div class="card"><div class="card-header"><h3 class="card-title">{{.Data.Client.FullName}}</h3></div>
 <div class="card-body"><dl class="row">
 <dt class="col-4">Jenis</dt><dd class="col-8">{{.Data.Client.Kind}}</dd>
@@ -61,5 +68,9 @@
 <div class="col-6 mb-2"><input class="form-control" name="phone" placeholder="Telepon"/></div></div>
 <div class="mb-2"><input class="form-control" name="authority" placeholder="Dasar kewenangan"/></div>
 <button class="btn btn-primary w-100" type="submit">Tambah Perwakilan</button></form></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Riwayat Layanan</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Services}}<a class="list-group-item" href="/requests/{{.ID}}"><span class="badge bg-blue-lt me-2">{{.Status}}</span>{{.Title}} <span class="text-secondary">· {{.Service}}</span></a>{{else}}<div class="list-group-item text-secondary">Belum ada permohonan.</div>{{end}}</div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Jejak Audit</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Trail}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.Action}}</span><span class="text-secondary small">{{.At}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada jejak audit.</div>{{end}}</div></div>
 </div></div>
 {{template "page_close" .}}{{end}}

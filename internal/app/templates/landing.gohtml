@@ -3,94 +3,157 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="description" content="NOTARIUS — Sistem Manajemen Kantor Notaris Indonesia. Kelola klien, akta, repertorium, protokol, dan keuangan dengan aman dan terintegrasi."/>
+<meta property="og:title" content="NOTARIUS — Solusi Digital untuk Kantor Notaris"/>
+<meta property="og:description" content="Kelola klien, buat akta, dan administrasi notaris dengan mudah, aman, dan terintegrasi."/>
+<meta property="og:image" content="/assets/landing/notarius-hero.png"/>
 <title>NOTARIUS — Solusi Digital untuk Kantor Notaris yang Profesional</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css"/>
+<link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
+<link rel="stylesheet" href="/assets/notarius/notarius.css"/>
 <style>
-:root{--navy:#101c33;--gold:#c9a24b;--gold-d:#a8822f}
-body{font-family:"Inter",system-ui,sans-serif;color:#1e293b}
-.nav-blur{background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
+body{font-family:var(--nt-font);color:var(--nt-text)}
+.nav-blur{background:rgba(255,255,255,.94);backdrop-filter:blur(8px)}
 .hero{background:linear-gradient(180deg,#f7f4ec 0%,#fff 100%);overflow:hidden}
 .hero-img{border-radius:20px;box-shadow:0 24px 60px -20px rgba(16,28,51,.35);object-fit:cover;width:100%;height:420px}
-.btn-gold{background:var(--gold);color:#fff;border:none}
-.btn-gold:hover{background:var(--gold-d);color:#fff}
-.text-gold{color:var(--gold-d)}
-.bg-navy{background:var(--navy)}
-.feat-card{border:1px solid #eef0f4;border-radius:16px;padding:28px;background:#fff;height:100%}
-.feat-card:hover{box-shadow:0 16px 40px -16px rgba(16,28,51,.18)}
+.btn-gold{background:var(--nt-gold);color:#fff;border:none}
+.btn-gold:hover{background:#bd9137;color:#fff}
+.text-gold{color:#bd9137}
+.bg-navy{background:var(--nt-navy)}
+.feat-card{border:1px solid var(--nt-border);border-radius:16px;padding:28px;background:#fff;height:100%}
+.feat-card:hover{box-shadow:var(--nt-shadow)}
 .feat-ico{width:52px;height:52px;border-radius:14px;background:#faf6ea;display:flex;align-items:center;justify-content:center;font-size:24px}
-.cta-img{border-radius:20px;object-fit:cover;width:100%;height:320px}
-.step-num{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+.cta-img{border-radius:20px;object-fit:cover;width:100%;height:300px}
+.show-img{border-radius:12px;object-fit:cover;width:100%;height:190px;border:1px solid var(--nt-border)}
+.wf-dot{width:30px;height:30px;border-radius:50%;background:var(--nt-navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+details.faq{border:1px solid var(--nt-border);border-radius:12px;padding:14px 18px;background:#fff}
+details.faq summary{font-weight:600;cursor:pointer}
+.price-card{border:2px solid var(--nt-border);border-radius:16px;padding:32px;background:#fff;height:100%}
+.price-card.hot{border-color:var(--nt-gold)}
 </style>
 </head>
 <body>
 <header class="navbar navbar-expand-md nav-blur sticky-top border-bottom">
 <div class="container-xl">
 <h1 class="navbar-brand navbar-brand-autodark"><span class="text-gold fw-bold">N</span> NOTARIUS</h1>
-<div class="navbar-nav ms-auto flex-row gap-3 align-items-center">
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navmenu"><span class="navbar-toggler-icon"></span></button>
+<div class="collapse navbar-collapse" id="navmenu">
+<div class="navbar-nav ms-auto align-items-center gap-1">
+<a class="nav-link" href="#beranda">Beranda</a>
 <a class="nav-link" href="#fitur">Fitur</a>
-<a class="nav-link" href="#cara">Cara Kerja</a>
+<a class="nav-link" href="#harga">Harga</a>
+<a class="nav-link" href="#tentang">Tentang</a>
 <a class="nav-link" href="#kontak">Kontak</a>
-<a class="btn btn-outline-primary" href="/login">Masuk</a>
-<a class="btn btn-gold" href="/login">Daftar</a>
+<a class="btn btn-outline-primary ms-2" href="/login">Masuk</a>
+<a class="btn btn-gold ms-1" href="/login">Daftar</a>
+</div>
 </div>
 </div>
 </header>
 
-<section class="hero py-5">
+<section id="beranda" class="hero py-5">
 <div class="container-xl"><div class="row align-items-center g-5">
 <div class="col-lg-6">
 <h1 class="display-5 fw-bold">Solusi Digital untuk Kantor Notaris yang Profesional</h1>
-<p class="text-secondary fs-3 mt-3">Kelola klien, buat akta, repertorium, protokol, dan administrasi notaris dengan mudah, aman, dan terintegrasi — sesuai praktik jabatan Notaris Indonesia.</p>
-<div class="mt-4 d-flex gap-2">
+<p class="text-secondary fs-3 mt-3">Kelola klien, buat akta, dan administrasi notaris dengan mudah, aman, dan terintegrasi.</p>
+<div class="mt-4 d-flex gap-2 flex-wrap">
 <a class="btn btn-gold btn-lg" href="/login">Mulai Sekarang →</a>
 <a class="btn btn-outline-primary btn-lg" href="#fitur">Pelajari Fitur</a>
 </div>
-<div class="mt-4 d-flex gap-4 text-secondary small">
-<div><strong class="d-block fs-3">Repertorium</strong>Otomatis saat pengesahan</div>
-<div><strong class="d-block fs-3">AES-256-GCM</strong>Enkripsi NIK</div>
-<div><strong class="d-block fs-3">Audit Log</strong>Imutabel</div>
 </div>
-</div>
-<div class="col-lg-6"><img class="hero-img" src="/assets/landing/notarius-hero.png" alt="Meja kerja notaris profesional"/></div>
+<div class="col-lg-6"><img class="hero-img" src="/assets/landing/notarius-hero.png" alt="Meja kerja notaris: dokumen hukum, pena, timbangan keadilan"/></div>
 </div></div>
 </section>
+
+<section class="py-4 border-bottom"><div class="container-xl"><div class="row text-center g-3 small">
+<div class="col-6 col-md"><strong class="d-block">👥 Manajemen Klien</strong><span class="text-secondary">Terintegrasi</span></div>
+<div class="col-6 col-md"><strong class="d-block">📝 Pembuatan Akta</strong><span class="text-secondary">Lebih Mudah</span></div>
+<div class="col-6 col-md"><strong class="d-block">📚 Repertorium & Protokol</strong><span class="text-secondary">Digital</span></div>
+<div class="col-6 col-md"><strong class="d-block">🔒 Keamanan Data</strong><span class="text-secondary">Tingkat Tinggi</span></div>
+<div class="col-6 col-md"><strong class="d-block">🤝 Portal Klien</strong><span class="text-secondary">Akses Terkendali</span></div>
+</div></div></section>
 
 <section id="fitur" class="py-5">
 <div class="container-xl">
 <div class="text-center mb-4"><h2 class="fw-bold">Fitur Unggulan</h2><p class="text-secondary">Semua yang Anda butuhkan dalam satu platform terpadu</p></div>
 <div class="row g-3">
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">👥</div><h4 class="mt-3">Manajemen Klien</h4><p class="text-secondary">Data perorangan & badan hukum, verifikasi identitas manusia, beneficial owner.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📝</div><h4 class="mt-3">Workflow Akta</h4><p class="text-secondary">Draf → review → sahkan notaris, versi tercatat, final terkunci.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📚</div><h4 class="mt-3">Repertorium & Protokol</h4><p class="text-secondary">Nomor unik per kantor, bendel tahunan, retensi 25 tahun.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">🔒</div><h4 class="mt-3">Keamanan Terdepan</h4><p class="text-secondary">MFA TOTP, RBAC 9 peran, CSRF, sesi server-side, audit imutabel.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">💰</div><h4 class="mt-3">Keuangan & Pembayaran</h4><p class="text-secondary">Invoice multi-baris, anti-kelebihan bayar, pengeluaran, tarif.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📊</div><h4 class="mt-3">Laporan Lengkap</h4><p class="text-secondary">Akta, repertorium, protokol, layanan, keuangan — real-query.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">🖋️</div><h4 class="mt-3">Ekspor PDF & DOCX</h4><p class="text-secondary">Watermark DRAFT jujur, hanya dari template yang disetujui.</p></div></div>
-<div class="col-md-3"><div class="feat-card"><div class="feat-ico">🤝</div><h4 class="mt-3">Portal Klien</h4><p class="text-secondary">Tracking permohonan terisolasi per klien, server-side.</p></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">👥</div><h4 class="mt-3">Manajemen Klien</h4><p class="text-secondary">Perorangan & badan hukum, identitas terverifikasi manusia, beneficial owner.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📝</div><h4 class="mt-3">Workflow Akta</h4><p class="text-secondary">Draf berversi → review → pengesahan notaris → repertorium otomatis.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📚</div><h4 class="mt-3">Repertorium & Protokol</h4><p class="text-secondary">Pencatatan dan arsip digital, nomor unik per kantor, retensi 25 tahun.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">🤝</div><h4 class="mt-3">Portal Klien</h4><p class="text-secondary">Pantau status permohonan, unduh dokumen — terisolasi per klien.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">💰</div><h4 class="mt-3">Keuangan & Pembayaran</h4><p class="text-secondary">Invoice multi-baris, anti-kelebihan bayar, pengeluaran, tarif, piutang.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📊</div><h4 class="mt-3">Laporan Lengkap</h4><p class="text-secondary">Akta, repertorium, layanan, keuangan — dihitung dari data nyata.</p><a href="/login">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">🔒</div><h4 class="mt-3">Keamanan Terdepan</h4><p class="text-secondary">MFA TOTP, RBAC 9 peran, enkripsi NIK AES-256-GCM, audit imutabel.</p><a href="#keamanan">Detail →</a></div></div>
+<div class="col-md-3"><div class="feat-card"><div class="feat-ico">📁</div><h4 class="mt-3">Document Management</h4><p class="text-secondary">Document center, upload privat, OCR terverifikasi, ekspor PDF & DOCX.</p><a href="/login">Detail →</a></div></div>
 </div>
 </div>
 </section>
 
-<section id="cara" class="py-5 bg-light border-top border-bottom">
-<div class="container-xl"><div class="row align-items-center g-5">
-<div class="col-lg-6"><img class="cta-img" src="/assets/landing/notarius-sign.png" alt="Penandatanganan akta notaris"/></div>
-<div class="col-lg-6">
-<h2 class="fw-bold">Alur kerja notaris, dari permohonan hingga minuta</h2>
-<div class="mt-4 d-flex flex-column gap-3">
-<div><span class="step-num">1</span> <strong class="ms-2">Permohonan masuk</strong><span class="text-secondary"> — staf mencatat + pemeriksaan persyaratan.</span></div>
-<div><span class="step-num">2</span> <strong class="ms-2">Draf akta</strong><span class="text-secondary"> — dari template terapproved, revisi berversi.</span></div>
-<div><span class="step-num">3</span> <strong class="ms-2">Pengesahan notaris</strong><span class="text-secondary"> — nomor akta + repertorium otomatis.</span></div>
-<div><span class="step-num">4</span> <strong class="ms-2">Arsip & tagihan</strong><span class="text-secondary"> — protokol, salinan, invoice, portal klien.</span></div>
+<section id="tentang" class="py-5 bg-light border-top border-bottom">
+<div class="container-xl">
+<div class="text-center mb-4"><h2 class="fw-bold">Lihat NOTARIUS Beraksi</h2><p class="text-secondary">Tampilan aplikasi yang benar-benar berjalan — masuk untuk mencoba langsung</p></div>
+<div class="row g-3">
+<div class="col-md-4"><div class="card"><img class="show-img" src="/assets/landing/notarius-office.png" alt="Dashboard kantor"/><div class="card-body"><strong>Dashboard Kantor</strong><p class="text-secondary mb-2">Statistik real-time, agenda hari ini, notifikasi.</p><a href="/login" class="btn btn-sm btn-outline-primary">Buka Dashboard →</a></div></div></div>
+<div class="col-md-4"><div class="card"><img class="show-img" src="/assets/landing/notarius-hero.png" alt="Dokumen dan arsip"/><div class="card-body"><strong>Daftar Klien</strong><p class="text-secondary mb-2">Pencarian, filter jenis, deteksi duplikat, berkas privat.</p><a href="/login" class="btn btn-sm btn-outline-primary">Kelola Klien →</a></div></div></div>
+<div class="col-md-4"><div class="card"><img class="show-img" src="/assets/landing/notarius-sign.png" alt="Editor dan pengesahan akta"/><div class="card-body"><strong>Editor Akta</strong><p class="text-secondary mb-2">Template terapproved, riwayat versi, pengesahan + repertorium.</p><a href="/login" class="btn btn-sm btn-outline-primary">Buat Akta →</a></div></div></div>
 </div>
+</div>
+</section>
+
+<section class="py-5"><div class="container-xl"><div class="row g-5">
+<div class="col-lg-6">
+<h2 class="fw-bold">Alur Kerja Notaris</h2>
+<p class="text-secondary">Tahapan manual tetap di tangan notaris — sistem mencatat dan mengarsipkan.</p>
+<div class="mt-3 d-flex flex-column gap-1">
+<div class="d-flex gap-2"><span class="wf-dot">1</span><div><strong>Permohonan Klien</strong><div class="text-secondary small">Dicatat staf beserta persyaratan.</div></div></div><div style="width:2px;background:var(--nt-border);margin-left:14px;height:10px"></div>
+<div class="d-flex gap-2"><span class="wf-dot">2</span><div><strong>Pemeriksaan Persyaratan</strong><div class="text-secondary small">Kelengkapan berkas + verifikasi identitas.</div></div></div><div style="width:2px;background:var(--nt-border);margin-left:14px;height:10px"></div>
+<div class="d-flex gap-2"><span class="wf-dot">3</span><div><strong>Pembuatan Draft</strong><div class="text-secondary small">Dari template terapproved, revisi berversi.</div></div></div><div style="width:2px;background:var(--nt-border);margin-left:14px;height:10px"></div>
+<div class="d-flex gap-2"><span class="wf-dot">4</span><div><strong>Review & Persetujuan</strong><div class="text-secondary small">Hanya notaris yang dapat mengesahkan.</div></div></div><div style="width:2px;background:var(--nt-border);margin-left:14px;height:10px"></div>
+<div class="d-flex gap-2"><span class="wf-dot">5</span><div><strong>Finalisasi</strong><div class="text-secondary small">Draf terkunci, ekspor PDF/DOCX berwatermark.</div></div></div><div style="width:2px;background:var(--nt-border);margin-left:14px;height:10px"></div>
+<div class="d-flex gap-2"><span class="wf-dot">6</span><div><strong>Register & Arsip</strong><div class="text-secondary small">Repertorium otomatis, protokol, invoice.</div></div></div>
+</div>
+</div>
+<div class="col-lg-6" id="keamanan">
+<h2 class="fw-bold">Keamanan Berdasarkan Implementasi Aktual</h2>
+<ul class="list-group mt-3">
+<li class="list-group-item">🔐 Login bcrypt + sesi server-side + MFA TOTP dua langkah</li>
+<li class="list-group-item">🛡️ RBAC 9 peran / 19 izin, penegakan di server + isolasi data per kantor</li>
+<li class="list-group-item">🧬 NIK terenkripsi AES-256-GCM, tidak pernah tersimpan polos</li>
+<li class="list-group-item">📜 Audit log imutabel untuk login, akta, keuangan, dan serah-terima</li>
+<li class="list-group-item">🌐 Header HSTS + CSP ketat, CSRF semua form, rate-limit login</li>
+</ul>
+<p class="text-secondary small mt-2">Tanpa klaim sertifikasi — keamanan dibuktikan lewat uji, bukan janji.</p>
 </div>
 </div></div>
 </section>
 
+<section id="harga" class="py-5 bg-light border-top">
+<div class="container-xl">
+<div class="text-center mb-4"><h2 class="fw-bold">Harga</h2><p class="text-secondary">Pilih sesuai kebutuhan kantor Anda — hubungi kami untuk penawaran resmi</p></div>
+<div class="row g-3">
+<div class="col-md-4"><div class="price-card"><h4>Kantor</h4><p class="display-6 fw-bold">Konsultasi</p><p class="text-secondary">Untuk kantor notaris tunggal. Seluruh modul operasional.</p><a href="#kontak" class="btn btn-outline-primary w-100">Minta Penawaran</a></div></div>
+<div class="col-md-4"><div class="price-card hot"><h4>Korporat ⭐</h4><p class="display-6 fw-bold">Konsultasi</p><p class="text-secondary">Multi-pengguna, portal klien, laporan lanjutan, prioritas dukungan.</p><a href="#kontak" class="btn btn-gold w-100">Minta Penawaran</a></div></div>
+<div class="col-md-4"><div class="price-card"><h4>Enterprise</h4><p class="display-6 fw-bold">Konsultasi</p><p class="text-secondary">On-premise, retensi arsip, SLA, audit keamanan khusus.</p><a href="#kontak" class="btn btn-outline-primary w-100">Hubungi Kami</a></div></div>
+</div>
+<p class="text-secondary small text-center mt-3">Harga final ditetapkan lewat penawaran resmi — tidak ada harga mengada-ada di halaman ini.</p>
+</div>
+</section>
+
+<section class="py-5"><div class="container-xl" style="max-width:760px">
+<h2 class="fw-bold text-center mb-4">Pertanyaan Umum</h2>
+<div class="d-flex flex-column gap-2">
+<details class="faq"><summary>Apakah NOTARIUS pengganti PPAT / advokat?</summary><p class="text-secondary mt-2 mb-0">Bukan. NOTARIUS hanya untuk layanan jabatan Notaris Indonesia, bukan PPAT maupun praktik advokat.</p></details>
+<details class="faq"><summary>Apakah terhubung ke AHU/OSS resmi?</summary><p class="text-secondary mt-2 mb-0">Tidak ada API resmi yang diklaim. Modul AHU/OSS bersifat asistensi: checklist + pengarsipan bukti pengisian manual di portal resmi.</p></details>
+<details class="faq"><summary>Bagaimana keamanan data NIK klien?</summary><p class="text-secondary mt-2 mb-0">NIK dienkripsi AES-256-GCM di sisi aplikasi; yang tampil hanya 4 digit terakhir. Hasil OCR tidak pernah dianggap terverifikasi — wajib verifikasi manusia.</p></details>
+<details class="faq"><summary>Apakah bisa dipakai multi-kantor?</summary><p class="text-secondary mt-2 mb-0">Ya — seluruh data diisolasi per kantor di sisi server (office_id), bukan sekadar filter tampilan.</p></details>
+<details class="faq"><summary>Bagaimana backup data?</summary><p class="text-secondary mt-2 mb-0">Skrip backup GPG + restore terdokumentasi di <code>deploy/</code>. Uji restore wajib sebelum produksi.</p></details>
+</div>
+</div></section>
+
 <section class="bg-navy text-white py-5">
 <div class="container-xl"><div class="row align-items-center g-5">
 <div class="col-lg-6">
-<h2 class="fw-bold">Tingkatkan Produktivitas Kantor Notaris Anda</h2>
-<p class="text-white-50">Dengan NOTARIUS, fokus pada pelayanan hukum — kami yang mengurus teknologi.</p>
+<h2 class="fw-bold">Kelola Kantor Notaris dengan Lebih Terstruktur</h2>
+<p class="text-white-50">Fokus pada pelayanan hukum — kami yang mengurus teknologi.</p>
 <a class="btn btn-gold btn-lg mt-2" href="/login">Mulai Sekarang →</a>
 </div>
 <div class="col-lg-6"><img class="cta-img" src="/assets/landing/notarius-office.png" alt="Kantor notaris modern"/></div>
@@ -98,10 +161,16 @@ body{font-family:"Inter",system-ui,sans-serif;color:#1e293b}
 </section>
 
 <footer id="kontak" class="py-4 border-top">
-<div class="container-xl d-flex flex-wrap gap-3 justify-content-between text-secondary small">
-<div><strong class="text-dark">N</strong> NOTARIUS — Digital. Profesional. Terpercaya. © 2026</div>
-<div class="d-flex gap-3"><span>Syarat & Ketentuan</span><span>Kebijakan Privasi</span><a href="/login">Masuk</a></div>
+<div class="container-xl">
+<div class="row g-3 small">
+<div class="col-md-3"><strong>NOTARIUS</strong><p class="text-secondary">Digital. Profesional. Terpercaya.</p></div>
+<div class="col-md-3"><strong>Produk</strong><div><a href="#fitur">Fitur</a></div><div><a href="#harga">Harga</a></div></div>
+<div class="col-md-3"><strong>Perusahaan</strong><div><a href="#tentang">Tentang Kami</a></div><div><a href="#kontak">Kontak</a></div></div>
+<div class="col-md-3"><strong>Bantuan</strong><div><a href="/login">Dokumentasi</a></div><div><a href="/login">Panduan</a></div></div>
+</div>
+<div class="d-flex justify-content-between text-secondary small mt-3 pt-3 border-top"><span>© 2026 NOTARIUS. Seluruh hak dilindungi.</span><span><a href="#beranda">Syarat & Ketentuan</a> · <a href="#beranda">Kebijakan Privasi</a></span></div>
 </div>
 </footer>
+<script src="/assets/vendor/tabler.min.js"></script>
 </body>
 </html>{{end}}

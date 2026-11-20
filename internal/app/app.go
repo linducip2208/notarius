@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -204,8 +205,12 @@ func (a *App) Router() http.Handler {
 		p.Use(mw.RequireAuth)
 		p.Use(mw.CSRF(a.sessions, a.cfg.SessionName))
 		p.Post("/logout", a.logout)
-		p.Get("/dashboard", a.dashboard)
+		p.Get("/app", a.dashboard)
+		p.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/app", http.StatusFound)
+		})
 		p.Get("/clients", a.clientList)
+		p.Get("/clients/export", a.clientExport)
 		p.Post("/clients", a.clientCreate)
 		p.Get("/clients/new", a.clientNew)
 		p.Get("/clients/{id}", a.clientDetail)
@@ -238,6 +243,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/wills", a.willCreate)
 		p.Post("/wills/{id}/handover", a.willHandover)
 		p.Get("/repertorium", a.repertorium)
+		p.Get("/repertorium/export", a.repertoriumExport)
 		p.Get("/protocols", a.protocols)
 		p.Post("/protocols", a.protocolCreate)
 		p.Get("/legalisasi", a.legalisasi)
@@ -297,7 +303,7 @@ func (a *App) readyz(w http.ResponseWriter, _ *http.Request) {
 
 func (a *App) loginForm(w http.ResponseWriter, r *http.Request) {
 	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
 	a.render(w, r, "login", "Masuk — NOTARYOS", nil)
@@ -336,7 +342,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	})
 	uid := u.ID
 	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(u.ID, 10)})
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
@@ -349,10 +355,10 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 
 // ---- public landing ----
 
-// landing renders the public marketing page. Logged-in users go to /dashboard.
+// landing renders the public marketing page. Logged-in users go to /app.
 func (a *App) landing(w http.ResponseWriter, r *http.Request) {
 	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -438,15 +444,45 @@ func (a *App) last6Months(office int64) (labels []string, reqs []int, deeds []in
 
 func (a *App) clientList(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		a.forbidden(w, r)
 		return
 	}
-	list, _ := a.clients.List(a.officeOf(r), r.URL.Query().Get("q"), 50)
+	q := r.URL.Query().Get("q")
+	kind := r.URL.Query().Get("kind")
+	page := config.MustInt(r.URL.Query().Get("page"), 1)
+	if page < 1 {
+		page = 1
+	}
+	const perPage = 20
+	list, total, _ := a.clients.ListFiltered(a.officeOf(r), q, kind, perPage, (page-1)*perPage)
+	pages := (total + perPage - 1) / perPage
+	if pages < 1 {
+		pages = 1
+	}
 	if r.Header.Get("HX-Request") == "true" {
 		_ = a.tmpl.ExecuteTemplate(w, "client_rows", list)
 		return
 	}
-	a.render(w, r, "clients", "Klien", list)
+	a.render(w, r, "clients", "Daftar Klien", map[string]any{
+		"List": list, "Q": q, "Kind": kind, "Page": page, "Pages": pages, "Total": total,
+	})
+}
+
+// clientExport downloads the filtered client list as CSV (permission-gated).
+func (a *App) clientExport(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
+	list, _, _ := a.clients.ListFiltered(a.officeOf(r), r.URL.Query().Get("q"), r.URL.Query().Get("kind"), 200, 0)
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"klien.csv\"")
+	w.Write([]byte("\xef\xbb\xbf"))
+	fmt.Fprintln(w, "ID,Nama,Jenis,Telepon,Email,NPWP,Dibuat")
+	for _, c := range list {
+		fmt.Fprintf(w, "%d,\"%s\",%s,%s,%s,%s,%s\n", c.ID,
+			strings.ReplaceAll(c.FullName, `"`, `""`), c.Kind, c.Phone, c.Email, c.NPWP, c.CreatedAt)
+	}
 }
 
 func (a *App) clientNew(w http.ResponseWriter, r *http.Request) {
@@ -488,8 +524,35 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 	ids, _ := a.clients.Identities(c.ID)
 	reps, _ := a.clients.Reps(c.ID)
 	docs, _ := a.uploads.List(a.officeOf(r), "client", c.ID)
+	// Riwayat layanan + akta + audit klien ini.
+	type svcRow struct {
+		ID, Title, Service, Status string
+	}
+	var svcs []svcRow
+	if rows, err := a.db.Query(`SELECT r.id, r.title, s.name, r.status FROM service_requests r
+		JOIN services s ON s.id=r.service_id WHERE r.client_id=? AND r.office_id=? ORDER BY r.id DESC LIMIT 20`, id, a.officeOf(r)); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var x svcRow
+			_ = rows.Scan(&x.ID, &x.Title, &x.Service, &x.Status)
+			svcs = append(svcs, x)
+		}
+	}
+	type auditRow struct {
+		Action, At string
+	}
+	var trail []auditRow
+	if rows, err := a.db.Query(`SELECT action, created_at FROM audit_logs WHERE entity='client' AND entity_id=? ORDER BY id DESC LIMIT 20`, strconv.FormatInt(id, 10)); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var x auditRow
+			_ = rows.Scan(&x.Action, &x.At)
+			trail = append(trail, x)
+		}
+	}
 	a.render(w, r, "client_detail", "Detail Klien", map[string]any{
 		"Client": c, "Duplicates": dups, "Identities": ids, "Reps": reps, "Files": docs,
+		"Services": svcs, "Trail": trail,
 		"CanVerify": rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity),
 	})
 }
@@ -543,12 +606,13 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) deedList(w http.ResponseWriter, r *http.Request) {
 	list, _ := a.deeds.List(a.officeOf(r))
-	a.render(w, r, "deeds", "Akta", list)
+	tpls, _ := a.tpl.List(a.officeOf(r))
+	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls})
 }
 
 func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		a.forbidden(w, r)
 		return
 	}
 	_ = r.ParseForm()
@@ -557,14 +621,19 @@ func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.ParseInt(v, 10, 64)
 		reqID = &n
 	}
-	id, err := a.deeds.CreateDraft(a.officeOf(r), reqID, r.FormValue("title"), r.FormValue("kind"), nil, a.uid(r))
+	var tplID *int64
+	if v := r.FormValue("template_id"); v != "" {
+		n, _ := strconv.ParseInt(v, 10, 64)
+		tplID = &n
+	}
+	id, err := a.deeds.CreateDraft(a.officeOf(r), reqID, r.FormValue("title"), r.FormValue("kind"), tplID, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	uid := a.uid(r)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.draft", Entity: "deed", EntityID: strconv.FormatInt(id, 10)})
-	http.Redirect(w, r, "/deeds?flash=Draf+akta+dibuat", http.StatusSeeOther)
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Draf+akta+dibuat", http.StatusSeeOther)
 }
 
 // ---- registers ----
@@ -573,9 +642,26 @@ func (a *App) repertorium(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		No, Date, Desc, Parties string
 	}
+	q := r.URL.Query()
+	year, month, search := q.Get("year"), q.Get("month"), q.Get("q")
+	where := ` WHERE office_id=?`
+	args := []any{a.officeOf(r)}
+	if year != "" {
+		where += ` AND YEAR(entry_date)=?`
+		args = append(args, year)
+	}
+	if month != "" {
+		where += ` AND MONTH(entry_date)=?`
+		args = append(args, month)
+	}
+	if search != "" {
+		where += ` AND (entry_no LIKE ? OR description LIKE ? OR parties LIKE ?)`
+		like := "%" + search + "%"
+		args = append(args, like, like, like)
+	}
 	var rows []row
 	if a.db != nil {
-		rs, err := a.db.Query(`SELECT entry_no, entry_date, description, parties FROM repertorium WHERE office_id=? ORDER BY entry_no DESC LIMIT 200`, a.officeOf(r))
+		rs, err := a.db.Query(`SELECT entry_no, entry_date, description, parties FROM repertorium`+where+` ORDER BY entry_no DESC LIMIT 200`, args...)
 		if err == nil {
 			defer rs.Close()
 			for rs.Next() {
@@ -589,7 +675,54 @@ func (a *App) repertorium(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	a.render(w, r, "repertorium", "Repertorium", rows)
+	a.render(w, r, "repertorium", "Repertorium", map[string]any{
+		"Rows": rows, "Year": year, "Month": month, "Q": search,
+	})
+}
+
+// repertoriumExport downloads the filtered register as CSV (server-side numbering).
+func (a *App) repertoriumExport(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageRepert) && !rbac.Has(mw.RoleOf(r), rbac.PermViewReports) {
+		a.forbidden(w, r)
+		return
+	}
+	q := r.URL.Query()
+	year, month, search := q.Get("year"), q.Get("month"), q.Get("q")
+	where := ` WHERE office_id=?`
+	args := []any{a.officeOf(r)}
+	if year != "" {
+		where += ` AND YEAR(entry_date)=?`
+		args = append(args, year)
+	}
+	if month != "" {
+		where += ` AND MONTH(entry_date)=?`
+		args = append(args, month)
+	}
+	if search != "" {
+		where += ` AND (entry_no LIKE ? OR description LIKE ? OR parties LIKE ?)`
+		like := "%" + search + "%"
+		args = append(args, like, like, like)
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"repertorium.csv\"")
+	w.Write([]byte("\xef\xbb\xbf"))
+	fmt.Fprintln(w, "No,Tanggal,Uraian,Para Pihak")
+	rs, err := a.db.Query(`SELECT entry_no, entry_date, description, parties FROM repertorium`+where+` ORDER BY entry_no`, args...)
+	if err != nil {
+		return
+	}
+	defer rs.Close()
+	for rs.Next() {
+		var no, date, desc string
+		var p sql.NullString
+		_ = rs.Scan(&no, &date, &desc, &p)
+		parties := ""
+		if p.Valid {
+			parties = p.String
+		}
+		fmt.Fprintf(w, "%s,%s,\"%s\",\"%s\"\n", no, date,
+			strings.ReplaceAll(desc, `"`, `""`), strings.ReplaceAll(parties, `"`, `""`))
+	}
 }
 
 func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
