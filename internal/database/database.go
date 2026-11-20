@@ -55,7 +55,10 @@ func Migrate(db *sql.DB, files fs.FS, dir string) (int, error) {
 		if err != sql.ErrNoRows {
 			return applied, err
 		}
-		raw, err := fs.ReadFile(files, dir+"/"+n)
+		raw, err := fs.ReadFile(files, n)
+		if err != nil && dir != "" && dir != "." {
+			raw, err = fs.ReadFile(files, dir+"/"+n)
+		}
 		if err != nil {
 			return applied, err
 		}
