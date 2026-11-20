@@ -9,13 +9,13 @@
 <script src="/assets/vendor/htmx.min.js"></script>
 </head>{{end}}
 
-{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:#101f3c">
 <div class="container-fluid">
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
-<h1 class="navbar-brand navbar-brand-autodark mt-2"><span class="text-yellow fw-bold">N</span> NOTARIUS</h1>
+<h1 class="navbar-brand navbar-brand-autodark mt-2"><span class="text-yellow fw-bold">N</span> <span class="text-white">NOTARIUS</span></h1>
 <div class="collapse navbar-collapse" id="sidebar-menu">
 <form method="get" action="/search" class="px-3 mb-2"><input class="form-control" name="q" placeholder="Cari klien/akta…"/></form>
-<ul class="navbar-nav pt-lg-3">
+<ul class="navbar-nav pt-lg-3" id="mainnav">
 <li class="nav-item"><span class="nav-link disabled text-uppercase small">Workspace</span></li>
 <li class="nav-item"><a class="nav-link" href="/app">Dashboard</a></li>
 <li class="nav-item"><a class="nav-link" href="/appointments">Janji Temu</a></li>
@@ -79,5 +79,8 @@
 </div>
 </div>
 <script src="/assets/vendor/tabler.min.js"></script>
+<script>
+(function(){var p=location.pathname;document.querySelectorAll('#mainnav a.nav-link').forEach(function(a){var h=a.getAttribute('href');if(h&&h!=='#'&&(p===h||(h!=='/'&&p.indexOf(h)===0))){a.style.background='#c9a844';a.style.color='#101f3c';a.style.borderRadius='8px';a.style.fontWeight='700';}});})();
+</script>
 </body>
 </html>{{end}}

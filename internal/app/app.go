@@ -84,6 +84,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"can":     func(role, perm string) bool { return rbac.Has(role, perm) },
 		"wib":     func(t time.Time) string { return wib.Format(t) },
 		"wibdate": func(t time.Time) string { return wib.Date(t) },
+		"css":     func(s string) template.CSS { return template.CSS(s) },
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
@@ -406,6 +407,46 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	// Aktivitas 6 bulan terakhir (permohonan + akta selesai) untuk grafik.
 	months, reqSeries, deedSeries := a.last6Months(office)
+	reqPts, deedPts := svgSeries(reqSeries, deedSeries)
+	// Total klien + delta bulanan (mockup: Total Klien, delta %).
+	var totalClients int
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE office_id=?`, office).Scan(&totalClients)
+	}
+	var conic string
+	deltaReq, deltaDeed, deltaRev := pct(reqSeries), pct(deedSeries), 0
+	{
+		ym, prev := month, time.Now().AddDate(0, -1, 0).Format("2006-01")
+		var cur, old int64
+		if a.db != nil {
+			_ = a.db.QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.office_id=? AND DATE_FORMAT(p.paid_at,'%Y-%m')=?`, office, ym).Scan(&cur)
+			_ = a.db.QueryRow(`SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.office_id=? AND DATE_FORMAT(p.paid_at,'%Y-%m')=?`, office, prev).Scan(&old)
+		}
+		deltaRev = pct64(cur, old)
+	}
+	// Donat komposisi: Akta korporat vs Perjanjian vs Legalisasi vs Lainnya.
+	type seg struct {
+		Label, Color string
+		Pct          int
+	}
+	var donut []seg
+	if a.db != nil {
+		var corp, agree, leg int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND kind IN ('PT','CV','Firma','Yayasan')`, office).Scan(&corp)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND kind IN ('Agreement','POA','Prenup','Will','Other')`, office).Scan(&agree)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM legalizations WHERE office_id=?`, office).Scan(&leg)
+		tot := corp + agree + leg
+		if tot == 0 {
+			tot = 1
+		}
+		pc, pl, pa := corp*100/tot, leg*100/tot, agree*100/tot
+		donut = []seg{
+			{"Akta", "#206bc4", pc},
+			{"Legalitas", "#e9a23b", pl},
+			{"Perjanjian", "#16a37b", pa},
+		}
+		conic = fmt.Sprintf("conic-gradient(#206bc4 0 %d%%,#e9a23b %d%% %d%%,#16a37b %d%% 100%%)", pc, pc, pc+pl, pc+pl)
+	}
 	// Notifikasi terbaru pengguna.
 	var notifs []map[string]any
 	if id := a.uid(r); id != nil {
@@ -418,8 +459,54 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Pending": pending, "Active": active, "Completed": completed,
 		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
 		"Role": mw.RoleOf(r), "Today": today, "Notifs": notifs,
-		"Months": months, "ReqSeries": reqSeries, "DeedSeries": deedSeries,
+		"Months": months, "ReqPts": reqPts, "DeedPts": deedPts,
+		"Clients": totalClients, "DReq": deltaReq, "DDeed": deltaDeed, "DRev": deltaRev,
+		"Donut": donut, "Conic": conic,
 	})
+}
+
+// svgSeries converts two monthly series into SVG polyline point strings (600x160).
+func svgSeries(a, b []int) (string, string) {
+	max := 1
+	for _, v := range append(append([]int{}, a...), b...) {
+		if v > max {
+			max = v
+		}
+	}
+	pts := func(s []int) string {
+		out := ""
+		for i, v := range s {
+			x := 20 + i*(560/5)
+			y := 150 - v*130/max
+			out += strconv.Itoa(x) + "," + strconv.Itoa(y) + " "
+		}
+		return out
+	}
+	return pts(a), pts(b)
+}
+
+func pct(s []int) int {
+	if len(s) < 2 {
+		return 0
+	}
+	old, cur := s[len(s)-2], s[len(s)-1]
+	if old == 0 {
+		if cur > 0 {
+			return 100
+		}
+		return 0
+	}
+	return (cur - old) * 100 / old
+}
+
+func pct64(cur, old int64) int {
+	if old == 0 {
+		if cur > 0 {
+			return 100
+		}
+		return 0
+	}
+	return int((cur - old) * 100 / old)
 }
 
 // last6Months returns month labels + request counts + completed-deed counts.
