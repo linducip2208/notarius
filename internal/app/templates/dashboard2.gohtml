@@ -1,0 +1,45 @@
+{{define "dashboard"}}{{template "head" .}}{{template "page_open" .}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<div><h2 class="page-title mb-0">Dashboard</h2><p class="text-secondary mb-0">Selamat datang, {{.UserName}}</p></div>
+<form method="get" action="/appointments"><button class="btn btn-primary" type="submit">+ Jadwal Penghadap</button></form>
+</div>
+<div class="row row-deck row-cards mb-3">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu</div><div class="h1">{{.Data.Pending}}</div><a href="/requests?status=SUBMITTED">Lihat antrean</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Aktif</div><div class="h1">{{.Data.Active}}</div><a href="/requests?status=IN_PROGRESS">Lihat pekerjaan</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Selesai</div><div class="h1">{{.Data.Completed}}</div><a href="/requests?status=COMPLETED">Lihat riwayat</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Piutang</div><div class="h1">Rp {{.Data.Outstanding}}</div><a href="/finance">Ke keuangan</a></div></div></div>
+</div>
+<div class="row g-3">
+<div class="col-lg-8">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas 6 Bulan Terakhir</h3></div>
+<div class="card-body">
+<div class="d-flex align-items-end gap-2" style="height:160px">
+{{range $i, $m := .Data.Months}}
+<div class="flex-fill text-center"><div class="d-flex align-items-end justify-content-center gap-1" style="height:130px">
+<div title="Permohonan" style="width:14px;background:#206bc4;height:{{index $.Data.ReqSeries $i}}px;max-height:130px;min-height:3px;border-radius:3px"></div>
+<div title="Akta" style="width:14px;background:#c9a24b;height:{{index $.Data.DeedSeries $i}}px;max-height:130px;min-height:3px;border-radius:3px"></div>
+</div><div class="small text-secondary mt-1">{{$m}}</div></div>
+{{end}}
+</div>
+<div class="d-flex gap-3 small mt-2"><span><span class="badge" style="background:#206bc4">&nbsp;</span> Permohonan</span><span><span class="badge" style="background:#c9a24b">&nbsp;</span> Akta disahkan</span></div>
+</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Agenda Hari Ini</h3><div class="ms-auto"><a href="/appointments">Lihat Semua →</a></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><tbody>
+{{range .Data.Today}}<tr><td class="text-secondary">{{.At}}</td><td>{{.Purpose}} – {{.Client}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
+{{else}}<tr><td class="text-center text-secondary py-3">Tidak ada jadwal hari ini. <a href="/appointments">Buat janji →</a></td></tr>{{end}}
+</tbody></table></div></div>
+</div>
+<div class="col-lg-4">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Notifikasi Terbaru</h3><div class="ms-auto"><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-primary" type="submit">Tandai dibaca</button></form></div></div>
+<div class="list-group list-group-flush">{{range .Data.Notifs}}<div class="list-group-item"><div>{{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
+{{else}}<div class="list-group-item text-secondary">Belum ada notifikasi.</div>{{end}}</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Aktivitas Terbaru</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter">
+<thead><tr><th>ID</th><th>Judul</th><th>Status</th><th></th></tr></thead>
+<tbody>{{range .Data.Recent}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
+<td><form method="post" action="/requests/{{.ID}}/move" class="d-inline">{{template "csrf" $}}<input type="hidden" name="to" value="IN_REVIEW"/><button class="btn btn-sm btn-ghost-primary" type="submit">Proses</button></form></td></tr>
+{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada permohonan. Buat dari halaman Permohonan.</td></tr>{{end}}</tbody>
+</table></div></div>
+</div>
+</div>
+{{template "page_close" .}}{{end}}

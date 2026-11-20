@@ -193,6 +193,8 @@ func (a *App) Router() http.Handler {
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
+	r.Get("/", a.landing)
+	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
 	r.Get("/login", a.loginForm)
 	r.With(limiter.Limit).Post("/login", a.login)
 	r.Get("/mfa/verify", a.mfaVerifyForm)
@@ -202,7 +204,7 @@ func (a *App) Router() http.Handler {
 		p.Use(mw.RequireAuth)
 		p.Use(mw.CSRF(a.sessions, a.cfg.SessionName))
 		p.Post("/logout", a.logout)
-		p.Get("/", a.dashboard)
+		p.Get("/dashboard", a.dashboard)
 		p.Get("/clients", a.clientList)
 		p.Post("/clients", a.clientCreate)
 		p.Get("/clients/new", a.clientNew)
@@ -295,7 +297,7 @@ func (a *App) readyz(w http.ResponseWriter, _ *http.Request) {
 
 func (a *App) loginForm(w http.ResponseWriter, r *http.Request) {
 	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
 	a.render(w, r, "login", "Masuk — NOTARYOS", nil)
@@ -334,7 +336,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	})
 	uid := u.ID
 	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(u.ID, 10)})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
@@ -345,24 +347,91 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
+// ---- public landing ----
+
+// landing renders the public marketing page. Logged-in users go to /dashboard.
+func (a *App) landing(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != "" {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := a.tmpl.ExecuteTemplate(w, "landing", nil); err != nil {
+		a.log.Error("render", "page", "landing", "err", err)
+		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+	}
+}
+
 // ---- dashboard ----
 
 func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	office := a.officeOf(r)
 	pending, active, completed := 0, 0, 0
 	var outstanding int64
+	var monthRev int64
+	month := time.Now().Format("2006-01")
 	if a.db != nil {
 		pending, active, completed, _ = a.reqs.Counts(office)
 		outstanding, _ = a.fin.Outstanding(office)
+		monthRev, _ = a.fin.Revenue(office, month)
 	}
 	recent, _ := a.reqs.List(office, "")
 	if len(recent) > 8 {
 		recent = recent[:8]
 	}
+	// Agenda hari ini (mockup: Agenda Hari Ini).
+	type agenda struct {
+		At, Client, Purpose, Status string
+	}
+	var today []agenda
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT a.scheduled_at, c.full_name, a.purpose, a.status
+			FROM appointments a JOIN clients c ON c.id=a.client_id
+			WHERE a.office_id=? AND DATE(a.scheduled_at)=CURDATE() ORDER BY a.scheduled_at LIMIT 10`, office)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var g agenda
+				_ = rows.Scan(&g.At, &g.Client, &g.Purpose, &g.Status)
+				g.At = g.At[11:16]
+				today = append(today, g)
+			}
+		}
+	}
+	// Aktivitas 6 bulan terakhir (permohonan + akta selesai) untuk grafik.
+	months, reqSeries, deedSeries := a.last6Months(office)
+	// Notifikasi terbaru pengguna.
+	var notifs []map[string]any
+	if id := a.uid(r); id != nil {
+		notifs, _ = notify.List(a.db, *id)
+		if len(notifs) > 5 {
+			notifs = notifs[:5]
+		}
+	}
 	a.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed,
-		"Outstanding": outstanding, "Recent": recent, "Role": mw.RoleOf(r),
+		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
+		"Role": mw.RoleOf(r), "Today": today, "Notifs": notifs,
+		"Months": months, "ReqSeries": reqSeries, "DeedSeries": deedSeries,
 	})
+}
+
+// last6Months returns month labels + request counts + completed-deed counts.
+func (a *App) last6Months(office int64) (labels []string, reqs []int, deeds []int) {
+	now := time.Now()
+	for i := 5; i >= 0; i-- {
+		m := now.AddDate(0, -i, 0)
+		labels = append(labels, m.Format("Jan"))
+		ym := m.Format("2006-01")
+		var rc, dc int
+		if a.db != nil {
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM service_requests WHERE office_id=? AND DATE_FORMAT(created_at,'%Y-%m')=?`, office, ym).Scan(&rc)
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND DATE_FORMAT(created_at,'%Y-%m')=? AND status IN ('APPROVED','SIGNED','ARCHIVED')`, office, ym).Scan(&dc)
+		}
+		reqs = append(reqs, rc)
+		deeds = append(deeds, dc)
+	}
+	return labels, reqs, deeds
 }
 
 // ---- clients ----

@@ -64,7 +64,7 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1})
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
 		Expires: sess.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func (a *App) mfaSetup(w http.ResponseWriter, r *http.Request) {
@@ -1035,7 +1035,7 @@ func (a *App) notifRead(w http.ResponseWriter, r *http.Request) {
 	if id := a.uid(r); id != nil {
 		_ = notify.ReadAll(a.db, *id)
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 // notifCount is a template helper wired in render below.
