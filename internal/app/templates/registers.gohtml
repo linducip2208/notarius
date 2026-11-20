@@ -26,7 +26,7 @@
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Daftar Akta</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nomor</th><th>Judul</th><th>Jenis</th><th>Status</th><th>Ver</th><th>Terkunci</th><th>Ekspor</th><th>Aksi</th></tr></thead>
-<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Number}}</td><td>{{.Title}}</td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a></td>
+<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Number}}</td><td>{{.Title}}</td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/docx">DOCX</a></div></td>
 <td><div class="d-flex gap-1"><form method="post" action="/deeds/{{.ID}}/review">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" title="Kirim ke review notaris">Review</button></form><form method="post" action="/deeds/{{.ID}}/approve" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="number" placeholder="No. akta" style="width:90px"/><button class="btn btn-sm btn-success" type="submit" title="Setujui (notaris) + repertorium otomatis">Sahkan</button></form></div></td></tr>
 {{else}}<tr><td colspan="9" class="text-center text-secondary py-4">Belum ada akta.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
@@ -39,6 +39,13 @@
 {{template "page_close" .}}{{end}}
 
 {{define "protocols"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Bendel Baru (25 tahun, UUJN)</h3></div>
+<form method="post" action="/protocols"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><input class="form-control" name="bundle_no" placeholder="No. bendel" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="year" placeholder="Tahun" value="2026" required/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="minuta_ref" placeholder="Referensi minuta"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Catat</button></div>
+</div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Arsip Protokol Notaris</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Bendel</th><th>Tahun</th><th>Referensi minuta</th></tr></thead>
 <tbody>{{range .Data}}<tr><td>{{.Bundle}}</td><td>{{.Year}}</td><td>{{.Ref}}</td></tr>

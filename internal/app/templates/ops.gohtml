@@ -9,9 +9,9 @@
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Buku Register</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jenis</th><th>No. Register</th><th>Dokumen</th><th>Biaya</th><th>Status</th></tr></thead>
-<tbody>{{range .Data.Rows}}<tr><td>{{.Kind}}</td><td>{{.Reg}}</td><td>{{.Title}}</td><td>{{.Fee}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada register.</td></tr>{{end}}</tbody></table></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jenis</th><th>No. Register</th><th>Dokumen</th><th>Biaya</th><th>Status</th><th>Serah</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.Kind}}</td><td>{{.Reg}}</td><td>{{.Title}}</td><td>{{.Fee}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td><td><form method="post" action="/legalisasi/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option value="COMPLETED">COMPLETED</option><option value="HANDED_OVER">HANDED_OVER</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada register.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "gov"}}{{template "head" .}}{{template "page_open" .}}

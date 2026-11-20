@@ -1,6 +1,7 @@
 package app
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"notaryos/internal/clients"
 	"notaryos/internal/corp"
 	"notaryos/internal/doctpl"
+	"notaryos/internal/docx"
 	"notaryos/internal/gov"
 	"notaryos/internal/mfa"
 	mw "notaryos/internal/middleware"
@@ -187,6 +189,25 @@ func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/clients?flash=OCR+selesai", http.StatusSeeOther)
+}
+
+// fileDownload streams a private file after office-scope authorization (F-024).
+func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) && !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	m, rc, err := a.uploads.Get(a.officeOf(r), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer rc.Close()
+	w.Header().Set("Content-Type", m.MIME)
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+m.Name+"\"")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(w, rc)
 }
 
 // ---- request detail + corporate ----
@@ -441,7 +462,6 @@ func (a *App) clauseSave(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---- deed PDF export ----
-
 func (a *App) deedToReview(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) && !rbac.Has(mw.RoleOf(r), rbac.PermEditDeed) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -516,6 +536,80 @@ func (a *App) deedPDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"akta-"+strconv.FormatInt(id, 10)+".pdf\"")
 	w.Write(out)
+}
+
+func (a *App) deedDOCX(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var title, body, status string
+	err := a.db.QueryRow(`SELECT title, content, status FROM deed_drafts WHERE id=? AND office_id=?`, id, a.officeOf(r)).
+		Scan(&title, &body, &status)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	draft := status != "SIGNED" && status != "ARCHIVED"
+	out := docx.Export(title, body, draft)
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"akta-"+strconv.FormatInt(id, 10)+".docx\"")
+	w.Write(out)
+}
+
+func (a *App) protocolCreate(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	year, _ := strconv.Atoi(r.FormValue("year"))
+	if err := a.deeds.CreateProtocol(a.officeOf(r), r.FormValue("bundle_no"), year, r.FormValue("minuta_ref")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "protocol.create", Entity: "protocol", EntityID: r.FormValue("bundle_no")})
+	http.Redirect(w, r, "/protocols?flash=Bendel+protokol+dicatat", http.StatusSeeOther)
+}
+
+func (a *App) legalisasiAdvance(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermLegalize) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err := a.deeds.AdvanceLegalization(a.officeOf(r), id, r.FormValue("to")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "legalisasi.advance", Entity: "legalization", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("to")})
+	http.Redirect(w, r, "/legalisasi?flash=Status+register+diperbarui", http.StatusSeeOther)
+}
+
+func (a *App) appointmentStatus(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err := a.reqs.SetAppointmentStatus(a.officeOf(r), id, r.FormValue("to")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/appointments?flash=Janji+diperbarui", http.StatusSeeOther)
+}
+
+func (a *App) metrics(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewReports) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	pending, active, completed := 0, 0, 0
+	var out int64
+	if a.db != nil {
+		pending, active, completed, _ = a.reqs.Counts(a.officeOf(r))
+		out, _ = a.fin.Outstanding(a.officeOf(r))
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte("notaryos_requests_pending " + strconv.Itoa(pending) + "\n"))
+	w.Write([]byte("notaryos_requests_active " + strconv.Itoa(active) + "\n"))
+	w.Write([]byte("notaryos_requests_completed " + strconv.Itoa(completed) + "\n"))
+	w.Write([]byte("notaryos_outstanding_rupiah " + strconv.FormatInt(out, 10) + "\n"))
 }
 
 // ---- user admin ----

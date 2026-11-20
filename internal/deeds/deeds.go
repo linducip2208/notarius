@@ -167,3 +167,44 @@ func (s *Store) RegisterLegalization(officeID int64, kind, regNo string, clientI
 	}
 	return res.LastInsertId()
 }
+
+// AdvanceLegalization moves REGISTERED → COMPLETED → HANDED_OVER (office-scoped).
+func (s *Store) AdvanceLegalization(officeID, id int64, to string) error {
+	var cur, kind string
+	var oid int64
+	if err := s.db.QueryRow(`SELECT status, office_id, kind FROM legalizations WHERE id=?`, id).Scan(&cur, &oid, &kind); err != nil {
+		return err
+	}
+	if oid != officeID {
+		return errors.New("register tidak ditemukan")
+	}
+	allowed := map[string][]string{
+		"REGISTERED": {"COMPLETED"},
+		"COMPLETED":  {"HANDED_OVER"},
+	}
+	ok := false
+	for _, n := range allowed[cur] {
+		if n == to {
+			ok = true
+		}
+	}
+	if !ok {
+		return errors.New("transisi register tidak valid: " + cur + " → " + to)
+	}
+	_, err := s.db.Exec(`UPDATE legalizations SET status=?, completed_at=IF(?='COMPLETED',UTC_TIMESTAMP(),completed_at) WHERE id=?`, to, to, id)
+	return err
+}
+
+// CreateProtocol records a protocol bundle (office-scoped, unique per year).
+func (s *Store) CreateProtocol(officeID int64, bundle string, year int, minutaRef string) error {
+	if bundle == "" || year < 2000 || year > 2100 {
+		return errors.New("bendel/tahun protokol tidak valid")
+	}
+	var ref any
+	if minutaRef != "" {
+		ref = minutaRef
+	}
+	_, err := s.db.Exec(`INSERT INTO protocols(office_id, bundle_no, year, minuta_ref) VALUES(?,?,?,?)`,
+		officeID, bundle, year, ref)
+	return err
+}

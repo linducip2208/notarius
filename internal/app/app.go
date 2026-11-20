@@ -189,6 +189,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/identities/{id}/verify", a.identityVerify)
 		p.Post("/clients/{id}/reps", a.repAdd)
 		p.Post("/clients/{id}/files", a.fileUpload)
+		p.Get("/files/{id}", a.fileDownload)
 		p.Post("/files/{id}/ocr", a.fileOCR)
 		p.Get("/requests", a.requestList)
 		p.Post("/requests", a.requestCreate)
@@ -200,18 +201,22 @@ func (a *App) Router() http.Handler {
 		p.Post("/requests/{id}/bo", a.boAdd)
 		p.Get("/appointments", a.appointments)
 		p.Post("/appointments", a.appointmentCreate)
+		p.Post("/appointments/{id}/status", a.appointmentStatus)
 		p.Get("/deeds", a.deedList)
 		p.Post("/deeds", a.deedCreate)
 		p.Post("/deeds/{id}/approve", a.deedApprove)
 		p.Post("/deeds/{id}/review", a.deedToReview)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
+		p.Get("/deeds/{id}/docx", a.deedDOCX)
 		p.Get("/wills", a.willsPage)
 		p.Post("/wills", a.willCreate)
 		p.Post("/wills/{id}/handover", a.willHandover)
 		p.Get("/repertorium", a.repertorium)
 		p.Get("/protocols", a.protocols)
+		p.Post("/protocols", a.protocolCreate)
 		p.Get("/legalisasi", a.legalisasi)
 		p.Post("/legalisasi", a.legalisasiCreate)
+		p.Post("/legalisasi/{id}/advance", a.legalisasiAdvance)
 		p.Get("/gov", a.gov)
 		p.Post("/gov", a.govCreate)
 		p.Post("/gov/{id}/advance", a.govAdvance)
@@ -232,6 +237,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/mfa", a.mfaEnable)
 		p.Get("/portal", a.portal)
 		p.Post("/notifications/read", a.notifRead)
+		p.Get("/metrics", a.metrics)
 	})
 	return r
 }
@@ -507,17 +513,18 @@ func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) legalisasi(w http.ResponseWriter, r *http.Request) {
 	type row struct {
+		ID                       int64
 		Kind, Reg, Title, Status string
 		Fee                      float64
 	}
 	var rows []row
 	if a.db != nil {
-		rs, err := a.db.Query(`SELECT kind, register_no, doc_title, fee, status FROM legalizations WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
+		rs, err := a.db.Query(`SELECT id, kind, register_no, doc_title, fee, status FROM legalizations WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
 		if err == nil {
 			defer rs.Close()
 			for rs.Next() {
 				var x row
-				_ = rs.Scan(&x.Kind, &x.Reg, &x.Title, &x.Fee, &x.Status)
+				_ = rs.Scan(&x.ID, &x.Kind, &x.Reg, &x.Title, &x.Fee, &x.Status)
 				rows = append(rows, x)
 			}
 		}

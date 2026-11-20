@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"notaryos/internal/clients"
@@ -279,5 +280,44 @@ func TestBeneficialOwnerAndWillHandover(t *testing.T) {
 	}
 	if err := ws.Handover(wid, "X", ""); err == nil {
 		t.Fatal("handover ganda harus gagal")
+	}
+}
+
+func TestProtocolLegalisasiAppointment(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := clients.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "Proto", Phone: "0855000055"})
+	ds := deeds.NewStore(db)
+	if err := ds.CreateProtocol(office, "B-I", 2026, "minuta-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.CreateProtocol(office, "", 1999, ""); err == nil {
+		t.Fatal("protokol invalid harus gagal")
+	}
+	lid, err := ds.RegisterLegalization(office, "LEGALISASI", "REG-1", cid, "Dok A", 150000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.AdvanceLegalization(office, lid, "HANDED_OVER"); err == nil {
+		t.Fatal("loncat status harus gagal")
+	}
+	if err := ds.AdvanceLegalization(office, lid, "COMPLETED"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ds.AdvanceLegalization(office, lid, "HANDED_OVER"); err != nil {
+		t.Fatal(err)
+	}
+	rs := requests.NewStore(db)
+	at := time.Now().Add(2 * time.Hour)
+	aid, err := rs.Schedule(office, cid, nil, at, "Konsultasi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rs.SetAppointmentStatus(office, aid, "DONE"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rs.SetAppointmentStatus(office, aid, "BOGUS"); err == nil {
+		t.Fatal("status liar harus gagal")
 	}
 }

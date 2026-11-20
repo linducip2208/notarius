@@ -108,11 +108,45 @@ func (s *Store) List(officeID int64, ownerType string, ownerID int64) ([]Meta, e
 
 // RunOCR executes the provider and stores the result with provenance.
 // Human verification is a separate explicit step (VerifyOCR).
-func (s *Store) RunOCR(fileID int64, tmpPath string) (ocr.Result, error) {
-	res, err := s.ocr.Extract(nil, tmpPath)
+// It resolves the private ref to a temp file so Tesseract works on real bytes.
+func (s *Store) RunOCR(fileID int64, _ string) (ocr.Result, error) {
+	var ref, mime, orig string
+	var officeID int64
+	if err := s.db.QueryRow(`SELECT ref, mime, original_name, office_id FROM files WHERE id=?`, fileID).
+		Scan(&ref, &mime, &orig, &officeID); err != nil {
+		return ocr.Result{}, err
+	}
+	rc, err := s.files.Open(ref)
 	if err != nil {
 		_, _ = s.db.Exec(`UPDATE files SET ocr_status='FAILED' WHERE id=?`, fileID)
 		return ocr.Result{}, err
+	}
+	defer rc.Close()
+	tmp, err := os.CreateTemp("", "ocr-*"+filepath.Ext(orig))
+	if err != nil {
+		_, _ = s.db.Exec(`UPDATE files SET ocr_status='FAILED' WHERE id=?`, fileID)
+		return ocr.Result{}, err
+	}
+	tmpName := tmp.Name()
+	if _, err := io.Copy(tmp, io.LimitReader(rc, 100<<20)); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		_, _ = s.db.Exec(`UPDATE files SET ocr_status='FAILED' WHERE id=?`, fileID)
+		return ocr.Result{}, err
+	}
+	tmp.Close()
+	defer os.Remove(tmpName)
+	_ = mime
+	res, err := s.ocr.Extract(nil, tmpName)
+	if err != nil {
+		_, _ = s.db.Exec(`UPDATE files SET ocr_status='FAILED' WHERE id=?`, fileID)
+		return ocr.Result{}, err
+	}
+	if res.Fields == nil {
+		res.Fields = map[string]string{}
+	}
+	if _, ok := res.Fields["text"]; !ok {
+		res.Fields["text"] = ""
 	}
 	_, err = s.db.Exec(`INSERT INTO ai_results(file_id, provider, provenance, doc_type)
 		VALUES(?,?,?,?)`, fileID, res.Provider, res.Provenance, string(res.DocType))
@@ -121,6 +155,24 @@ func (s *Store) RunOCR(fileID int64, tmpPath string) (ocr.Result, error) {
 	}
 	_, _ = s.db.Exec(`UPDATE files SET ocr_status='DONE' WHERE id=?`, fileID)
 	return res, nil
+}
+
+// Get returns metadata + open reader, enforcing office scope (otorisasi unduhan).
+func (s *Store) Get(officeID, fileID int64) (Meta, io.ReadCloser, error) {
+	var m Meta
+	var ref string
+	err := s.db.QueryRow(`SELECT id, owner_type, owner_id, ref, original_name, mime, size_bytes, ocr_status
+		FROM files WHERE id=? AND office_id=?`, fileID, officeID).
+		Scan(&m.ID, &m.OwnerType, &m.OwnerID, &ref, &m.Name, &m.MIME, &m.Size, &m.OCRStatus)
+	if err != nil {
+		return Meta{}, nil, err
+	}
+	m.Ref = ref
+	rc, err := s.files.Open(ref)
+	if err != nil {
+		return Meta{}, nil, err
+	}
+	return m, rc, nil
 }
 
 func stamp() string { return time.Now().UTC().Format("20060102T150405Z0700") }
