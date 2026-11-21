@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"notaryos/internal/audit"
 	"notaryos/internal/auth"
 	"notaryos/internal/clients"
+	"notaryos/internal/cms"
 	"notaryos/internal/config"
 	"notaryos/internal/corp"
 	"notaryos/internal/cryptoxx"
@@ -66,6 +68,7 @@ type App struct {
 	tpl       *doctpl.Store
 	govs      *gov.Store
 	uploads   *files.Store
+	web       *cms.Store
 	ocr       ocr.Provider
 	files     storage.Store
 	pool      *workers.Pool
@@ -92,6 +95,17 @@ type Page struct {
 	Flash      string
 	CSRF       string
 	Data       any
+	Brand      BrandingView
+}
+
+// BrandingView carries white-label values into every template (safe, validated).
+type BrandingView struct {
+	AppName, ShortName, Tagline string
+	Primary, Secondary, Accent  string
+	SidebarBG, HeaderBG          string
+	ButtonRadius, FontStack     string
+	LogoURL, FaviconURL, LoginBG string
+	FooterText, CopyrightText   string
 }
 
 // New builds the app. db may be nil only in tests that never hit handlers.
@@ -105,6 +119,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"hasPrefix": func(s, p string) bool { return strings.HasPrefix(s, p) },
 		"hasSuffix": func(s, p string) bool { return strings.HasSuffix(s, p) },
 		"safeHTML":  func(s string) template.HTML { return template.HTML(safehtml.Sanitize(s)) },
+		"cmsHTML":   func(s string) template.HTML { return template.HTML(cms.SanitizeHTML(s)) },
 		"plaintext": func(s string) string { return safehtml.ToText(s) },
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
@@ -143,6 +158,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		a.tpl = doctpl.NewStore(db)
 		a.govs = gov.NewStore(db)
 		a.uploads = files.NewStore(db, a.files, a.ocr)
+		a.web = cms.NewStore(db)
 		// Session hygiene: hapus sesi kedaluwarsa tiap jam (best-effort, B-07).
 		if sqls, ok := a.sessions.(*auth.SQLStore); ok {
 			go func() {
@@ -188,6 +204,10 @@ func (a *App) runReminders() (appt, overdue, tasks, sla int) {
 		_ = rows.Scan(&oid)
 		pa, po, pt, ps, _ := remind.RunOnce(a.db, oid, deliver.FromEnv())
 		appt, overdue, tasks, sla = appt+pa, overdue+po, tasks+pt, sla+ps
+		// CMS: terbitkan halaman/artikel terjadwal yang jatuh tempo.
+		if a.web != nil {
+			a.web.PublishDue(oid)
+		}
 	}
 	return appt, overdue, tasks, sla
 }
@@ -295,10 +315,53 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 	if acting && actName != "" {
 		officeName = actName + " (bertindak)"
 	}
-	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data}); err != nil {
+	brand := a.brandView(a.officeOf(r))
+	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data, Brand: brand}); err != nil {
 		a.log.Error("render", "page", name, "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
+}
+
+// brandView resolves white-label values for an office (defaults when unset).
+// Logged-out pages (office 0) fall back to the install's first office so the
+// standalone install's login screen carries its own brand.
+func (a *App) brandView(officeID int64) BrandingView {
+	bv := BrandingView{
+		AppName: "SaktiNotaris", ShortName: "SN",
+		Primary: "#1f6feb", Secondary: "#101f3c", Accent: "#c9a844",
+		SidebarBG: "#101f3c", HeaderBG: "#ffffff",
+		ButtonRadius: "8px",
+		FontStack:    cms.FontStack("system"),
+	}
+	if a.db == nil || a.web == nil {
+		return bv
+	}
+	if officeID == 0 {
+		_ = a.db.QueryRow(`SELECT COALESCE(MIN(id),0) FROM offices`).Scan(&officeID)
+		if officeID == 0 {
+			return bv
+		}
+	}
+	b, err := a.web.BrandingOf(officeID)
+	if err != nil {
+		return bv
+	}
+	bv.AppName, bv.ShortName, bv.Tagline = b.AppName, b.ShortName, b.Tagline
+	bv.Primary, bv.Secondary, bv.Accent = b.Primary, b.Secondary, b.Accent
+	bv.SidebarBG, bv.HeaderBG = b.SidebarBG, b.HeaderBG
+	bv.ButtonRadius = cms.ButtonRadius(b.ButtonStyle, b.BorderRadius)
+	bv.FontStack = cms.FontStack(b.FontFamily)
+	if b.LogoRef != "" {
+		bv.LogoURL = "/media/by-ref?ref=" + url.QueryEscape(b.LogoRef)
+	}
+	if b.FaviconRef != "" {
+		bv.FaviconURL = "/media/by-ref?ref=" + url.QueryEscape(b.FaviconRef)
+	}
+	if b.LoginBG != "" {
+		bv.LoginBG = "/media/by-ref?ref=" + url.QueryEscape(b.LoginBG)
+	}
+	bv.FooterText, bv.CopyrightText = b.FooterText, b.CopyrightText
+	return bv
 }
 
 // forbidden renders 403 with guidance instead of plain text.
@@ -329,7 +392,18 @@ func (a *App) Router() http.Handler {
 	r.Get("/s/{token}", a.dmsSharedDownload)
 	r.Get("/verify", a.verifyPage)
 	r.Get("/qr/inv/{id}", a.invoiceQR)
-	r.Get("/", a.landing)
+	r.Get("/", a.publicHome)
+	r.Get("/tentang-kami", a.publicPageSlug("tentang-kami"))
+	r.Get("/kontak", a.publicContact)
+	r.Get("/p/{slug}", a.publicGeneric)
+	r.Get("/artikel", a.publicArticles)
+	r.Get("/artikel/{slug}", a.publicArticle)
+	r.Get("/faq", a.publicFAQ)
+	r.Get("/layanan-kami", a.publicServices)
+	r.Get("/layanan-kami/{slug}", a.publicService)
+	r.Get("/media/{id}", a.mediaServe)
+	r.Get("/media/{id}/{file}", a.mediaServe)
+	r.Get("/media/by-ref", a.mediaByRef)
 	r.Get("/robots.txt", a.robotsTxt)
 	r.Get("/sitemap.xml", a.sitemapXML)
 	r.Get("/llms.txt", a.llmsTxt)
@@ -407,6 +481,43 @@ func (a *App) Router() http.Handler {
 		p.Post("/clauses", a.clauseSave)
 		p.Get("/reports", a.reports)
 		p.Get("/settings", a.settings)
+		// Website CMS + White Label (standalone per kantor).
+		p.Get("/cms", a.cmsDashboard)
+		p.Get("/cms/branding", a.brandingPage)
+		p.Post("/cms/branding", a.brandingSave)
+		p.Get("/cms/site", a.sitePage)
+		p.Post("/cms/site", a.siteSave)
+		p.Post("/cms/domain", a.domainSave)
+		p.Get("/cms/media", a.mediaPage)
+		p.With(mw.NewRateLimiter(20, time.Minute).Limit).Post("/cms/media", a.mediaUpload)
+		p.Post("/cms/media/{id}/delete", a.mediaDelete)
+		p.Get("/cms/pages", a.cmsPages)
+		p.Get("/cms/pages/new", a.cmsPageNew)
+		p.Post("/cms/pages", a.cmsPageCreate)
+		p.Get("/cms/pages/{id}", a.cmsPageEdit)
+		p.Post("/cms/pages/{id}", a.cmsPageUpdate)
+		p.Post("/cms/pages/{id}/duplicate", a.cmsPageDuplicate)
+		p.Post("/cms/pages/{id}/delete", a.cmsPageDelete)
+		p.Post("/cms/pages/{id}/sections", a.cmsSectionSave)
+		p.Post("/cms/sections/{sid}/delete", a.cmsSectionDelete)
+		p.Get("/cms/articles", a.cmsArticles)
+		p.Get("/cms/articles/new", a.cmsArticleNew)
+		p.Get("/cms/articles/{id}", a.cmsArticleEdit)
+		p.Post("/cms/articles", a.cmsArticleSave)
+		p.Post("/cms/articles/{id}", a.cmsArticleUpdate)
+		p.Post("/cms/categories", a.cmsCategorySave)
+		p.Get("/cms/services", a.cmsServices)
+		p.Post("/cms/services", a.cmsServiceSave)
+		p.Get("/cms/faq", a.cmsFAQ)
+		p.Post("/cms/faq", a.cmsFAQSave)
+		p.Post("/cms/faq/{id}/delete", a.cmsFAQDelete)
+		p.Get("/cms/nav", a.cmsNav)
+		p.Post("/cms/nav", a.cmsNavSave)
+		p.Post("/cms/nav/{id}/delete", a.cmsNavDelete)
+		p.Get("/cms/history", a.cmsHistory)
+		p.Get("/cms/setup", a.setupPage)
+		p.Post("/cms/setup", a.setupSave)
+		p.Post("/cms/setup/sample", a.setupSample)
 		p.Post("/users", a.userCreate)
 		p.Post("/users/{id}/link", a.userLink)
 		p.Get("/roles", a.rolesPage)
@@ -594,6 +705,9 @@ func (a *App) sitemapXML(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, s := range []string{"#fitur", "#solusi", "#harga", "#faq"} {
 		urls = append(urls, url{base + "/" + s, "monthly", "0.5"})
+	}
+	for _, u := range a.cmsSitemapURLs(base) {
+		urls = append(urls, url{u, "weekly", "0.8"})
 	}
 	urls = append(urls, url{base + "/docs", "monthly", "0.9"})
 	for _, st := range docSteps() {

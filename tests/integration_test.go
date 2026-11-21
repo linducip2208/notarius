@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"notaryos/internal/clients"
+	"notaryos/internal/cms"
 	"notaryos/internal/corp"
 	"notaryos/internal/deeds"
 	"notaryos/internal/finance"
@@ -449,5 +450,91 @@ func TestApproveConcurrent(t *testing.T) {
 	_ = db.QueryRow(`SELECT COUNT(*) FROM repertorium WHERE deed_id=?`, did).Scan(&repert)
 	if status != "APPROVED" || repert != 1 {
 		t.Fatalf("status=%s repertorium=%d, harus APPROVED/1", status, repert)
+	}
+}
+
+func TestCMSLifecycle(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := cms.NewStore(db)
+	// Branding: invalid color rejected-normalized, unknown font falls back.
+	if err := cs.SaveBranding(office, cms.Branding{AppName: "", Primary: "red"}); err == nil {
+		t.Fatal("nama kosong harus ditolak")
+	}
+	b, err := cs.BrandingOf(office)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.AppName != "SaktiNotaris" {
+		t.Fatalf("default branding hilang: %q", b.AppName)
+	}
+	// Page lifecycle + slug uniqueness + publish rules.
+	p := &cms.Page{Title: "Beranda", Slug: "beranda", Content: "<p>Halo</p><script>x</script>", Status: cms.StatusDraft}
+	pid, err := cs.SavePage(office, p, nil)
+	if err != nil || pid == 0 {
+		t.Fatal(err)
+	}
+	dup := &cms.Page{Title: "Duplikat", Slug: "beranda", Content: "x", Status: cms.StatusDraft}
+	if _, err := cs.SavePage(office, dup, nil); err == nil {
+		t.Fatal("slug ganda harus ditolak")
+	}
+	// PUBLISH needs content: empty content draft cannot publish.
+	empty := &cms.Page{Title: "Kosong", Slug: "kosong", Status: cms.StatusPublished}
+	if _, err := cs.SavePage(office, empty, nil); err == nil {
+		t.Fatal("terbit tanpa isi harus ditolak")
+	}
+	// Sections: bad type + bad CTA rejected; valid saved.
+	bad := &cms.Section{PageID: pid, Type: "nope", CTAURL: "javascript:x"}
+	if _, err := cs.SaveSection(office, bad); err == nil {
+		t.Fatal("section jahat harus ditolak")
+	}
+	sec := &cms.Section{PageID: pid, Type: "hero", Title: "Halo", CTALabel: "Mulai",
+		CTAURL: "/kontak", Visible: true, Settings: map[string]any{"columns": 2.0, "evil": 1}}
+	sid, err := cs.SaveSection(office, sec)
+	if err != nil || sid == 0 {
+		t.Fatal(err)
+	}
+	// Publish page, verify public read + sanitization.
+	p.ID = pid
+	p.Status = cms.StatusPublished
+	p.Content = "<p>Halo</p><script>x</script>"
+	if _, err := cs.SavePage(office, p, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, secs, err := cs.PublicPage(office, "beranda")
+	if err != nil || got.Title != "Beranda" || len(secs) != 1 {
+		t.Fatalf("public read gagal: %+v %v", got, err)
+	}
+	// Scheduled publish.
+	fut := time.Now().Add(2 * time.Hour)
+	sp := &cms.Page{Title: "Jadwal", Slug: "jadwal", Content: "x", Status: cms.StatusScheduled}
+	sp.ScheduledAt = sql.NullTime{Time: fut, Valid: true}
+	if _, err := cs.SavePage(office, sp, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n1, n2 := cs.PublishDue(office); n1+n2 != 0 {
+		t.Fatal("belum jatuh tempo tapi terbit")
+	}
+	if _, err := db.Exec(`UPDATE website_pages SET scheduled_at=DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR) WHERE slug='jadwal'`); err != nil {
+		t.Fatal(err)
+	}
+	if n1, _ := cs.PublishDue(office); n1 != 1 {
+		t.Fatal("jadwal lewat harus terbit")
+	}
+	if _, _, err := cs.PublicPage(office, "jadwal"); err != nil {
+		t.Fatal("sesudah PublishDue harus tampil publik")
+	}
+	cs.RecordHistory(office, "page", pid, "publish", "DRAFT", "PUBLISHED", nil, "uji", "127.0.0.1")
+	hist, err := cs.History(office, 10)
+	if err != nil || len(hist) == 0 {
+		t.Fatal("riwayat publikasi kosong")
+	}
+	// Public isolation: DRAFT must not render.
+	priv := &cms.Page{Title: "Rahasia", Slug: "rahasia-internal", Content: "x", Status: cms.StatusDraft}
+	if _, err := cs.SavePage(office, priv, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := cs.PublicPage(office, "rahasia-internal"); err == nil {
+		t.Fatal("draf tak boleh publik")
 	}
 }

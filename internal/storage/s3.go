@@ -159,3 +159,17 @@ func (s *S3Store) Open(ref string) (io.ReadCloser, error) {
 	}
 	return resp.Body, nil
 }
+
+// Delete removes ref (idempotent on 200/204/404).
+func (s *S3Store) Delete(ref string) error {
+	resp, err := s.do("DELETE", ref, nil, 0, sha256hex(""))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode != 200 && resp.StatusCode != 204 && resp.StatusCode != 404 {
+		return fmt.Errorf("s3 delete status %d", resp.StatusCode)
+	}
+	return nil
+}

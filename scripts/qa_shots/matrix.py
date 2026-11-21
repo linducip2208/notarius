@@ -31,6 +31,17 @@ ALLOW = {
     "/portal": set(ROLES),
     "/wills": {"notary", "substitute_notary", "auditor"},
     "/offices": set(),  # super_admin saja (diuji terpisah sebagai admin)
+    "/cms": set(ROLES) - {"client"},
+    "/cms/pages": set(ROLES) - {"client", "finance", "doc_operator", "auditor"},
+    "/cms/articles": {"office_admin", "notary", "substitute_notary", "staff"},
+    "/cms/media": {"office_admin", "notary", "substitute_notary", "staff"},
+    "/cms/faq": {"office_admin", "notary", "substitute_notary", "staff"},
+    "/cms/services": {"office_admin", "notary", "substitute_notary", "staff"},
+    "/cms/nav": {"office_admin"},
+    "/cms/branding": {"office_admin"},
+    "/cms/site": {"office_admin"},
+    "/cms/history": {"office_admin", "auditor"},
+    "/cms/setup": {"office_admin"},
 }
 
 results = []
@@ -106,7 +117,7 @@ with sync_playwright() as p:
             table.append(f"| {role} | {route} | {want} | {got} | {'YA' if ok else 'TIDAK'} |")
         # client: portal milik sendiri harus 200
         ctx.close()
-    step("matriks izin 8 peran x 15 rute", fails == 0, f"{fails} selisih" if fails else "semua cocok")
+    step(f"matriks izin 8 peran x {len(ALLOW)} rute", fails == 0, f"{fails} selisih" if fails else "semua cocok")
 
     b.close()
 

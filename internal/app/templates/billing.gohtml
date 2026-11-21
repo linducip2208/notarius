@@ -2,7 +2,7 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/finance">Keuangan</a></li><li class="breadcrumb-item active">Kuitansi {{.Data.Number}}</li></ol></nav>
 <div class="card" style="max-width:640px"><div class="card-body p-4">
 <div class="d-flex justify-content-between align-items-center mb-3">
-<div><h2 class="mb-0">KUITANSI PEMBAYARAN</h2><div class="text-secondary">SaktiNotaris · {{.Data.Number}}</div></div>
+<div><h2 class="mb-0">KUITANSI PEMBAYARAN</h2><div class="text-secondary">{{.Brand.AppName}} · {{.Data.Number}}</div></div>
 <img src="/qr/inv/{{.Data.ID}}" alt="QR verifikasi" style="width:110px;height:110px"/>
 </div>
 <dl class="row"><dt class="col-4">Klien</dt><dd class="col-8">{{.Data.Client}}</dd>
@@ -17,7 +17,7 @@
 
 {{define "verify"}}{{template "head" .}}
 <body class="d-flex flex-column"><div class="page page-center"><div class="container container-tight py-4">
-<div class="text-center mb-4"><h1>SaktiNotaris</h1><p class="text-secondary">Verifikasi keaslian kuitansi — tanpa login</p></div>
+<div class="text-center mb-4"><h1>{{.Brand.AppName}}</h1><p class="text-secondary">Verifikasi keaslian kuitansi — tanpa login</p></div>
 <div class="card card-md"><div class="card-body">
 <form method="get" action="/verify"><div class="mb-3"><label class="form-label">Kode verifikasi (cth. INV-12-AB34CD56)</label><input class="form-control" name="code" value="{{.Data.Code}}" required/></div>
 <button class="btn btn-primary w-100" type="submit">Periksa</button></form>

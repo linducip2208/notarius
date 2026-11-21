@@ -1,0 +1,118 @@
+{{define "pub_head"}}<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{.Title}} — {{.Data.Brand.AppName}}</title>
+{{if .Data.SEODesc}}<meta name="description" content="{{.Data.SEODesc}}"/>{{else if .Data.Site.SiteDesc}}<meta name="description" content="{{.Data.Site.SiteDesc}}"/>{{end}}
+<meta property="og:title" content="{{.Title}} — {{.Data.Brand.AppName}}"/>
+{{if .Data.OG}}<meta property="og:image" content="{{.Data.OG}}"/>{{end}}
+<link rel="icon" type="image/png" href="{{if .Data.Brand.FaviconURL}}{{.Data.Brand.FaviconURL}}{{else}}/assets/brand/favicon.svg{{end}}"/>
+<style>
+:root{--pri:{{.Data.Brand.Primary}};--sec:{{.Data.Brand.Secondary}};--acc:{{.Data.Brand.Accent}};--rad:{{.Data.Brand.ButtonRadius}}}
+*{box-sizing:border-box}body{margin:0;font-family:{{css .Data.Brand.FontStack}};color:#1a2333;line-height:1.65;background:#fff}
+a{color:var(--pri)}.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.top{background:var(--sec);color:#fff}.top .wrap{display:flex;align-items:center;gap:14px;padding:12px 20px}
+.top img{height:38px;width:38px;object-fit:cover;border-radius:9px}.top .nm{font-weight:800;font-size:1.15rem}
+.top nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}.top nav a{color:#fff;text-decoration:none;padding:8px 12px;border-radius:var(--rad)}
+.top nav a:hover,.top nav a.on{background:rgba(255,255,255,.15)}
+.burger{display:none;background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:8px 12px;font-size:1.1rem}
+.hero{background:linear-gradient(180deg,var(--sec),#24344f);color:#fff;padding:72px 0;text-align:center}
+.hero h1{font-size:2.4rem;margin:0 0 12px}.hero p{opacity:.85;max-width:640px;margin:0 auto 24px}
+.btn{display:inline-block;background:var(--pri);color:#fff !important;text-decoration:none;padding:12px 26px;border-radius:var(--rad);font-weight:700;border:0}
+.btn.ghost{background:transparent;border:2px solid var(--pri);color:var(--pri) !important}
+.sec{padding:56px 0}.sec.dark{background:var(--sec);color:#fff}.sec.primary{background:var(--pri);color:#fff}.sec .kicker{color:var(--acc);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem}
+.sec h2{font-size:1.9rem;margin:6px 0 14px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.card{border:1px solid #e5e9f0;border-radius:12px;padding:22px;background:#fff}.dark .card{background:rgba(255,255,255,.06);border-color:transparent}
+.faq details{border:1px solid #e5e9f0;border-radius:10px;padding:14px 18px;margin-bottom:10px}.faq summary{font-weight:700;cursor:pointer}
+footer{background:#0d1526;color:#c6cfdd;padding:44px 0 26px;margin-top:0}footer a{color:#c6cfdd}
+.meta{font-size:.85rem;color:#667}.tag{background:#eef2f7;border-radius:20px;padding:2px 12px;font-size:.8rem;display:inline-block;margin:2px}
+input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;border-radius:8px;width:100%}
+.skip{position:absolute;left:-9999px}.skip:focus{left:8px;top:8px;background:#fff;padding:8px;z-index:99}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}.hero h1{font-size:1.7rem}.top nav{display:none}.top nav.open{display:flex;flex-direction:column;width:100%}.burger{display:block}}
+</style>
+</head>{{end}}
+
+{{define "pub_nav"}}<a class="skip" href="#isi">Lewati ke konten</a>
+<header class="top"><div class="wrap">
+{{if .Data.Brand.LogoURL}}<img src="{{.Data.Brand.LogoURL}}" alt="{{.Data.Brand.AppName}}"/>{{end}}
+<span class="nm">{{.Data.Brand.AppName}}</span>
+{{if .Data.Brand.Tagline}}<span style="opacity:.7;font-size:.85rem">{{.Data.Brand.Tagline}}</span>{{end}}
+<button class="burger" aria-label="Menu" onclick="document.getElementById('mnav').classList.toggle('open')">☰</button>
+<nav id="mnav" aria-label="Navigasi utama">{{range .Data.Nav}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}</nav>
+</div></header>{{end}}
+
+{{define "pub_foot"}}<footer><div class="wrap">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px">
+<div><strong>{{.Data.Brand.AppName}}</strong><br/><span class="meta">{{.Data.Office.Addr}}</span><br/><span class="meta">{{.Data.Office.Phone}} · {{.Data.Office.Email}}</span></div>
+<div><strong>Navigasi</strong><br/>{{range .Data.Foot}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a><br/>{{end}}</div>
+<div><strong>Kantor</strong><br/><span class="meta">{{.Data.Office.Name}}</span><br/><a href="/kontak">Hubungi kami →</a></div>
+</div>
+<p class="meta" style="margin-top:26px">{{if .Data.Brand.FooterText}}{{.Data.Brand.FooterText}}{{end}} {{if .Data.Brand.CopyrightText}}· {{.Data.Brand.CopyrightText}}{{end}}</p>
+</div></footer></body></html>{{end}}
+
+{{define "pub_home"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+{{if .Data.HasCMS}}<section class="sec"><div class="wrap"><div>{{cmsHTML .Data.Page.Content}}</div></div></section>{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}
+{{else}}<section class="hero"><div class="wrap"><h1>{{.Data.Brand.AppName}}</h1><p>Website kantor dalam penyiapan. Kembali lagi segera.</p></div></section>{{end}}
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_home_empty"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="hero"><div class="wrap"><h1>{{.Data.Brand.AppName}}</h1><p>Website kantor dalam penyiapan. Kembali lagi segera.</p><p><a class="btn" href="/layanan">Lihat layanan</a></p></div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_sec"}}
+{{if eq .Type "hero"}}<section class="hero"><div class="wrap"><h1>{{.Title}}</h1><p>{{.Subtitle}}</p>{{if .CTALabel}}<a class="btn" href="{{.CTAURL}}">{{.CTALabel}}</a>{{end}}<div>{{cmsHTML .Content}}</div></div></section>
+{{else if eq .Type "cta"}}<section class="sec primary" style="text-align:center"><div class="wrap"><h2>{{.Title}}</h2><p>{{.Subtitle}}</p>{{if .CTALabel}}<a class="btn ghost" style="border-color:#fff;color:#fff !important" href="{{.CTAURL}}">{{.CTALabel}}</a>{{end}}</div></section>
+{{else}}<section class="sec {{.Background}}"><div class="wrap{{if eq .Layout "wide"}}{{else if eq .Layout "split"}} grid2{{end}}">
+<div><div class="kicker">{{.Subtitle}}</div><h2>{{.Title}}</h2><div>{{cmsHTML .Content}}</div>{{if .CTALabel}}<p><a class="btn" href="{{.CTAURL}}">{{.CTALabel}}</a></p>{{end}}</div>
+{{if .ImageMediaID.Valid}}<div><img src="/media/{{.ImageMediaID.Int64}}" alt="{{.Title}}" style="width:100%;border-radius:14px" loading="lazy"/></div>{{end}}
+</div></section>{{end}}
+{{end}}
+
+{{define "pub_page"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1 style="font-size:2.1rem">{{.Data.Page.Title}}</h1><p class="meta">{{.Data.Page.Excerpt}}</p><div>{{cmsHTML .Data.Page.Content}}</div>
+{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_articles"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1>Artikel</h1>
+<form method="get" action="/artikel" style="max-width:420px;display:flex;gap:8px;margin-bottom:22px"><input name="q" value="{{.Data.Q}}" placeholder="Cari artikel…"/><button class="btn" type="submit">Cari</button></form>
+<div class="cards">{{range .Data.List}}<div class="card"><h3 style="margin-top:0"><a href="/artikel/{{.Slug}}">{{.Title}}</a></h3><p class="meta">{{.Excerpt}}</p><p class="meta">{{.Author}}</p></div>{{else}}<p class="meta">Belum ada artikel terbit.</p>{{end}}</div>
+<p class="meta">Halaman {{.Data.Page}} dari {{.Data.Pages}} · total {{.Data.Total}}</p>
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_article"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>{{.Data.Article.Title}}</h1>
+<p class="meta">{{.Data.Article.Author}} · {{range .Data.Related}}{{end}}</p>
+<div>{{cmsHTML .Data.Article.Content}}</div>
+{{if .Data.Related}}<h3>Terkait</h3><div class="cards">{{range .Data.Related}}<div class="card"><a href="/artikel/{{.Slug}}">{{.Title}}</a></div>{{end}}</div>{{end}}
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_faq"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap faq" style="max-width:760px"><h1>Tanya Jawab</h1>
+{{range .Data.Groups}}<h2>{{.Name}}</h2>{{range .Items}}<details><summary>{{.Question}}</summary><div>{{cmsHTML .Answer}}</div></details>{{end}}{{else}}<p class="meta">Belum ada FAQ.</p>{{end}}
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_contact"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1>Kontak</h1>
+{{if .Data.HasPage}}<div>{{cmsHTML .Data.Page.Content}}</div>{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}{{end}}
+<div class="cards"><div class="card"><strong>{{.Data.Office.Name}}</strong><br/>{{.Data.Office.Addr}}<br/>{{.Data.Office.Phone}}<br/>{{.Data.Office.Email}}<br/>{{.Data.Office.Site}}</div>
+<div class="card"><strong>Jam operasional</strong><br/>Senin–Jumat, 08.00–16.00 WIB<br/><span class="meta">Di luar jam kerja lewat WhatsApp/telepon.</span></div></div>
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_services"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1>Layanan Kami</h1><p class="meta">Ruang lingkup jabatan Notaris. Bukan layanan PPAT/advokat.</p>
+<div class="cards">{{range .Data.List}}<div class="card"><h3 style="margin-top:0"><a href="/layanan-kami/{{.Slug}}">{{.Name}}</a></h3><p class="meta">{{.Description}}</p></div>{{else}}<p class="meta">Belum ada info layanan.</p>{{end}}</div>
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_service"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>{{.Data.Service.Name}}</h1><p class="meta">{{.Data.Service.Description}}</p><div>{{cmsHTML .Data.Service.Content}}</div>
+<p><a class="btn" href="/kontak">Konsultasi →</a></p></div></section>
+</main>{{template "pub_foot" .}}{{end}}

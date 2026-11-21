@@ -1,7 +1,7 @@
 {{define "login"}}{{template "head" .}}
 <body class="d-flex flex-column">
 <div class="page page-center"><div class="container container-tight py-4">
-<div class="text-center mb-4"><img src="/assets/brand/saktinotaris-logo-b.png" alt="SaktiNotaris" style="height:72px;width:72px;object-fit:cover;object-position:center;border-radius:16px"/><h1 class="mt-2">SaktiNotaris</h1><p class="text-secondary">Sistem Manajemen Kantor Notaris Indonesia</p></div>
+<div class="text-center mb-4">{{if .Brand.LogoURL}}<img src="{{.Brand.LogoURL}}" alt="{{.Brand.AppName}}" style="height:72px;width:72px;object-fit:cover;object-position:center;border-radius:16px"/>{{else}}<img src="/assets/brand/saktinotaris-logo-b.png" alt="{{.Brand.AppName}}" style="height:72px;width:72px;object-fit:cover;object-position:center;border-radius:16px"/>{{end}}<h1 class="mt-2">{{.Brand.AppName}}</h1><p class="text-secondary">{{if .Brand.Tagline}}{{.Brand.Tagline}}{{else}}Sistem Manajemen Kantor Notaris Indonesia{{end}}</p></div>
 <form class="card card-md" method="post" action="/login">
 <div class="card-body">
 <h2 class="card-title text-center mb-4">Masuk ke akun Anda</h2>

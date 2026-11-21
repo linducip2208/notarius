@@ -149,7 +149,7 @@ func (a *App) verifyPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := a.tmpl.ExecuteTemplate(w, "verify", Page{Title: "Verifikasi Dokumen", Data: data}); err != nil {
+	if err := a.tmpl.ExecuteTemplate(w, "verify", Page{Title: "Verifikasi Dokumen", Data: data, Brand: a.brandView(0)}); err != nil {
 		http.Error(w, "gagal merender", http.StatusInternalServerError)
 	}
 }

@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="description" content="SaktiNotaris — Sistem Manajemen Kantor Notaris Indonesia. Kelola klien, akta, repertorium, protokol, dan keuangan dengan aman."/>
-<title>{{.Title}} — SaktiNotaris</title>
-<link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>
+<meta name="description" content="{{.Brand.AppName}} — Sistem Manajemen Kantor Notaris Indonesia. Kelola klien, akta, repertorium, protokol, dan keuangan dengan aman."/>
+<title>{{.Title}} — {{.Brand.AppName}}</title>
+{{if .Brand.FaviconURL}}<link rel="icon" type="image/png" href="{{.Brand.FaviconURL}}"/>{{else}}<link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>{{end}}
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 <link rel="stylesheet" href="/assets/notarius/tokens.css"/>
-<style>.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
+<style>:root{--wl-primary:{{.Brand.Primary}};--wl-secondary:{{.Brand.Secondary}};--wl-accent:{{.Brand.Accent}};--wl-header:{{.Brand.HeaderBG}};--wl-radius:{{.Brand.ButtonRadius}}}body{font-family:{{css .Brand.FontStack}}}.btn-primary{background:var(--wl-primary);border-color:var(--wl-primary)}.navbar-brand,.page-title{color:var(--wl-secondary)}.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
 <script src="/assets/vendor/htmx.min.js"></script>
 </head>{{end}}
 
-{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:#101f3c" aria-label="Navigasi utama">
+{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:{{.Brand.SidebarBG}}" aria-label="Navigasi utama">
 <div class="container-fluid">
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
-<h1 class="navbar-brand navbar-brand-autodark mt-2"><img src="/assets/brand/saktinotaris-logo-b.png" alt="SaktiNotaris" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/> <span class="text-white">SaktiNotaris</span></h1>
+<h1 class="navbar-brand navbar-brand-autodark mt-2">{{if .Brand.LogoURL}}<img src="{{.Brand.LogoURL}}" alt="{{.Brand.AppName}}" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/>{{else}}<img src="/assets/brand/saktinotaris-logo-b.png" alt="{{.Brand.AppName}}" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/>{{end}} <span class="text-white">{{.Brand.AppName}}</span></h1>
 {{if .Acting}}<div class="px-3"><div class="alert alert-warning py-2 mb-2 small">Mode lintas-kantor AKTIF ({{.OfficeName}}). <form method="post" action="/offices/act" class="d-inline">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning" type="submit">Keluar mode</button></form></div></div>{{end}}
 <div class="collapse navbar-collapse" id="sidebar-menu">
 <form method="get" action="/search" class="px-3 mb-2" role="search"><input class="form-control" name="q" placeholder="Cari klien/akta…" aria-label="Pencarian cepat"/></form>
@@ -54,6 +54,13 @@
 {{if can .Role "reports.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Laporan</span></li>
 <li class="nav-item"><a class="nav-link" href="/reports">📊 Laporan</a></li>
 <li class="nav-item"><a class="nav-link" href="/audit">📜 Audit Log</a></li>{{end}}
+{{if can .Role "website.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Website CMS</span></li>
+<li class="nav-item"><a class="nav-link" href="/cms">🌐 Website</a></li>
+<li class="nav-item"><a class="nav-link" href="/cms/pages">📄 Halaman</a></li>
+<li class="nav-item"><a class="nav-link" href="/cms/articles">📰 Artikel</a></li>
+<li class="nav-item"><a class="nav-link" href="/cms/media">🖼 Media</a></li>
+{{if can .Role "website.branding.manage"}}<li class="nav-item"><a class="nav-link" href="/cms/branding">🎨 Branding</a></li>{{end}}
+{{if can .Role "website.seo.manage"}}<li class="nav-item"><a class="nav-link" href="/cms/site">🔍 SEO & Domain</a></li>{{end}}{{end}}
 <li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Pengaturan</span></li>
 {{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">🏢 Kantor</a></li>{{end}}
 <li class="nav-item"><a class="nav-link" href="/settings">⚙ Pengaturan</a></li>

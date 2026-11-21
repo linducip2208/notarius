@@ -4,6 +4,17 @@
 |---|---|---|---|---|
 | office_admin | /audit | 200 | 200 | YA |
 | office_admin | /clients | 200 | 200 | YA |
+| office_admin | /cms | 200 | 200 | YA |
+| office_admin | /cms/articles | 200 | 200 | YA |
+| office_admin | /cms/branding | 200 | 200 | YA |
+| office_admin | /cms/faq | 200 | 200 | YA |
+| office_admin | /cms/history | 200 | 200 | YA |
+| office_admin | /cms/media | 200 | 200 | YA |
+| office_admin | /cms/nav | 200 | 200 | YA |
+| office_admin | /cms/pages | 200 | 200 | YA |
+| office_admin | /cms/services | 200 | 200 | YA |
+| office_admin | /cms/setup | 200 | 200 | YA |
+| office_admin | /cms/site | 200 | 200 | YA |
 | office_admin | /deeds | 200 | 200 | YA |
 | office_admin | /dms | 200 | 200 | YA |
 | office_admin | /finance | 200 | 200 | YA |
@@ -19,6 +30,17 @@
 | office_admin | /wills | 403 | 403 | YA |
 | notary | /audit | 200 | 200 | YA |
 | notary | /clients | 200 | 200 | YA |
+| notary | /cms | 200 | 200 | YA |
+| notary | /cms/articles | 200 | 200 | YA |
+| notary | /cms/branding | 403 | 403 | YA |
+| notary | /cms/faq | 200 | 200 | YA |
+| notary | /cms/history | 403 | 403 | YA |
+| notary | /cms/media | 200 | 200 | YA |
+| notary | /cms/nav | 403 | 403 | YA |
+| notary | /cms/pages | 200 | 200 | YA |
+| notary | /cms/services | 200 | 200 | YA |
+| notary | /cms/setup | 403 | 403 | YA |
+| notary | /cms/site | 403 | 403 | YA |
 | notary | /deeds | 200 | 200 | YA |
 | notary | /dms | 200 | 200 | YA |
 | notary | /finance | 200 | 200 | YA |
@@ -34,6 +56,17 @@
 | notary | /wills | 200 | 200 | YA |
 | substitute_notary | /audit | 200 | 200 | YA |
 | substitute_notary | /clients | 200 | 200 | YA |
+| substitute_notary | /cms | 200 | 200 | YA |
+| substitute_notary | /cms/articles | 200 | 200 | YA |
+| substitute_notary | /cms/branding | 403 | 403 | YA |
+| substitute_notary | /cms/faq | 200 | 200 | YA |
+| substitute_notary | /cms/history | 403 | 403 | YA |
+| substitute_notary | /cms/media | 200 | 200 | YA |
+| substitute_notary | /cms/nav | 403 | 403 | YA |
+| substitute_notary | /cms/pages | 200 | 200 | YA |
+| substitute_notary | /cms/services | 200 | 200 | YA |
+| substitute_notary | /cms/setup | 403 | 403 | YA |
+| substitute_notary | /cms/site | 403 | 403 | YA |
 | substitute_notary | /deeds | 200 | 200 | YA |
 | substitute_notary | /dms | 200 | 200 | YA |
 | substitute_notary | /finance | 403 | 403 | YA |
@@ -49,6 +82,17 @@
 | substitute_notary | /wills | 200 | 200 | YA |
 | staff | /audit | 200 | 200 | YA |
 | staff | /clients | 200 | 200 | YA |
+| staff | /cms | 200 | 200 | YA |
+| staff | /cms/articles | 200 | 200 | YA |
+| staff | /cms/branding | 403 | 403 | YA |
+| staff | /cms/faq | 200 | 200 | YA |
+| staff | /cms/history | 403 | 403 | YA |
+| staff | /cms/media | 200 | 200 | YA |
+| staff | /cms/nav | 403 | 403 | YA |
+| staff | /cms/pages | 200 | 200 | YA |
+| staff | /cms/services | 200 | 200 | YA |
+| staff | /cms/setup | 403 | 403 | YA |
+| staff | /cms/site | 403 | 403 | YA |
 | staff | /deeds | 200 | 200 | YA |
 | staff | /dms | 200 | 200 | YA |
 | staff | /finance | 403 | 403 | YA |
@@ -64,6 +108,17 @@
 | staff | /wills | 403 | 403 | YA |
 | finance | /audit | 200 | 200 | YA |
 | finance | /clients | 200 | 200 | YA |
+| finance | /cms | 200 | 200 | YA |
+| finance | /cms/articles | 403 | 403 | YA |
+| finance | /cms/branding | 403 | 403 | YA |
+| finance | /cms/faq | 403 | 403 | YA |
+| finance | /cms/history | 403 | 403 | YA |
+| finance | /cms/media | 403 | 403 | YA |
+| finance | /cms/nav | 403 | 403 | YA |
+| finance | /cms/pages | 403 | 403 | YA |
+| finance | /cms/services | 403 | 403 | YA |
+| finance | /cms/setup | 403 | 403 | YA |
+| finance | /cms/site | 403 | 403 | YA |
 | finance | /deeds | 200 | 200 | YA |
 | finance | /dms | 200 | 200 | YA |
 | finance | /finance | 200 | 200 | YA |
@@ -79,6 +134,17 @@
 | finance | /wills | 403 | 403 | YA |
 | doc_operator | /audit | 403 | 403 | YA |
 | doc_operator | /clients | 200 | 200 | YA |
+| doc_operator | /cms | 200 | 200 | YA |
+| doc_operator | /cms/articles | 403 | 403 | YA |
+| doc_operator | /cms/branding | 403 | 403 | YA |
+| doc_operator | /cms/faq | 403 | 403 | YA |
+| doc_operator | /cms/history | 403 | 403 | YA |
+| doc_operator | /cms/media | 403 | 403 | YA |
+| doc_operator | /cms/nav | 403 | 403 | YA |
+| doc_operator | /cms/pages | 403 | 403 | YA |
+| doc_operator | /cms/services | 403 | 403 | YA |
+| doc_operator | /cms/setup | 403 | 403 | YA |
+| doc_operator | /cms/site | 403 | 403 | YA |
 | doc_operator | /deeds | 200 | 200 | YA |
 | doc_operator | /dms | 200 | 200 | YA |
 | doc_operator | /finance | 403 | 403 | YA |
@@ -94,6 +160,17 @@
 | doc_operator | /wills | 403 | 403 | YA |
 | auditor | /audit | 200 | 200 | YA |
 | auditor | /clients | 200 | 200 | YA |
+| auditor | /cms | 200 | 200 | YA |
+| auditor | /cms/articles | 403 | 403 | YA |
+| auditor | /cms/branding | 403 | 403 | YA |
+| auditor | /cms/faq | 403 | 403 | YA |
+| auditor | /cms/history | 200 | 200 | YA |
+| auditor | /cms/media | 403 | 403 | YA |
+| auditor | /cms/nav | 403 | 403 | YA |
+| auditor | /cms/pages | 403 | 403 | YA |
+| auditor | /cms/services | 403 | 403 | YA |
+| auditor | /cms/setup | 403 | 403 | YA |
+| auditor | /cms/site | 403 | 403 | YA |
 | auditor | /deeds | 200 | 200 | YA |
 | auditor | /dms | 200 | 200 | YA |
 | auditor | /finance | 200 | 200 | YA |
@@ -109,6 +186,17 @@
 | auditor | /wills | 200 | 200 | YA |
 | client | /audit | 403 | 403 | YA |
 | client | /clients | 403 | 403 | YA |
+| client | /cms | 403 | 403 | YA |
+| client | /cms/articles | 403 | 403 | YA |
+| client | /cms/branding | 403 | 403 | YA |
+| client | /cms/faq | 403 | 403 | YA |
+| client | /cms/history | 403 | 403 | YA |
+| client | /cms/media | 403 | 403 | YA |
+| client | /cms/nav | 403 | 403 | YA |
+| client | /cms/pages | 403 | 403 | YA |
+| client | /cms/services | 403 | 403 | YA |
+| client | /cms/setup | 403 | 403 | YA |
+| client | /cms/site | 403 | 403 | YA |
 | client | /deeds | 403 | 403 | YA |
 | client | /dms | 403 | 403 | YA |
 | client | /finance | 403 | 403 | YA |
@@ -124,13 +212,13 @@
 | client | /wills | 403 | 403 | YA |
 
 - [PASS] login admin
-- [PASS] buat office_admin matrix-officeadmin-271580@uji.id
-- [PASS] buat notary matrix-notary-271580@uji.id
-- [PASS] buat substitute_notary matrix-substitutenotary-271580@uji.id
-- [PASS] buat staff matrix-staff-271580@uji.id
-- [PASS] buat finance matrix-finance-271580@uji.id
-- [PASS] buat doc_operator matrix-docoperator-271580@uji.id
-- [PASS] buat auditor matrix-auditor-271580@uji.id
-- [PASS] buat client matrix-client-271580@uji.id
+- [PASS] buat office_admin matrix-officeadmin-279791@uji.id
+- [PASS] buat notary matrix-notary-279791@uji.id
+- [PASS] buat substitute_notary matrix-substitutenotary-279791@uji.id
+- [PASS] buat staff matrix-staff-279791@uji.id
+- [PASS] buat finance matrix-finance-279791@uji.id
+- [PASS] buat doc_operator matrix-docoperator-279791@uji.id
+- [PASS] buat auditor matrix-auditor-279791@uji.id
+- [PASS] buat client matrix-client-279791@uji.id
 - [PASS] admin boleh /offices 200
-- [PASS] matriks izin 8 peran x 15 rute semua cocok
+- [PASS] matriks izin 8 peran x 26 rute semua cocok

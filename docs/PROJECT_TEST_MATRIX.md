@@ -12,7 +12,9 @@
 | E2E Fase 1 jualan | `fase1a.py` 6/6 + `fase1b.py` 8/8 | PASS: kuitansi QR HMAC, /verify publik + tolak palsu, portal bayar + bukti, pengingat |
 | E2E Fase 2 jualan | `fase2.py` 8/8 | PASS: template checklist→auto-create+progress, revisi editor kaya + sanitasi, diff highlight, label QR |
 | E2E Fase 3 (TTE+multi-kantor+tier) | `fase3.py` 14/14 | PASS: offices ENTERPRISE+acting+HMAC, approve→segel DEED-*→/verify akta, sign hash-64, gate LITE→402→PRO |
-| Matriks izin 9 peran | `matrix.py` 120 sel | PASS semua cocok (8 peran × 15 rute + admin /offices); bukti `docs/qa/PERMISSION_MATRIX.md` |
+| Matriks izin 9 peran | `matrix.py` 208 sel | PASS semua cocok (8 peran × 26 rute + admin /offices); bukti `docs/qa/PERMISSION_MATRIX.md` |
+| CMS E2E | `cms.py` 25/25 | branding+SEO+domain+validasi, halaman+section+terbit+render+sanitasi, beranda ganti landing, artikel+FAQ+nav, media+re-encode+tolak, sitemap, histori, setup contoh DRAF |
+| CMS unit+integrasi | `internal/cms` + `TestCMSLifecycle` + `TestCMSPerf` | validasi/section-schema/sanitasi/media; slug ganda+publish-guard+jadwal+isolasi publik; 100 hal/500 art/1000 media <500ms |
 | INTERACTION 1-12 | `interactions.py` 14/14 | login±, sidebar, +Buat, notif, 5 tab, filter, CSV 134b, revisi RTE, komparasi, repertorium+cetak, a11y landmark, logout |
 | Wizard korporat | `wizard.py` 5/5 | PT 5/5 langkah + peringatan modal; unit `corp.WizardProgress` PASS |
 | Gabung duplikat | `merge.py` 5/5 | unggah 2x → kandidat → N berkas digabung ke kanonis + banner; migrasi 014 ENUM file |

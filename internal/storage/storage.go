@@ -13,6 +13,7 @@ import (
 type Store interface {
 	Save(ref string, r io.Reader) error
 	Open(ref string) (io.ReadCloser, error)
+	Delete(ref string) error
 }
 
 // LocalStore keeps files under a base directory with safe path joining.
@@ -66,4 +67,16 @@ func (l *LocalStore) Open(ref string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return os.Open(p)
+}
+
+// Delete removes one object (idempotent).
+func (l *LocalStore) Delete(ref string) error {
+	p, err := l.path(ref)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

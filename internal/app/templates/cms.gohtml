@@ -1,0 +1,280 @@
+{{define "cms_dash"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Website</li></ol></nav>
+<p class="text-secondary">Kelola website publik kantor: halaman, artikel, media, SEO, dan branding. Hanya konten berstatus TERBIT yang tampil publik.</p>
+<div class="row g-2 mb-3">
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Halaman</div><div class="h1 mb-0">{{.Data.Counts.Pages}}</div><div class="small text-secondary">{{.Data.Counts.Published}} terbit</div><a href="/cms/pages">Kelola →</a></div></div></div>
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Artikel</div><div class="h1 mb-0">{{.Data.Counts.Articles}}</div><a href="/cms/articles">Kelola →</a></div></div></div>
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Media</div><div class="h1 mb-0">{{.Data.Counts.Media}}</div><a href="/cms/media">Kelola →</a></div></div></div>
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Layanan info</div><div class="h1 mb-0">{{.Data.Counts.Services}}</div><a href="/cms/services">Kelola →</a></div></div></div>
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">FAQ / Nav</div><div class="h1 mb-0">{{.Data.Counts.FAQ}}/{{.Data.Counts.Nav}}</div><a href="/cms/faq">FAQ</a> · <a href="/cms/nav">Nav</a></div></div></div>
+<div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Draf menunggu</div><div class="h1 mb-0">{{.Data.Counts.Drafts}}</div><div class="small text-secondary">termasuk review</div></div></div></div>
+</div>
+<div class="row"><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aksi cepat</h3></div>
+<div class="card-body d-flex flex-wrap gap-2">
+<a class="btn btn-primary" href="/cms/pages/new">+ Halaman</a>
+<a class="btn btn-outline-primary" href="/cms/articles/new">+ Artikel</a>
+<a class="btn btn-outline-primary" href="/cms/media">Unggah media</a>
+<a class="btn btn-ghost-primary" href="/" target="_blank">Lihat website ↗</a>
+<a class="btn btn-ghost-primary" href="/cms/setup">Setup</a>
+<a class="btn btn-ghost-primary" href="/cms/history">Riwayat publikasi</a>
+</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Butuh SEO (terbit tanpa judul/deskripsi)</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Missing}}<div class="list-group-item">{{.Kind}}: <strong>{{.Title}}</strong></div>{{else}}<div class="list-group-item text-secondary">Semua konten terbit sudah ber-SEO. Bagus.</div>{{end}}</div></div>
+</div><div class="col-md-6">
+<div class="card"><div class="card-header"><h3 class="card-title">Riwayat publikasi terbaru</h3></div>
+<div class="list-group list-group-flush">{{range .Data.History}}<div class="list-group-item small">{{.At}} · {{.Actor}} · {{.Kind}} #{{.Ref}} {{.From}}→{{.To}} ({{.Action}}){{if .Note}} — {{.Note}}{{end}}</div>{{else}}<div class="list-group-item text-secondary">Belum ada aktivitas publikasi.</div>{{end}}</div></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_branding"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Branding</li></ol></nav>
+<p class="text-secondary">Identitas & tema kantor. Pratinjau di kanan — simpan untuk menerapkan ke admin, portal, dan dokumen.</p>
+<div class="row"><div class="col-md-7"><div class="card"><div class="card-header"><h3 class="card-title">Identitas & Tema</h3></div>
+<form method="post" action="/cms/branding"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-6 mb-2"><label class="form-label">Nama aplikasi</label><input class="form-control" name="app_name" value="{{.Data.B.AppName}}" required/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Singkatan</label><input class="form-control" name="short_name" value="{{.Data.B.ShortName}}" maxlength="10"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Bahasa</label><select class="form-select" name="default_lang"><option value="id">id</option></select></div>
+<div class="col-12 mb-2"><label class="form-label">Tagline</label><input class="form-control" name="tagline" value="{{.Data.B.Tagline}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna utama</label><input class="form-control" type="color" name="primary" value="{{.Data.B.Primary}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna sekunder</label><input class="form-control" type="color" name="secondary" value="{{.Data.B.Secondary}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna aksen</label><input class="form-control" type="color" name="accent" value="{{.Data.B.Accent}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Sidebar</label><input class="form-control" type="color" name="sidebar_bg" value="{{.Data.B.SidebarBG}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Header</label><input class="form-control" type="color" name="header_bg" value="{{.Data.B.HeaderBG}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Gaya tombol</label><select class="form-select" name="button_style"><option value="square"{{if eq .Data.B.ButtonStyle "square"}} selected{{end}}>Kotak</option><option value="rounded"{{if eq .Data.B.ButtonStyle "rounded"}} selected{{end}}>Membulat</option><option value="pill"{{if eq .Data.B.ButtonStyle "pill"}} selected{{end}}>Pil</option></select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Radius (0–24)</label><input class="form-control" type="number" name="border_radius" value="{{.Data.B.BorderRadius}}" min="0" max="24"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Font</label><select class="form-select" name="font_family"><option value="system"{{if eq .Data.B.FontFamily "system"}} selected{{end}}>Sistem</option><option value="serif"{{if eq .Data.B.FontFamily "serif"}} selected{{end}}>Serif</option><option value="mono"{{if eq .Data.B.FontFamily "mono"}} selected{{end}}>Mono</option></select></div>
+<div class="col-md-6 mb-2"><label class="form-label">Logo (ref media, cth. cms/2026/11/ab.png)</label><input class="form-control" name="logo_ref" value="{{.Data.B.LogoRef}}" placeholder="kosongkan = logo bawaan"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Favicon (ref media)</label><input class="form-control" name="favicon_ref" value="{{.Data.B.FaviconRef}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Latar login (ref media)</label><input class="form-control" name="login_bg" value="{{.Data.B.LoginBG}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Zona waktu</label><input class="form-control" name="timezone" value="{{.Data.B.Timezone}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Format tanggal</label><input class="form-control" name="date_format" value="{{.Data.B.DateFormat}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Mata uang</label><input class="form-control" name="currency" value="{{.Data.B.Currency}}"/></div>
+<div class="col-md-4 mb-2 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit">Simpan Branding</button></div>
+<div class="col-12 mb-2"><label class="form-label">Teks footer</label><input class="form-control" name="footer_text" value="{{.Data.B.FooterText}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Teks hak cipta</label><input class="form-control" name="copyright_text" value="{{.Data.B.CopyrightText}}"/></div>
+<p class="text-secondary small">Unggah gambar lewat <a href="/cms/media">Media Library</a>, lalu salin ref-nya ke kolom di atas.</p>
+</div></form></div></div>
+<div class="col-md-5"><div class="card"><div class="card-header"><h3 class="card-title">Pratinjau (tidak mengubah produksi)</h3></div>
+<div class="card-body" id="brandprev" style="border-radius:8px">
+<div class="d-flex align-items-center gap-2 mb-2"><span class="avatar" id="pvAva">S</span><strong id="pvName">Nama</strong></div>
+<button class="btn btn-primary" id="pvBtn" type="button">Contoh tombol</button>
+<p class="small text-secondary mt-2">Login, navbar, portal, dan kop kuitansi mengikuti warna & nama ini setelah disimpan.</p>
+</div></div>
+<script>
+(function(){function v(n,d){var e=document.querySelector('[name="'+n+'"]');return e&&e.value?e.value:d;}
+function draw(){document.getElementById('pvName').textContent=v('app_name','SaktiNotaris');
+document.getElementById('brandprev').style.background=v('header_bg','#ffffff');
+document.getElementById('pvAva').style.background=v('accent','#c9a844');
+document.getElementById('pvBtn').style.background=v('primary','#1f6feb');
+document.getElementById('pvBtn').style.borderColor=v('primary','#1f6feb');}
+document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/branding"] select').forEach(function(e){e.addEventListener('input',draw);});draw();})();
+</script>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_site"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">SEO & Domain</li></ol></nav>
+<div class="row"><div class="col-md-6"><div class="card mb-3"><div class="card-header"><h3 class="card-title">SEO global & kontak tampil</h3></div>
+<form method="post" action="/cms/site"><div class="card-body row">{{template "csrf" .}}
+<div class="col-12 mb-2"><label class="form-label">Judul situs</label><input class="form-control" name="site_title" value="{{.Data.Site.SiteTitle}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Deskripsi situs</label><textarea class="form-control" name="site_desc" rows="2">{{.Data.Site.SiteDesc}}</textarea></div>
+<div class="col-12 mb-2"><label class="form-label">OG image default (ref/URL)</label><input class="form-control" name="default_og" value="{{.Data.Site.DefaultOG}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Base URL publik (cth. https://kantor.id)</label><input class="form-control" name="base_url" value="{{.Data.Site.BaseURL}}" placeholder="kosongkan = host aktif"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card"><div class="card-body">
+<p class="mb-1"><strong>Kantor:</strong> {{.Data.Office.Name}}</p>
+<p class="mb-1 text-secondary">{{.Data.Office.Addr}} · {{.Data.Office.Phone}} · {{.Data.Office.Email}}</p>
+<p class="text-secondary small mb-0">Kontak kantor diubah di <a href="/office">Profil Kantor</a>. Hanya info publik yang tampil di website.</p>
+</div></div></div>
+<div class="col-md-6"><div class="card"><div class="card-header"><h3 class="card-title">Domain</h3></div>
+<form method="post" action="/cms/domain"><div class="card-body row">{{template "csrf" .}}
+<div class="col-12 mb-2"><label class="form-label">Domain utama (cth. kantor.co.id)</label><input class="form-control" name="primary_domain" value="{{.Data.Site.PrimaryDomain}}" placeholder="opsional"/></div>
+<div class="col-12 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="enforce_https" value="1" {{if .Data.Site.EnforceHTTPS}}checked{{end}}/> Wajibkan HTTPS (butuh TLS di reverse proxy)</label></div>
+<div class="col-12 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="domain_verified" value="1" {{if .Data.Site.DomainVerified}}checked{{end}}/> Domain sudah saya verifikasi (DNS + TLS aktif)</label>
+<p class="text-secondary small">Centang hanya bila DNS mengarah ke server ini dan sertifikat TLS valid. Host terakhir terlihat: <code>{{.Data.Site.LastSeenHost}}</code>. Lihat <a href="/docs">panduan domain</a>.</p></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan Domain</button></div>
+</div></form></div></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_media"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Media Library</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Unggah publik</h3></div>
+<form method="post" action="/cms/media" enctype="multipart/form-data"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><input class="form-control" type="file" name="file" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="folder" placeholder="folder" value="umum"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="alt" placeholder="Alt text (aksesibilitas)"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="caption" placeholder="Caption"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
+<p class="text-secondary small mb-0">JPG/PNG/GIF/WebP/SVG/PDF ≤10MB. Gambar raster di-encode ulang (buang metadata). SVG aktif ditolak. Terpisah dari DMS privat.</p>
+</div></form></div>
+<div class="card mb-3"><form method="get" action="/cms/media"><div class="card-body d-flex gap-2"><input class="form-control" name="q" placeholder="Cari…" value="{{.Data.Q}}"/><input class="form-control" name="folder" placeholder="folder" value="{{.Data.Folder}}" style="max-width:160px"/><button class="btn btn-primary" type="submit">Cari</button></div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Pratinjau</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>Ref (untuk branding/konten)</th><th></th></tr></thead>
+<tbody>{{range .Data.Items}}<tr><td>{{.ID}}</td><td>{{if hasPrefix .MIME "image/"}}<img src="/media/{{.ID}}" alt="{{.Alt}}" style="height:40px;border-radius:6px"/>{{else}}<span class="badge bg-azure-lt">{{.MIME}}</span>{{end}}</td><td>{{.OriginalName}}<div class="small text-secondary">{{.Alt}}</div></td><td>{{.MIME}}</td><td>{{.Size}}</td><td><code>{{.Ref}}</code></td><td><form method="post" action="/cms/media/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus media? (ditolak bila dipakai konten)') ">Hapus</button></form></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada media. Unggah di atas.</td></tr>{{end}}</tbody></table></div></div>
+<p class="text-secondary small mt-2">Total {{.Data.Total}} · halaman {{.Data.Pages}} · URL publik: <code>/media/{id}</code> (+ <code>?thumb=1</code> untuk miniatur).</p>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_pages"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Halaman</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Halaman</h3><div class="ms-auto"><a class="btn btn-primary btn-sm" href="/cms/pages/new">+ Halaman</a></div></div>
+<form method="get" action="/cms/pages"><div class="card-body d-flex gap-2"><input class="form-control" name="q" placeholder="Cari judul/slug…" value="{{.Data.Q}}"/><button class="btn btn-primary" type="submit">Cari</button></div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Judul</th><th>Slug</th><th>Status</th><th>Diubah</th><th></th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td><a href="/cms/pages/{{.ID}}">{{.Title}}</a></td><td><code>{{.Slug}}</code></td><td><span class="badge bg-azure-lt">{{.Status}}</span></td><td>{{.Updated}}</td><td><div class="d-flex gap-1"><form method="post" action="/cms/pages/{{.ID}}/duplicate">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Duplikat</button></form><form method="post" action="/cms/pages/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Arsipkan halaman?')">Arsip</button></form></div></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada halaman. Buat baru atau jalankan Setup contoh.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_page_form"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item"><a href="/cms/pages">Halaman</a></li><li class="breadcrumb-item active">{{if .Data.IsNew}}Baru{{else}}#{{.Data.P.ID}}{{end}}</li></ol></nav>
+<div class="row"><div class="col-md-8">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Isi</h3></div>
+<form method="post" action="{{if .Data.IsNew}}/cms/pages{{else}}/cms/pages/{{.Data.P.ID}}{{end}}"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-8 mb-2"><label class="form-label">Judul</label><input class="form-control" name="title" value="{{if .Data.P}}{{.Data.P.Title}}{{end}}" required/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Slug</label><input class="form-control" name="slug" value="{{if .Data.P}}{{.Data.P.Slug}}{{end}}" placeholder="huruf-kecil-saja" required/></div>
+<div class="col-12 mb-2"><label class="form-label">Ringkasan</label><input class="form-control" name="excerpt" value="{{if .Data.P}}{{.Data.P.Excerpt}}{{end}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Konten (HTML aman: p/h/b/i/list/link/gambar)</label><textarea class="form-control" name="content" rows="8">{{if .Data.P}}{{.Data.P.Content}}{{end}}</textarea></div>
+<div class="col-md-4 mb-2"><label class="form-label">Status</label><select class="form-select" name="status" data-cur="{{if .Data.P}}{{.Data.P.Status}}{{end}}"><option>DRAFT</option><option>REVIEW</option><option>SCHEDULED</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Terjadwal (opsional)</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">ID media sampul</label><input class="form-control" name="featured_media_id" placeholder="cth. 3"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">SEO title</label><input class="form-control" name="seo_title" value="{{if .Data.P}}{{.Data.P.SEO.Title}}{{end}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">SEO desc</label><input class="form-control" name="seo_desc" value="{{if .Data.P}}{{.Data.P.SEO.Desc}}{{end}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Canonical</label><input class="form-control" name="canonical_url" value="{{if .Data.P}}{{.Data.P.SEO.Canonical}}{{end}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">OG image</label><input class="form-control" name="og_image" value="{{if .Data.P}}{{.Data.P.SEO.OGImage}}{{end}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.P}}{{.Data.P.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option><option value="index,nofollow">index,nofollow</option><option value="noindex,nofollow">noindex,nofollow</option></select></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+{{if .Data.Secs}}<div class="card"><div class="card-header"><h3 class="card-title">Sections ({{len .Data.Secs}})</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Secs}}<div class="list-group-item"><strong>{{.Type}}</strong> #{{.Position}} — {{.Title}} {{if not .Visible}}<span class="badge bg-yellow-lt">sembunyi</span>{{end}}<form method="post" action="/cms/sections/{{.ID}}/delete" class="d-inline">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-danger" type="submit" onclick="return confirm('Hapus section?')">Hapus</button></form></div>{{end}}</div></div>{{end}}
+</div><div class="col-md-4">
+{{if .Data.P}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Section baru</h3></div>
+<form method="post" action="/cms/pages/{{.Data.P.ID}}/sections"><div class="card-body row">{{template "csrf" .}}
+<div class="col-6 mb-2"><select class="form-select" name="type"><option>hero</option><option>intro</option><option>profile</option><option>services</option><option>process</option><option>info</option><option>articles</option><option>faq</option><option>contact</option><option>map</option><option>footer</option><option>text</option><option>gallery</option><option>cta</option></select></div>
+<div class="col-6 mb-2"><input class="form-control" type="number" name="position" value="0" placeholder="urutan"/></div>
+<div class="col-12 mb-2"><input class="form-control" name="title" placeholder="Judul section"/></div>
+<div class="col-12 mb-2"><input class="form-control" name="subtitle" placeholder="Subjudul"/></div>
+<div class="col-12 mb-2"><textarea class="form-control" name="content" rows="3" placeholder="Konten (HTML aman)"></textarea></div>
+<div class="col-6 mb-2"><input class="form-control" name="cta_label" placeholder="Label tombol"/></div>
+<div class="col-6 mb-2"><input class="form-control" name="cta_url" placeholder="/kontak atau https://…"/></div>
+<div class="col-4 mb-2"><select class="form-select" name="background"><option>light</option><option>white</option><option>dark</option><option>primary</option></select></div>
+<div class="col-4 mb-2"><select class="form-select" name="align"><option>left</option><option>center</option><option>right</option></select></div>
+<div class="col-4 mb-2"><select class="form-select" name="layout"><option>standard</option><option>wide</option><option>split</option></select></div>
+<div class="col-6 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="visible" value="1" checked/> Tampil</label></div>
+<div class="col-6 mb-2"><input class="form-control" name="image_media_id" placeholder="ID gambar"/></div>
+<div class="col-12"><button class="btn btn-outline-primary w-100" type="submit">+ Section</button></div>
+</div></form></div>
+<script>(function(){document.querySelectorAll('select[data-cur]').forEach(function(s){var v=s.getAttribute('data-cur');if(!v)return;for(var i=0;i<s.options.length;i++){if(s.options[i].value===v||s.options[i].text===v){s.selectedIndex=i;break;}}});})();</script>
+<div class="card"><div class="card-body"><a class="btn btn-ghost-primary w-100" href="/p/{{.Data.P.Slug}}" target="_blank">Pratinjau publik ↗</a><p class="text-secondary small mt-2 mb-0">Terbit + simpan dulu; draf tidak tampil di URL publik.</p></div></div>{{end}}
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_articles"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Artikel</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Artikel</h3><div class="ms-auto"><a class="btn btn-primary btn-sm" href="/cms/articles/new">+ Artikel</a></div></div>
+<form method="get" action="/cms/articles"><div class="card-body d-flex gap-2"><input class="form-control" name="q" placeholder="Cari…" value="{{.Data.Q}}"/><button class="btn btn-primary" type="submit">Cari</button></div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Judul</th><th>Slug</th><th>Kategori</th><th>Status</th><th>Diubah</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td><a href="/cms/articles/{{.ID}}">{{.Title}}</a></td><td><code>{{.Slug}}</code></td><td>{{.Cat}}</td><td><span class="badge bg-azure-lt">{{.Status}}</span></td><td>{{.Updated}}</td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada artikel.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Kategori baru</h3></div>
+<form method="post" action="/cms/categories"><div class="card-body d-flex gap-2">{{template "csrf" .}}<input class="form-control" name="name" placeholder="Nama" required/><input class="form-control" name="slug" placeholder="slug" required/><button class="btn btn-outline-primary" type="submit">+</button></div></form>
+<div class="card-body pt-0">{{range .Data.Cats}}<span class="badge bg-azure-lt me-1">{{.Name}}</span>{{end}}</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_article_form"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item"><a href="/cms/articles">Artikel</a></li><li class="breadcrumb-item active">{{if .Data.IsNew}}Baru{{else}}#{{.Data.A.ID}}{{end}}</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Artikel (nasihat hukum dilarang tanpa review manusia)</h3></div>
+<form method="post" action="{{if .Data.IsNew}}/cms/articles{{else}}/cms/articles/{{.Data.A.ID}}{{end}}"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-8 mb-2"><label class="form-label">Judul</label><input class="form-control" name="title" value="{{if .Data.A}}{{.Data.A.Title}}{{end}}" required/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Slug</label><input class="form-control" name="slug" value="{{if .Data.A}}{{.Data.A.Slug}}{{end}}" required/></div>
+<div class="col-12 mb-2"><label class="form-label">Ringkasan</label><input class="form-control" name="excerpt" value="{{if .Data.A}}{{.Data.A.Excerpt}}{{end}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Isi</label><textarea class="form-control" name="content" rows="10">{{if .Data.A}}{{.Data.A.Content}}{{end}}</textarea></div>
+<div class="col-md-3 mb-2"><label class="form-label">Kategori</label><select class="form-select" name="category_id"><option value="">—</option>{{range .Data.Cats}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><label class="form-label">Penulis</label><input class="form-control" name="author" value="{{if .Data.A}}{{.Data.A.Author}}{{end}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Tag (koma)</label><input class="form-control" name="tags" value="{{if .Data.A}}{{.Data.A.Tags}}{{end}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">ID cover</label><input class="form-control" name="cover_media_id" placeholder="cth. 5"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Status</label><select class="form-select" name="status" data-cur="{{if .Data.A}}{{.Data.A.Status}}{{end}}"><option>DRAFT</option><option>REVIEW</option><option>SCHEDULED</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Terjadwal</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.A}}{{.Data.A.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option></select></div>
+<div class="col-md-6 mb-2"><label class="form-label">SEO title</label><input class="form-control" name="seo_title"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">SEO desc</label><input class="form-control" name="seo_desc"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+<script>(function(){document.querySelectorAll('select[data-cur]').forEach(function(s){var v=s.getAttribute('data-cur');if(!v)return;for(var i=0;i<s.options.length;i++){if(s.options[i].value===v||s.options[i].text===v){s.selectedIndex=i;break;}}});})();</script>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_services"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Layanan Website</li></ol></nav>
+<p class="text-secondary">Info layanan publik sesuai ruang lingkup jabatan Notaris. Bukan layanan operasional (<a href="/layanan">/layanan</a>).</p>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Layanan baru</h3></div>
+<form method="post" action="/cms/services"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><input class="form-control" name="name" placeholder="Nama layanan" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="slug" placeholder="slug" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="description" placeholder="Deskripsi singkat"/></div>
+<div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
+<div class="col-12 mb-2"><textarea class="form-control" name="content" rows="3" placeholder="Konten (HTML aman)"></textarea></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Slug</th><th>Urutan</th><th>Tampil</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><code>{{.Slug}}</code></td><td>{{.Pos}}</td><td>{{.Vis}}</td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_faq"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">FAQ</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">FAQ baru (hanya yang tampil yang publik)</h3></div>
+<form method="post" action="/cms/faq"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><input class="form-control" name="category" placeholder="Kategori" value="Umum"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="question" placeholder="Pertanyaan" required/></div>
+<div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
+<div class="col-12 mb-2"><textarea class="form-control" name="answer" rows="2" placeholder="Jawaban (HTML aman, tanpa klaim palsu)"></textarea></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Kategori</th><th>Pertanyaan</th><th>Urut</th><th>Tampil</th><th></th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Cat}}</td><td>{{.Q}}</td><td>{{.Pos}}</td><td>{{.Vis}}</td><td><form method="post" action="/cms/faq/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus FAQ?')">Hapus</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada FAQ.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_nav"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Navigasi</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Menu baru (URL relatif atau http(s); javascript: ditolak)</h3></div>
+<form method="post" action="/cms/nav"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-2 mb-2"><select class="form-select" name="area"><option>header</option><option>footer</option></select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="label" placeholder="Label" required/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="url" placeholder="/tentang-kami" required/></div>
+<div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Area</th><th>Label</th><th>URL</th><th>Induk</th><th>Urut</th><th></th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Area}}</td><td>{{.Label}}</td><td><code>{{.URL}}</code></td><td>{{.Parent}}</td><td>{{.Pos}}</td><td><form method="post" action="/cms/nav/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus menu?')">Hapus</button></form></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada menu. Tambahkan di atas.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_history"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Riwayat Publikasi</li></ol></nav>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>Waktu</th><th>Aktor</th><th>Jenis</th><th>ID</th><th>Aksi</th><th>Dari→Ke</th><th>Catatan</th><th>IP</th></tr></thead>
+<tbody>{{range .Data.Hist}}<tr><td>{{.At}}</td><td>{{.Actor}}</td><td>{{.Kind}}</td><td>{{.Ref}}</td><td>{{.Action}}</td><td>{{.From}}→{{.To}}</td><td>{{.Note}}</td><td>{{.IP}}</td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada riwayat.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "cms_setup"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/cms">Website</a></li><li class="breadcrumb-item active">Setup</li></ol></nav>
+<p class="text-secondary">Instalasi pertama: isi identitas, kontak, tema, dan domain. Lalu buat konten contoh (selalu DRAF berlabel CONTOH).</p>
+<div class="row"><div class="col-md-6"><div class="card mb-3"><div class="card-header"><h3 class="card-title">Identitas & kontak</h3></div>
+<form method="post" action="/cms/setup"><div class="card-body row">{{template "csrf" .}}
+<div class="col-12 mb-2"><label class="form-label">Nama aplikasi</label><input class="form-control" name="app_name" value="{{.Data.B.AppName}}" required/></div>
+<div class="col-12 mb-2"><label class="form-label">Tagline</label><input class="form-control" name="tagline" value="{{.Data.B.Tagline}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Telepon</label><input class="form-control" name="phone"/></div>
+<div class="col-12 mb-2"><label class="form-label">Email</label><input class="form-control" name="email" type="email"/></div>
+<div class="col-12 mb-2"><label class="form-label">Alamat</label><textarea class="form-control" name="address" rows="2"></textarea></div>
+<div class="col-md-6 mb-2"><label class="form-label">Website</label><input class="form-control" name="website" placeholder="https://…"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Judul situs</label><input class="form-control" name="site_title" value="{{.Data.Site.SiteTitle}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Deskripsi situs</label><input class="form-control" name="site_desc" value="{{.Data.Site.SiteDesc}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna utama</label><input class="form-control" type="color" name="primary" value="{{.Data.B.Primary}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna sekunder</label><input class="form-control" type="color" name="secondary" value="{{.Data.B.Secondary}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Warna aksen</label><input class="form-control" type="color" name="accent" value="{{.Data.B.Accent}}"/></div>
+<div class="col-12"><button class="btn btn-primary w-100" type="submit">Simpan Setup</button></div>
+</div></form></div></div>
+<div class="col-md-6"><div class="card"><div class="card-header"><h3 class="card-title">Konten contoh</h3></div>
+<div class="card-body"><p class="text-secondary">Membuat halaman Beranda / Tentang / Kontak berlabel <strong>[CONTOH]</strong> sebagai <strong>DRAF</strong> — tidak tampil publik sebelum Anda sunting + terbitkan.</p>
+<form method="post" action="/cms/setup/sample">{{template "csrf" .}}<button class="btn btn-outline-primary w-100" type="submit">Buat konten contoh</button></form></div></div></div></div>
+{{template "page_close" .}}{{end}}

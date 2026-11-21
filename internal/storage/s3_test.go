@@ -36,6 +36,9 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		f.objs[key] = b
 		w.WriteHeader(200)
+	case "DELETE":
+		delete(f.objs, key)
+		w.WriteHeader(204)
 	case "GET":
 		b, ok := f.objs[key]
 		if !ok {
@@ -71,6 +74,12 @@ func TestS3RoundTrip(t *testing.T) {
 	}
 	if _, err := st.Open("o1/tak-ada.bin"); err == nil {
 		t.Fatal("objek hilang harus 404→error")
+	}
+	if err := st.Delete("o1/f1.bin"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Open("o1/f1.bin"); err == nil {
+		t.Fatal("sesudah hapus harus hilang")
 	}
 }
 
