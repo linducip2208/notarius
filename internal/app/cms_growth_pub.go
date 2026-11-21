@@ -419,16 +419,39 @@ func (a *App) pubArchive(w http.ResponseWriter, r *http.Request) {
 	a.renderPub(w, r, "pub_arsip_list", title, map[string]any{"Month": month, "Rows": out})
 }
 
-// ---- pratinjau draf bertoken (staf saja, HMAC) ----
+// ---- pratinjau draf bertoken (staf saja, HMAC 24 jam) ----
 
+// previewToken issues a 24h HMAC token for draft preview (staff session also required).
 func (a *App) previewToken(kind string, id int64) string {
 	key, err := cryptoxx.Key()
 	if err != nil {
 		return ""
 	}
+	ts := time.Now().Unix()
 	mac := hmac.New(sha256.New, key)
-	fmt.Fprintf(mac, "preview:%s:%d", kind, id)
-	return fmt.Sprintf("%x", mac.Sum(nil))
+	fmt.Fprintf(mac, "preview:%s:%d:%d", kind, id, ts)
+	return fmt.Sprintf("%d:%x", ts, mac.Sum(nil))
+}
+
+func (a *App) verifyPreviewToken(kind string, id int64, token string) bool {
+	parts := strings.SplitN(token, ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	ts, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || ts <= 0 {
+		return false
+	}
+	if time.Since(time.Unix(ts, 0)) > 24*time.Hour {
+		return false
+	}
+	key, err := cryptoxx.Key()
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, key)
+	fmt.Fprintf(mac, "preview:%s:%d:%d", kind, id, ts)
+	return hmac.Equal([]byte(fmt.Sprintf("%x", mac.Sum(nil))), []byte(parts[1]))
 }
 
 func (a *App) pubPreview(w http.ResponseWriter, r *http.Request) {
@@ -438,7 +461,7 @@ func (a *App) pubPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	kind, idStr := r.URL.Query().Get("kind"), r.URL.Query().Get("id")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
-	if (kind != "page" && kind != "article") || id <= 0 || r.URL.Query().Get("token") != a.previewToken(kind, id) {
+	if (kind != "page" && kind != "article") || id <= 0 || !a.verifyPreviewToken(kind, id, r.URL.Query().Get("token")) {
 		http.Error(w, "tautan pratinjau tidak valid", http.StatusForbidden)
 		return
 	}

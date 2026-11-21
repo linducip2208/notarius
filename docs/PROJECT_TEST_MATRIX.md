@@ -41,3 +41,4 @@
 | restore VPS | — | BACKLOG (B-09) |
 | pen-test | — | BACKLOG (butuh pihak ketiga) |
 | CMS growth 14 ide | cms_growth.py SEMUA HIJAU | kalkulator, konsultasi, booking->janji temu, tim/galeri/testimoni terverifikasi, i18n, cari, arsip, preview HMAC, versi+rollback, kualitas, statistik, ekspor ZIP, banner, maintenance 503 |
+| Hardening keamanan | curl 6x salah->kunci + integrasi PASS + E2E penuh hijau | lockout 5x/15mnt, CSRF HttpOnly, preview HMAC 24 jam |

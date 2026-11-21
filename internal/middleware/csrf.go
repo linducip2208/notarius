@@ -51,7 +51,7 @@ func IssueCSRF(w http.ResponseWriter, r *http.Request, cookieName string, secure
 	tok := base64.RawURLEncoding.EncodeToString(b)
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName + "_csrf", Value: tok, Path: "/",
-		HttpOnly: false, SameSite: http.SameSiteStrictMode, Secure: secure, MaxAge: 43200,
+		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure, MaxAge: 43200,
 	})
 	return tok
 }

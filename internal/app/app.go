@@ -673,11 +673,23 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := r.FormValue("email")
+	ip := clientIPOf(r)
+	// Penguncian akun: 5 gagal dalam 15 menit → tolak 15 menit (anti brute-force lintas IP).
+	var fails int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM login_attempts WHERE email=? AND success=0 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)`, email).Scan(&fails)
+	if fails >= 5 {
+		a.audit.Record(audit.Entry{Action: "login.locked", Entity: "user", EntityID: email, Detail: ip})
+		a.render(w, r, "login", "Masuk — SaktiNotaris", map[string]string{"Error": "Akun terkunci sementara setelah 5x gagal (15 menit). Coba lagi nanti.", "Email": email})
+		return
+	}
 	u, err := a.users.Authenticate(email, r.FormValue("password"))
 	if err != nil {
+		_, _ = a.db.Exec(`INSERT INTO login_attempts(email, ip, success) VALUES(?,?,0)`, email, ip)
 		a.render(w, r, "login", "Masuk — SaktiNotaris", map[string]string{"Error": err.Error(), "Email": email})
 		return
 	}
+	_, _ = a.db.Exec(`INSERT INTO login_attempts(email, ip, success) VALUES(?,?,1)`, email, ip)
+	_, _ = a.db.Exec(`DELETE FROM login_attempts WHERE email=? AND success=0`, email)
 	// Step-up: accounts with TOTP enrolled must pass a second factor.
 	if a.users.MFAEnabled(u.ID) {
 		tok, _ := auth.NewCSRFToken()

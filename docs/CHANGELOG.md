@@ -1,5 +1,9 @@
 # CHANGELOG
-## [CMS-Growth] — 2026-11-22 — 14 ide CMS (uncommitted → verifikasi)
+## [Hardening] — 2026-11-22 — lockout + token expiry (dibuktikan)
+- Lockout: 5x gagal/15 mnt → kunci 15 mnt per email lintas IP; `login_attempts` aktif dipakai; sukses membersihkan riwayat; pesan generik; audit `login.locked`.
+- Cookie CSRF → `HttpOnly`; token pratinjau draf HMAC → kedaluwarsa 24 jam.
+- Bukti: curl 6x salah → kunci tampil; integrasi MySQL PASS; E2E growth/cms/matrix/fase1a-b/fase2-3/wizard/merge/interact/confirm SEMUA HIJAU.
+- Lihat `docs/SECURITY_HARDENING.md`; sisa deploy: HTTPS + COOKIE_SECURE, pen-test, race-CI.
 - Publik: kalkulator estimasi transparan (DB services+price_items, bukan harga final), konsultasi masuk → staf, booking slot berkuota → janji temu + klien tamu, tim/galeri/testimoni terverifikasi, pencarian situs, arsip artikel, i18n ID/EN (fallback ID), JSON-LD Notary, banner pengumuman, mode pemeliharaan (503 anonim, staf bypass), pageview internal tanpa tracker.
 - Admin: inbox konsultasi + status, slot + keputusan booking, tim/galeri/testimoni (terbit wajib bukti verifikasi), versi konten + rollback, dasbor kualitas (keterbacaan + SEO), statistik kunjungan, ekspor ZIP markdown, pratinjau draf bertoken HMAC.
 - Integrasi jujur: CTA layanan lama → /konsultasi + /kalkulator (ganti /login); migrasi 018; izin baru website.inquiries/engagement.manage.
