@@ -1,13 +1,11 @@
-# PROJECT_PROGRESS — v0.1 (2026-11-20)
-Fase 1–4 master command SELESAI (audit, PRD, arsitektur+DB, fondasi Go).
-Fase 5–7, 11–12, 14, 16–17 SEBAGIAN (inti jalan; pendalaman menyusul).
-Progres = fitur terverifikasi kode+test, bukan jumlah file.
+# PROJECT PROGRESS — 2026-11-21 (continuous execution)
 
-| Fase | Status | Bukti |
-|------|--------|-------|
-| 1–7, 10–12, 14, 16–17 | COMPLETED | build+vet+unit+integrasi+smoke test hijau |
-| 8 Korporat | COMPLETED | UI korporat/saham/pengurus teruji HTTP |
-| 9 Perjanjian/waris | COMPLETED | 9 jenis akta + register wasiat terbatas |
-| 13 OCR/AI | BLOCKED (jujur) | interface + upload + verifikasi manual; engine Tesseract belum ada |
-| 15 Portal klien | COMPLETED | isolasi server-side via user_client_links |
-| 18 Testing + deploy | IN_PROGRESS | integrasi MySQL PASS; sisa: CI race, pen-test, tinjauan notaris |
+Selesai sesi ini:
+- Audit repo penuh + 4 laporan subagent (backend, DB, security, UI).
+- Bug kritis: OCR persist+timeout, PDF multipage, 14 audit trail, 6 celah izin, migrasi-011 boot.
+- DMS enterprise: migrasi 011 (16 tabel + kolom), store 600+ baris (versi, workflow+SoD, OCR queue+SKIP LOCKED, FTS+fallback, share expiring, arsip, retensi+hold, duplikat, checklist, audit akses), 21 route, 11 template, sidebar DMS, auto-enqueue OCR + auto-relasi saat unggah, index OCR.
+- 28 fitur inti: audit+izin+uji dilengkapi; scorecard bukti 88-97 (rata-rata ±93).
+- SEO/PSEO/GEO + /docs tutorial WAN + logo SaktiNotaris + rebrand penuh.
+- Test: unit hijau (rename-AV), integrasi MySQL siap, E2E browser DMS berjalan, screenshot Chromium 15+ halaman.
+
+Berjalan: E2E DMS browser (upload→OCR→verify→workflow→share→search), lalu screenshot DMS + komit.

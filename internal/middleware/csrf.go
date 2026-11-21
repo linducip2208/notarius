@@ -28,8 +28,11 @@ func CSRF(store auth.SessionStore, cookieName string) func(http.Handler) http.Ha
 				http.Error(w, "CSRF token hilang. Muat ulang halaman.", http.StatusForbidden)
 				return
 			}
-			_ = r.ParseForm()
-			if subtle.ConstantTimeCompare([]byte(r.FormValue("csrf")), []byte(cookie.Value)) != 1 {
+			// NOTE: jangan panggil r.ParseForm() di sini — untuk multipart ia
+			// mengunci r.Form kosong dan FormValue takkan pernah melihat body.
+			// FormValue menangani urlencoded + multipart dengan benar.
+			fv := r.FormValue("csrf")
+			if subtle.ConstantTimeCompare([]byte(fv), []byte(cookie.Value)) != 1 {
 				http.Error(w, "CSRF token tidak valid.", http.StatusForbidden)
 				return
 			}

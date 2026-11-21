@@ -123,7 +123,7 @@ func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	var next int64 = 1
 	_ = tx.QueryRow(`SELECT COALESCE(MAX(entry_no),0)+1 FROM repertorium WHERE office_id=?`, officeID).Scan(&next)
 	if _, err := tx.Exec(`INSERT INTO repertorium(office_id, entry_no, entry_date, deed_id, description)
-		VALUES(?,?,CURDATE(),?,?,?)`, officeID, next, deedID, "Akta "+number+": "+title); err != nil {
+		VALUES(?,?,CURDATE(),?,?)`, officeID, next, deedID, "Akta "+number+": "+title); err != nil {
 		return err
 	}
 	return tx.Commit()

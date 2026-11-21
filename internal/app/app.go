@@ -20,6 +20,7 @@ import (
 	"notaryos/internal/config"
 	"notaryos/internal/corp"
 	"notaryos/internal/deeds"
+	"notaryos/internal/dms"
 	"notaryos/internal/doctpl"
 	"notaryos/internal/files"
 	"notaryos/internal/finance"
@@ -51,6 +52,7 @@ type App struct {
 	clients   *clients.Store
 	reqs      *requests.Store
 	deeds     *deeds.Store
+	dms       *dms.Store
 	fin       *finance.Store
 	wills     *deeds.WillStore
 	corp      *corp.Store
@@ -87,11 +89,12 @@ type Page struct {
 // New builds the app. db may be nil only in tests that never hit handlers.
 func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
-		"can":     func(role, perm string) bool { return rbac.Has(role, perm) },
-		"wib":     func(t time.Time) string { return wib.Format(t) },
-		"wibdate": func(t time.Time) string { return wib.Date(t) },
-		"css":     func(s string) template.CSS { return template.CSS(s) },
-		"lower":   func(s string) string { return strings.ToLower(s) },
+		"can":       func(role, perm string) bool { return rbac.Has(role, perm) },
+		"wib":       func(t time.Time) string { return wib.Format(t) },
+		"wibdate":   func(t time.Time) string { return wib.Date(t) },
+		"css":       func(s string) template.CSS { return template.CSS(s) },
+		"lower":     func(s string) string { return strings.ToLower(s) },
+		"hasPrefix": func(s, p string) bool { return strings.HasPrefix(s, p) },
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
@@ -122,6 +125,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		a.clients = clients.NewStore(db)
 		a.reqs = requests.NewStore(db)
 		a.deeds = deeds.NewStore(db)
+		a.dms = dms.NewStore(db)
 		a.fin = finance.NewStore(db)
 		a.wills = deeds.NewWillStore(db)
 		a.corp = corp.NewStore(db)
@@ -211,6 +215,7 @@ func (a *App) Router() http.Handler {
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
+	r.Get("/s/{token}", a.dmsSharedDownload)
 	r.Get("/", a.landing)
 	r.Get("/robots.txt", a.robotsTxt)
 	r.Get("/sitemap.xml", a.sitemapXML)
@@ -296,6 +301,35 @@ func (a *App) Router() http.Handler {
 		p.Post("/notifications/read", a.notifRead)
 		p.Get("/metrics", a.metrics)
 		p.Get("/documents", a.documents)
+		p.Get("/dms", a.dmsDashboard)
+		p.Get("/dms/library", a.dmsLibrary)
+		p.Get("/documents/{id}", a.dmsDetail)
+		p.Post("/documents/{id}/meta", a.dmsSaveMeta)
+		p.Post("/documents/{id}/verify", a.dmsVerify)
+		p.Get("/documents/{id}/preview", a.dmsPreview)
+		p.Post("/documents/{id}/version", a.dmsNewVersion)
+		p.Get("/documents/{id}/version/{v}", a.dmsDownloadVersion)
+		p.Post("/documents/{id}/restore/{v}", a.dmsRestoreVersion)
+		p.Post("/documents/{id}/workflow", a.dmsMove)
+		p.Post("/documents/{id}/link", a.dmsLink)
+		p.Post("/documents/{id}/favorite", a.dmsFavorite)
+		p.Post("/documents/{id}/share", a.dmsShare)
+		p.Post("/documents/{id}/archive", a.dmsArchiveMove)
+		p.Post("/documents/{id}/hold", a.dmsHold)
+		p.Post("/documents/{id}/disposition", a.dmsDisposition)
+		p.Get("/dms/ocr", a.dmsOCRQueue)
+		p.Post("/dms/ocr/run", a.dmsOCRRun)
+		p.Get("/dms/search", a.dmsSearch)
+		p.Get("/dms/archive", a.dmsArchive)
+		p.Post("/dms/archive/locations", a.dmsArchiveLoc)
+		p.Get("/dms/retention", a.dmsRetention)
+		p.Post("/dms/holds/{hid}/release", a.dmsReleaseHold)
+		p.Get("/dms/duplicates", a.dmsDuplicates)
+		p.Get("/dms/categories", a.dmsCategories)
+		p.Post("/dms/categories", a.dmsCategoryCreate)
+		p.Get("/dms/checklists", a.dmsChecklists)
+		p.Post("/dms/checklists", a.dmsChecklistCreate)
+		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
 		p.Get("/audit", a.auditPage)
 		p.Get("/office", a.officePage)
 		p.Post("/office", a.officeSave)
@@ -885,6 +919,10 @@ func (a *App) clientExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) clientNew(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) {
+		a.forbidden(w, r)
+		return
+	}
 	a.render(w, r, "client_new", "Klien Baru", nil)
 }
 
@@ -913,11 +951,26 @@ func (a *App) clientCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) && mw.RoleOf(r) != rbac.RoleClient {
+		a.forbidden(w, r)
+		return
+	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	c, err := a.clients.Get(a.officeOf(r), id)
 	if err != nil {
 		http.NotFound(w, r)
 		return
+	}
+	if mw.RoleOf(r) == rbac.RoleClient {
+		uid := a.uid(r)
+		var linked int64
+		if uid != nil {
+			linked = a.users.LinkedClient(*uid)
+		}
+		if linked == 0 || linked != c.ID {
+			a.forbidden(w, r)
+			return
+		}
 	}
 	dups, _ := a.clients.FindDuplicates(a.officeOf(r), c.FullName, c.Phone)
 	ids, _ := a.clients.Identities(c.ID)
@@ -1274,6 +1327,10 @@ func (a *App) templatesPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) reports(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewReports) {
+		a.forbidden(w, r)
+		return
+	}
 	pending, active, completed := 0, 0, 0
 	var out int64
 	if a.db != nil {
@@ -1286,6 +1343,10 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
 	list, _ := a.users.List(a.officeOf(r))
 	a.render(w, r, "settings", "Pengaturan", map[string]any{"Users": list, "Roles": rbac.Roles()})
 }

@@ -73,6 +73,10 @@
 <div class="col-md-5">
 <div class="card"><div class="card-header"><h3 class="card-title">Linimasa</h3></div>
 <div class="card-body">{{range .Data.Req.Events}}<div class="mb-2"><span class="badge bg-blue-lt">{{.From}} → {{.To}}</span> <span class="text-secondary">{{.Actor}} · {{.At}}</span><div>{{.Note}}</div></div>{{else}}<p class="text-secondary">Belum ada peristiwa.</p>{{end}}</div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Checklist Berkas</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Checklist}}<div class="list-group-item"><span class="badge {{if eq .Status "VERIFIED"}}bg-green-lt{{else if eq .Status "MISSING"}}bg-red-lt{{else}}bg-yellow-lt{{end}} me-2">{{.Status}}</span>{{.Label}}<form method="post" action="/requests/{{$.Data.Req.ID}}/checklist" class="d-flex gap-1 mt-1">{{template "csrf" $}}<input type="hidden" name="item_id" value="{{.ID}}"/><select class="form-select form-select-sm" name="status"><option>MISSING</option><option>RECEIVED</option><option>VERIFIED</option><option>REJECTED</option><option>NEEDS_REVISION</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></div>{{else}}<div class="list-group-item text-secondary">Belum ada template checklist untuk layanan ini. <a href="/dms/checklists">Buat template →</a></div>{{end}}</div></div>
+{{if .Data.LinkedDocs}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Dokumen Terkait</h3></div>
+<div class="list-group list-group-flush">{{range .Data.LinkedDocs}}<a class="list-group-item" href="/documents/{{.}}">Berkas #{{.}}</a>{{end}}</div></div>{{end}}
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Pengajuan AHU/OSS terkait</h3></div>
 <div class="card-body">{{range .Data.Gov}}<div class="mb-1">{{.Channel}} — {{.Reference}} ({{.Status}})</div>{{else}}<p class="text-secondary">Belum ada. Buat dari halaman AHU &amp; OSS.</p>{{end}}</div></div>
 </div></div>

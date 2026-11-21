@@ -1,0 +1,201 @@
+{{define "dms_dashboard"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">DMS Overview</li></ol></nav>
+<div class="row row-deck row-cards mb-3">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Total Dokumen</div><div class="h1">{{.Data.Stats.Total}}</div><a href="/dms/library">Buka library</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu Verifikasi</div><div class="h1">{{.Data.Stats.PendingVerify}}</div><a href="/dms/library?vst=PENDING">Antrean verifikasi</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu Approval</div><div class="h1">{{.Data.Stats.PendingApproval}}</div><a href="/dms/library?wf=APPROVAL">Antrean approval</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Berkas Hilang (checklist)</div><div class="h1">{{.Data.Stats.Missing}}</div><a href="/dms/retention">Lihat retensi</a></div></div></div>
+</div>
+<div class="row row-deck row-cards mb-3">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Kedaluwarsa ≤30 hari</div><div class="h1">{{.Data.Stats.Expiring}}</div><a href="/dms/retention">Lihat</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Antrean OCR</div><div class="h1">{{.Data.Stats.OCRQueued}}</div><a href="/dms/ocr">Proses</a></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Storage Terpakai</div><div class="h1">{{.Data.Stats.StorageBytes}}</div><span class="text-secondary small">bytes</span></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Grup Duplikat</div><div class="h1">{{.Data.Stats.Duplicates}}</div><a href="/dms/duplicates">Tinjau</a></div></div></div>
+</div>
+<div class="row g-3">
+<div class="col-lg-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Perlu Tindakan Workflow</h3></div>
+<div class="list-group list-group-flush">{{range .Data.PendingWF}}<a class="list-group-item" href="/documents/{{.ID}}"><span class="badge bg-yellow-lt me-2">{{.WF}}</span>{{.Name}}</a>{{else}}<div class="list-group-item text-secondary">Tidak ada — semua workflow lancar.</div>{{end}}</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Dokumen Terbaru</h3><div class="ms-auto"><a href="/dms/library">Semua →</a></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nama</th><th>Status</th><th></th></tr></thead>
+<tbody>{{range .Data.Recent}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><span class="badge bg-blue-lt">{{.WF}}</span></td><td><a class="btn btn-sm btn-ghost-secondary" href="/documents/{{.ID}}">Buka</a></td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada dokumen.</td></tr>{{end}}</tbody></table></div></div>
+</div>
+<div class="col-lg-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kedaluwarsa ≤30 Hari</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Expiring}}<a class="list-group-item" href="/documents/{{.ID}}">{{.Name}} <span class="text-secondary">· {{.Expiry}}</span></a>{{else}}<div class="list-group-item text-secondary">Tidak ada yang mendesak.</div>{{end}}</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Duplikat Terdeteksi (SHA-256 sama)</h3><div class="ms-auto"><a href="/dms/duplicates">Semua →</a></div></div>
+<div class="list-group list-group-flush">{{range .Data.Dups}}<div class="list-group-item"><code>{{.SHA}}</code><div class="small text-secondary">ID: {{.IDs}} ({{.N}} berkas — tinjau manual, jangan hapus otomatis)</div></div>{{else}}<div class="list-group-item text-secondary">Tidak ada duplikat.</div>{{end}}</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">OCR Terakhir</h3><div class="ms-auto"><a href="/dms/ocr">Antrean →</a></div></div>
+<div class="list-group list-group-flush">{{range .Data.Jobs}}<div class="list-group-item">File #{{.FileID}} <span class="badge bg-azure-lt">{{.Status}}</span>{{if .LastErr}} <span class="text-danger small">{{.LastErr}}</span>{{end}}</div>{{else}}<div class="list-group-item text-secondary">Antrean kosong.</div>{{end}}</div></div>
+</div>
+</div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_library"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Document Library</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Document Library</h3><div class="ms-auto d-flex gap-2"><a class="btn btn-outline-primary" href="/dms/search">Pencarian Lanjut</a><a class="btn btn-outline-primary" href="/dms/duplicates">Duplikat</a></div></div>
+<form method="get" action="/dms/library"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
+<input class="form-control" style="max-width:240px" type="search" name="q" placeholder="Cari nama / nomor…" value="{{.Data.Q}}"/>
+<select class="form-select" style="max-width:170px" name="cat"><option value="0">Semua Kategori</option>{{range .Data.Cats}}<option value="{{.ID}}" {{if eq $.Data.Cat .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+<select class="form-select" style="max-width:170px" name="wf"><option value="">Semua Workflow</option><option {{if eq .Data.WF "VERIFICATION"}}selected{{end}}>VERIFICATION</option><option {{if eq .Data.WF "APPROVAL"}}selected{{end}}>APPROVAL</option><option {{if eq .Data.WF "FINALIZED"}}selected{{end}}>FINALIZED</option><option {{if eq .Data.WF "ARCHIVED"}}selected{{end}}>ARCHIVED</option></select>
+<select class="form-select" style="max-width:150px" name="vst"><option value="">Verifikasi: semua</option><option {{if eq .Data.VST "PENDING"}}selected{{end}}>PENDING</option><option {{if eq .Data.VST "VERIFIED"}}selected{{end}}>VERIFIED</option><option {{if eq .Data.VST "REJECTED"}}selected{{end}}>REJECTED</option></select>
+<select class="form-select" style="max-width:150px" name="conf"><option value="">Semua akses</option><option {{if eq .Data.Conf "INTERNAL"}}selected{{end}}>INTERNAL</option><option {{if eq .Data.Conf "CONFIDENTIAL"}}selected{{end}}>CONFIDENTIAL</option><option {{if eq .Data.Conf "RESTRICTED"}}selected{{end}}>RESTRICTED</option></select>
+<label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="fav" value="1" {{if .Data.Fav}}checked{{end}}/> Favorit saya</label>
+<button class="btn btn-primary" type="submit">Filter</button>
+</div></form>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>OCR</th><th>Verifikasi</th><th>Workflow</th><th></th></tr></thead>
+<tbody>{{range .Data.Docs}}<tr><td>{{.ID}}</td><td><a href="/documents/{{.ID}}">{{.Name}}</a></td><td>{{.MIME}}</td><td>{{.Size}}</td><td>{{.OCR}}</td><td><span class="badge bg-azure-lt">{{.Ver}}</span></td><td><span class="badge bg-blue-lt">{{.WF}}</span></td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.ID}}">Buka</a><form method="post" action="/documents/{{.ID}}/favorite">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★</button></form></div></td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada dokumen. Unggah dari halaman detail klien.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_detail"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/dms/library">Library</a></li><li class="breadcrumb-item active">#{{.Data.M.ID}}</li></ol></nav>
+<div class="row"><div class="col-lg-7">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">{{if .Data.M.Disp}}{{.Data.M.Disp}}{{else}}{{.Data.M.Name}}{{end}}</h3><div class="ms-auto d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Pratinjau</a><a class="btn btn-sm btn-primary" href="/files/{{.Data.M.ID}}">Unduh</a></div></div>
+<div class="card-body">
+<p class="text-secondary">{{.Data.M.MIME}} · {{.Data.M.Size}} bytes · OCR: {{.Data.M.OCR}} · Verifikasi: <span class="badge bg-azure-lt">{{.Data.M.Ver}}</span> · Workflow: <span class="badge bg-blue-lt">{{.Data.M.WF}}</span></p>
+<form method="post" action="/documents/{{.Data.M.ID}}/meta"><div class="row">{{template "csrf" .}}
+<div class="col-md-6 mb-2"><label class="form-label">Nama tampil</label><input class="form-control" name="display_name" value="{{.Data.M.Disp}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Nomor dokumen</label><input class="form-control" name="doc_number" value="{{.Data.M.Num}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Kategori</label><select class="form-select" name="category_id"><option value="">—</option>{{range .Data.Cats}}<option value="{{.ID}}" {{if eq $.Data.M.CatID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Tanggal dokumen</label><input class="form-control" type="date" name="doc_date" value="{{.Data.M.DocDate}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Kedaluwarsa</label><input class="form-control" type="date" name="expiry_date" value="{{.Data.M.Exp}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Klasifikasi</label><select class="form-select" name="confidentiality"><option {{if eq .Data.M.Conf "INTERNAL"}}selected{{end}}>INTERNAL</option><option {{if eq .Data.M.Conf "CONFIDENTIAL"}}selected{{end}}>CONFIDENTIAL</option><option {{if eq .Data.M.Conf "RESTRICTED"}}selected{{end}}>RESTRICTED</option><option {{if eq .Data.M.Conf "PUBLIC"}}selected{{end}}>PUBLIC</option></select></div>
+<div class="col-md-6 mb-2 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit">Simpan Metadata</button></div>
+</div></form>
+</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Verifikasi Manusia (wajib)</h3></div>
+<div class="card-body"><form method="post" action="/documents/{{.Data.M.ID}}/verify" class="d-flex gap-2">{{template "csrf" .}}
+<select class="form-select" style="max-width:200px" name="to"><option value="VERIFIED">VERIFIED</option><option value="REJECTED">REJECTED</option></select>
+<button class="btn btn-success" type="submit" onclick="return confirm('Tandai hasil verifikasi manusia?')">Sahkan</button></form>
+<p class="text-secondary small mt-2">OCR tidak pernah auto-verify. Penolakan/persetujuan tercatat beserta pelakunya.</p></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Versi Baru</h3></div>
+<div class="card-body"><form method="post" action="/documents/{{.Data.M.ID}}/version" enctype="multipart/form-data"><div class="d-flex gap-2">{{template "csrf" .}}<input class="form-control" type="file" name="file" required/><input class="form-control" style="max-width:220px" name="note" placeholder="Catatan versi"/><button class="btn btn-primary" type="submit">Unggah</button></div></form>
+<div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>v</th><th>SHA-256</th><th>Ukuran</th><th>Catatan</th><th></th></tr></thead>
+<tbody>{{range .Data.Vers}}<tr><td>v{{.No}}</td><td><code>{{.Hash}}</code></td><td>{{.Size}}</td><td>{{.Note}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-secondary" href="/documents/{{$.Data.M.ID}}/version/{{.No}}">Unduh</a><form method="post" action="/documents/{{$.Data.M.ID}}/restore/{{.No}}">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" onclick="return confirm('Pulihkan sebagai versi baru?')">Restore</button></form></div></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary">Belum ada versi (unggah pertama tercatat sebagai v1 saat dibuat).</td></tr>{{end}}</tbody></table></div></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Relasi Dokumen</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Rels}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.RelatedType}}</span>#{{.RelatedID}} <span class="text-secondary">· {{.Relation}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada relasi tercatat.</div>{{end}}</div>
+<div class="card-body border-top"><form method="post" action="/documents/{{.Data.M.ID}}/link" class="row g-2">{{template "csrf" .}}
+<div class="col-md-4"><select class="form-select" name="related_type"><option value="client">client</option><option value="request">request</option><option value="deed">deed</option><option value="invoice">invoice</option><option value="service">service</option><option value="company">company</option><option value="repertorium">repertorium</option><option value="will">will</option><option value="legalization">legalization</option></select></div>
+<div class="col-md-3"><input class="form-control" name="related_id" placeholder="ID terkait" required/></div>
+<div class="col-md-3"><input class="form-control" name="relation" placeholder="Relasi (lampiran…)"/></div>
+<div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Taut</button></div></form></div></div>
+</div>
+<div class="col-lg-5">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pratinjau</h3></div>
+<div class="card-body text-center">{{if eq .Data.M.MIME "application/pdf"}}<p class="text-secondary">PDF — buka di tab baru (otorisasi + tercatat).</p>{{else if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau dokumen"/>{{else}}<p class="text-secondary">Pratinjau hanya untuk PDF/gambar. Unduh untuk format lain.</p>{{end}}
+<div class="d-flex gap-2 justify-content-center"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a>
+<form method="post" action="/documents/{{.Data.M.ID}}/favorite">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★ Favorit</button></form></div></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Workflow</h3></div>
+<div class="card-body"><p>Status: <span class="badge bg-blue-lt">{{.Data.M.WF}}</span></p>
+<form method="post" action="/documents/{{.Data.M.ID}}/workflow" id="wfform" class="d-flex gap-2">{{template "csrf" .}}
+<select class="form-select" name="to"><option>CLASSIFICATION</option><option>ADMIN_REVIEW</option><option>VERIFICATION</option><option>REVISION_REQUIRED</option><option>APPROVAL</option><option>APPROVED</option><option>FINALIZED</option><option>ARCHIVED</option><option>REJECTED</option></select>
+<button class="btn btn-primary" type="submit">Pindah</button></form>
+<input class="form-control mt-2" form="wfform" name="note" placeholder="Catatan (opsional)"/>
+<div class="mt-2">{{range .Data.Timeline}}<div class="small mb-1"><span class="badge bg-azure-lt">{{.From}} → {{.To}}</span> {{.Actor}} · {{.At}}{{if .Note}} — {{.Note}}{{end}}</div>{{else}}<p class="text-secondary small">Belum ada pergerakan.</p>{{end}}</div></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Berbagi & Arsip</h3></div>
+<div class="card-body">
+<form method="post" action="/documents/{{.Data.M.ID}}/share" class="row g-2 mb-2">{{template "csrf" .}}<div class="col-4"><input class="form-control" name="hours" placeholder="Jam (1-720)" value="24"/></div><div class="col-4"><input class="form-control" name="max" placeholder="Maks unduh" value="5"/></div><div class="col-4"><button class="btn btn-outline-primary w-100" type="submit">Buat Tautan</button></div></form>
+<form method="post" action="/documents/{{.Data.M.ID}}/archive" class="row g-2 mb-2">{{template "csrf" .}}<div class="col-5"><select class="form-select" name="location_id"><option value="">Lokasi…</option>{{range .Data.Locs}}<option value="{{.ID}}">{{.Code}}</option>{{end}}</select></div><div class="col-4"><select class="form-select" name="movement"><option>STORE</option><option>RETRIEVE</option><option>RETURN</option><option>TRANSFER</option></select></div><div class="col-3"><button class="btn btn-outline-primary w-100" type="submit">Catat</button></div><input class="form-control mt-2" name="note" placeholder="Catatan perpindahan"/></form>
+<form method="post" action="/documents/{{.Data.M.ID}}/hold" class="d-flex gap-2 mb-2">{{template "csrf" .}}<input class="form-control" name="reason" placeholder="Alasan legal hold" required/><button class="btn btn-warning" type="submit">Hold</button></form>
+{{if .Data.Holds}}<div class="alert alert-danger py-2">Legal hold aktif — penghancuran DITOLAK.</div>{{end}}
+<form method="post" action="/documents/{{.Data.M.ID}}/disposition" class="d-flex gap-2">{{template "csrf" .}}<select class="form-select" name="action"><option>RETAIN</option><option>DESTROY_REQUEST</option><option>DESTROYED</option></select><button class="btn btn-outline-danger" type="submit" onclick="return confirm('Catat keputusan disposisi?')">Catat</button></form>
+<div class="mt-2 small">{{range .Data.Hist}}<div>📦 {{.Move}} {{.Loc}} · {{.Actor}} · {{.At}}</div>{{else}}<span class="text-secondary">Belum ada riwayat fisik.</span>{{end}}</div>
+</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Hasil OCR</h3></div>
+<div class="list-group list-group-flush">{{range .Data.OCRs}}<div class="list-group-item"><span class="badge bg-green-lt">{{.Provider}}</span> <span class="text-secondary small">{{.Provenance}} · {{.CreatedAt}}</span><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{index .Fields "text"}}</pre></div>{{else}}<div class="list-group-item text-secondary">Belum ada hasil OCR. Jalankan dari halaman berkas klien / antrean OCR.</div>{{end}}</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Jejak Akses</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Access}}<div class="list-group-item small">{{.Action}} · {{.Actor}} · {{.IP}} · {{.At}}</div>{{else}}<div class="list-group-item text-secondary small">Belum ada akses tercatat.</div>{{end}}</div></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_share"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card"><div class="card-body text-center py-5">
+<h3>Tautan Berbagi Terbatas Dibuat</h3>
+<p class="text-secondary">Bagikan URL di bawah ini. Berlaku terbatas + dapat dicabut kapan saja.</p>
+<p><code>/s/{{.Data.Token}}</code></p>
+<a class="btn btn-primary" href="/s/{{.Data.Token}}">Uji Tautan</a>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_ocr"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Antrean OCR</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Antrean OCR (Tesseract lokal)</h3><div class="ms-auto"><form method="post" action="/dms/ocr/run">{{template "csrf" .}}<button class="btn btn-primary" type="submit">Proses 1 Pekerjaan</button></form></div></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>File</th><th>Status</th><th>Percobaan</th><th>Error</th></tr></thead>
+<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td><a href="/documents/{{.FileID}}">#{{.FileID}}</a></td><td>{{.Status}}</td><td>{{.Attempts}}</td><td class="text-danger small">{{.LastErr}}</td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Antrean kosong. Unggah berkas untuk menambah pekerjaan otomatis.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_search"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Pencarian</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pencarian Full-Text (nama, nomor, isi OCR)</h3></div>
+<form method="get" action="/dms/search"><div class="card-body d-flex gap-2"><input class="form-control" name="q" placeholder="Kata kunci…" value="{{.Data.Q}}"/><button class="btn btn-primary" type="submit">Cari</button></div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>OCR</th><th></th></tr></thead>
+<tbody>{{range .Data.Hits}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.MIME}}</td><td>{{.Size}}</td><td>{{.OCR}}</td><td><a class="btn btn-sm btn-outline-primary" href="/documents/{{.ID}}">Buka</a></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-3">{{if .Data.Q}}Tidak ada hasil.{{else}}Masukkan kata kunci untuk mencari isi dokumen terindeks.{{end}}</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_archive"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Arsip Fisik</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Lokasi Baru (ruang/rak/boks)</h3></div>
+<form method="post" action="/dms/archive/locations"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><input class="form-control" name="code" placeholder="Kode (cth. RAK-A1)" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="room" placeholder="Ruang"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="shelf" placeholder="Rak"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="box" placeholder="Boks"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Lokasi</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Kode</th><th>Ruang</th><th>Rak</th><th>Boks</th></tr></thead>
+<tbody>{{range .Data.Locs}}<tr><td><strong>{{.Code}}</strong></td><td>{{.Room}}</td><td>{{.Shelf}}</td><td>{{.Box}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada lokasi arsip.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Berkas Terarsip (100 terbaru)</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Lokasi Terakhir</th><th>Pergerakan Terakhir</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td><a href="/documents/{{.ID}}">{{.ID}}</a></td><td>{{.Name}}</td><td>{{.Loc}}</td><td class="text-secondary">{{.At}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada pergerakan tercatat.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_retention"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Retensi & Legal Hold</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Legal Hold Aktif (blokir penghancuran)</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Berkas</th><th>Alasan</th><th>Sejak</th><th></th></tr></thead>
+<tbody>{{range .Data.Holds}}<tr><td>{{.ID}}</td><td><a href="/documents/{{.FileID}}">{{.Name}}</a></td><td>{{.Reason}}</td><td>{{.At}}</td><td><form method="post" action="/dms/holds/{{.ID}}/release">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit">Lepas</button></form></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Tidak ada hold aktif.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kedaluwarsa ≤30 Hari</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Expiring}}<a class="list-group-item" href="/documents/{{.ID}}">{{.Name}} <span class="text-secondary">· {{.Expiry}}</span></a>{{else}}<div class="list-group-item text-secondary">Tidak ada yang mendesak.</div>{{end}}</div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Kebijakan Retensi</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Entitas</th><th>Tahun</th><th>Catatan</th></tr></thead>
+<tbody>{{range .Data.Policies}}<tr><td>{{.Entity}}</td><td>{{.Years}}</td><td>{{.Note}}</td></tr>{{end}}</tbody></table>
+<div class="card-body"><p class="text-secondary small mb-0">Minuta & repertorium: 25 tahun (UUJN). Penghancuran otomatis TIDAK PERNAH berjalan — hanya keputusan tercatat, dan DITOLAK bila hold aktif.</p></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_duplicates"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Duplikat</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Kandidat Duplikat (SHA-256 sama)</h3></div>
+<div class="list-group list-group-flush">{{range .Data}}<div class="list-group-item"><code>{{.SHA}}</code><div class="small text-secondary">ID: {{.IDs}} ({{.N}} berkas) — tinjau manual; tautkan relasi bila memang sama, jangan hapus otomatis.</div></div>
+{{else}}<div class="list-group-item text-secondary">Tidak ada duplikat terdeteksi.</div>{{end}}</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_categories"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Kategori</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kategori Baru (per kantor, dapat dikonfigurasi)</h3></div>
+<form method="post" action="/dms/categories"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><input class="form-control" name="name" placeholder="Nama (cth. KTP, Akta Final)" required/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="description" placeholder="Deskripsi"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Tambah</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Deskripsi</th></tr></thead>
+<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.Desc}}</td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada kategori. Tambahkan jenis KTP, Akta Final, dsb.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_checklists"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Template Checklist</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru (satu baris = satu item)</h3></div>
+<form method="post" action="/dms/checklists"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><select class="form-select" name="service_code"><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="name" placeholder="Nama template" required/></div>
+<div class="col-md-4 mb-2"><textarea class="form-control" name="items" rows="2" placeholder="KTP pendiri&#10;NPWP&#10;Susunan direksi"></textarea></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Layanan</th><th>Item</th></tr></thead>
+<tbody>{{range .Data.Tpls}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.Service}}</td><td class="small">{{.Items}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada template. Buat per jenis layanan.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}

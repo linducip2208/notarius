@@ -120,6 +120,7 @@ func (a *App) identityAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "identity.add", Entity: "client", EntityID: strconv.FormatInt(clientID, 10), Detail: r.FormValue("id_type")})
 	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash=Identitas+disimpan", http.StatusSeeOther)
 }
 
@@ -156,6 +157,7 @@ func (a *App) repAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "rep.add", Entity: "client", EntityID: strconv.FormatInt(clientID, 10)})
 	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash=Perwakilan+disimpan", http.StatusSeeOther)
 }
 
@@ -180,6 +182,11 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.upload", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
+	// DMS: auto-relasi ke klien + antre OCR (best-effort, tak menghambat respons).
+	_ = a.dms.AutoLink(a.officeOf(r), id, "client", clientID, a.uid(r))
+	if _, err := a.dms.EnqueueOCR(a.officeOf(r), id); err == nil {
+		_ = a.dms.Move(a.officeOf(r), id, "CLASSIFICATION", a.uid(r), "otomatis saat unggah")
+	}
 	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash=Berkas+diunggah", http.StatusSeeOther)
 }
 
@@ -194,12 +201,14 @@ func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	_, err := a.uploads.RunOCR(id, "")
+	_, err := a.uploads.RunOCRWithContext(r.Context(), id)
 	if err != nil {
 		// Honest failure: engine not installed (B-01). Staff falls back to manual entry.
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.ocr.failed", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
 		http.Error(w, "OCR belum dapat dijalankan: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.ocr", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/clients?flash=OCR+selesai", http.StatusSeeOther)
 }
 
@@ -224,6 +233,7 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = io.Copy(w, rc)
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.download", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
 }
 
 // ---- request detail + corporate ----
@@ -241,8 +251,11 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		bos, _ = a.corp.BeneficialOwners(co.ID)
 	}
 	subs, _ := a.govs.List(a.officeOf(r))
+	checklist, _ := a.dms.ChecklistForRequest(a.officeOf(r), id)
+	linked, _ := a.dms.ByRelated(a.officeOf(r), "request", id)
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
+		"Checklist": checklist, "LinkedDocs": linked,
 	})
 }
 
@@ -277,6 +290,7 @@ func (a *App) corpSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.save", Entity: "service_request", EntityID: strconv.FormatInt(reqID, 10)})
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Data+korporat+disimpan", http.StatusSeeOther)
 }
 
@@ -294,6 +308,7 @@ func (a *App) shareholderAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.shareholder.add", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10)})
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pemegang+saham+ditambah", http.StatusSeeOther)
 }
 
@@ -309,6 +324,7 @@ func (a *App) officerAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.officer.add", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10)})
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pengurus+ditambah", http.StatusSeeOther)
 }
 
@@ -354,6 +370,7 @@ func (a *App) appointmentCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "appointment.create", Entity: "appointment", EntityID: r.FormValue("client_id")})
 	http.Redirect(w, r, "/appointments?flash=Janji+disimpan", http.StatusSeeOther)
 }
 
@@ -391,6 +408,7 @@ func (a *App) govAdvance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "gov.advance", Entity: "gov_submission", EntityID: strconv.FormatInt(id, 10), Detail: string(r.FormValue("to"))})
 	http.Redirect(w, r, "/gov?flash=Status+pengajuan+diperbarui", http.StatusSeeOther)
 }
 
@@ -427,10 +445,15 @@ func (a *App) templateSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "template.save", Entity: "doc_template", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/templates/"+strconv.FormatInt(id, 10)+"?flash=Template+disimpan", http.StatusSeeOther)
 }
 
 func (a *App) templateEdit(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
+		a.forbidden(w, r)
+		return
+	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	t, err := a.tpl.Get(a.officeOf(r), id)
 	if err != nil {
@@ -478,6 +501,7 @@ func (a *App) clauseSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "clause.save", Entity: "clause", EntityID: r.FormValue("title")})
 	http.Redirect(w, r, "/templates?flash=Klausul+disimpan", http.StatusSeeOther)
 }
 
@@ -542,8 +566,38 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/deeds?flash=Akta+disetujui+dan+masuk+repertorium", http.StatusSeeOther)
 }
 
+// canViewDeed allows staff with client view (office-scoped), or a portal
+// client linked to the deed's own client (server-side, never trust URL alone).
+func (a *App) canViewDeed(r *http.Request, deedID int64) bool {
+	if rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		var oid int64
+		if err := a.db.QueryRow(`SELECT office_id FROM deed_drafts WHERE id=?`, deedID).Scan(&oid); err != nil {
+			return false
+		}
+		return oid == a.officeOf(r)
+	}
+	if mw.RoleOf(r) == rbac.RoleClient {
+		if id := a.uid(r); id != nil {
+			linked := a.users.LinkedClient(*id)
+			if linked == 0 {
+				return false
+			}
+			var cid int64
+			err := a.db.QueryRow(`SELECT r.client_id FROM deed_drafts d
+				JOIN service_requests r ON r.id=d.request_id
+				WHERE d.id=? AND d.office_id=?`, deedID, a.officeOf(r)).Scan(&cid)
+			return err == nil && cid == linked
+		}
+	}
+	return false
+}
+
 func (a *App) deedPDF(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if !a.canViewDeed(r, id) {
+		a.forbidden(w, r)
+		return
+	}
 	var title, body, status string
 	err := a.db.QueryRow(`SELECT title, content, status FROM deed_drafts WHERE id=? AND office_id=?`, id, a.officeOf(r)).
 		Scan(&title, &body, &status)
@@ -560,6 +614,10 @@ func (a *App) deedPDF(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) deedDOCX(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if !a.canViewDeed(r, id) {
+		a.forbidden(w, r)
+		return
+	}
 	var title, body, status string
 	err := a.db.QueryRow(`SELECT title, content, status FROM deed_drafts WHERE id=? AND office_id=?`, id, a.officeOf(r)).
 		Scan(&title, &body, &status)
@@ -611,6 +669,7 @@ func (a *App) appointmentStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "appointment.status", Entity: "appointment", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("to")})
 	http.Redirect(w, r, "/appointments?flash=Janji+diperbarui", http.StatusSeeOther)
 }
 
@@ -673,6 +732,7 @@ func (a *App) userLink(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "user.link", Entity: "user", EntityID: strconv.FormatInt(uid, 10), Detail: "client:" + strconv.FormatInt(cid, 10)})
 	http.Redirect(w, r, "/settings?flash=Akun+ditautkan", http.StatusSeeOther)
 }
 
@@ -787,30 +847,10 @@ func (a *App) deedSaveVersion(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Revisi+tersimpan", http.StatusSeeOther)
 }
 
-// ---- documents center (global file list) ----
+// ---- documents center redirects to DMS library ----
 
 func (a *App) documents(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
-	rows, err := a.db.Query(`SELECT f.id, f.owner_type, f.owner_id, f.original_name, f.mime, f.size_bytes, f.ocr_status, f.created_at
-		FROM files f WHERE f.office_id=? AND (?='' OR f.original_name LIKE CONCAT('%',?,'%'))
-		ORDER BY f.id DESC LIMIT 100`, a.officeOf(r), q, q)
-	if err != nil {
-		http.Error(w, "gagal memuat dokumen", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-	type doc struct {
-		ID, OwnerID                int64
-		Owner, Name, MIME, OCR, At string
-		Size                       int64
-	}
-	var out []doc
-	for rows.Next() {
-		var d doc
-		_ = rows.Scan(&d.ID, &d.Owner, &d.OwnerID, &d.Name, &d.MIME, &d.Size, &d.OCR, &d.At)
-		out = append(out, d)
-	}
-	a.render(w, r, "documents", "Document Center", map[string]any{"Docs": out, "Q": q})
+	http.Redirect(w, r, "/dms", http.StatusSeeOther)
 }
 
 // ---- audit log ----

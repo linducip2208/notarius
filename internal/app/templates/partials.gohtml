@@ -22,7 +22,16 @@
 <li class="nav-item"><a class="nav-link" href="/app">🏠 Dashboard</a></li>
 <li class="nav-item"><a class="nav-link" href="/appointments">📅 Janji Temu</a></li>
 <li class="nav-item"><a class="nav-link" href="/tasks">☰ Tugas</a></li>
-<li class="nav-item"><a class="nav-link" href="/documents">📁 Dokumen</a></li>
+<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Dokumen (DMS)</span></li>
+<li class="nav-item"><a class="nav-link" href="/dms">📊 Overview DMS</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/library">📁 Library</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/search">🔍 Pencarian</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/ocr">⚙ Antrean OCR</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/duplicates">⧉ Duplikat</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/archive">🗄 Arsip Fisik</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/retention">⏳ Retensi & Hold</a></li>
+{{if can .Role "template.manage"}}<li class="nav-item"><a class="nav-link" href="/dms/categories">🏷 Kategori</a></li>
+<li class="nav-item"><a class="nav-link" href="/dms/checklists">☑ Checklist</a></li>{{end}}
 {{if can .Role "client.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Manajemen Klien</span></li>
 <li class="nav-item"><a class="nav-link" href="/clients">👥 Daftar Klien{{if .Pending}}<span class="badge bg-yellow text-dark ms-auto">{{.Pending}}</span>{{end}}</a></li>
 <li class="nav-item"><a class="nav-link" href="/portal">🖥 Portal Klien</a></li>{{end}}
