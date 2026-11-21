@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -135,9 +136,33 @@ func (s *Store) List(officeID int64, ownerType string, ownerID int64) ([]Meta, e
 	return out, rows.Err()
 }
 
-// RunOCR executes the provider and stores the result with provenance.
-// Human verification is a separate explicit step (VerifyOCR).
-// It resolves the private ref to a temp file so Tesseract works on real bytes.
+// OCRResults returns extraction history for a file (newest first).
+func (s *Store) OCRResults(fileID int64) ([]ocr.Result, error) {
+	rows, err := s.db.Query(`SELECT provider, provenance, doc_type, fields, created_at
+		FROM ai_results WHERE file_id=? ORDER BY id DESC`, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ocr.Result
+	for rows.Next() {
+		var r ocr.Result
+		var fields sql.NullString
+		var at string
+		if err := rows.Scan(&r.Provider, &r.Provenance, &r.DocType, &fields, &at); err != nil {
+			return nil, err
+		}
+		r.Fields = map[string]string{}
+		if fields.Valid {
+			_ = json.Unmarshal([]byte(fields.String), &r.Fields)
+		}
+		if t, err := time.Parse("2006-01-02 15:04:05", at); err == nil {
+			r.CreatedAt = t
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
 func (s *Store) RunOCR(fileID int64, _ string) (ocr.Result, error) {
 	var ref, mime, orig string
 	var officeID int64
