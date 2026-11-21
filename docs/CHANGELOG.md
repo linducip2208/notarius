@@ -1,4 +1,9 @@
 # CHANGELOG
+## [CMS-Growth] — 2026-11-22 — 14 ide CMS (uncommitted → verifikasi)
+- Publik: kalkulator estimasi transparan (DB services+price_items, bukan harga final), konsultasi masuk → staf, booking slot berkuota → janji temu + klien tamu, tim/galeri/testimoni terverifikasi, pencarian situs, arsip artikel, i18n ID/EN (fallback ID), JSON-LD Notary, banner pengumuman, mode pemeliharaan (503 anonim, staf bypass), pageview internal tanpa tracker.
+- Admin: inbox konsultasi + status, slot + keputusan booking, tim/galeri/testimoni (terbit wajib bukti verifikasi), versi konten + rollback, dasbor kualitas (keterbacaan + SEO), statistik kunjungan, ekspor ZIP markdown, pratinjau draf bertoken HMAC.
+- Integrasi jujur: CTA layanan lama → /konsultasi + /kalkulator (ganti /login); migrasi 018; izin baru website.inquiries/engagement.manage.
+- Perbaikan: duplikat rute /layanan dihapus (pakai hub pSEO yang sudah ada + syarat).
 ## [Fase-8] — 2026-11-22 — Enterprise CRM + DMS lanjutan (uncommitted → verifikasi)
 - Migrasi 016_client_crm + 017_dms_enterprise (idempoten) teraplikasi di DB prod & test.
 - CRM: pencarian lanjutan, statistik, catatan, tandai inkonsisten (alasan wajib), pratinjau/penggabungan duplikat, ekspor CSV.

@@ -18,6 +18,7 @@ type Article struct {
 	CoverMediaID             sql.NullInt64
 	Tags, Author             string
 	Status                   string
+	Locale                   string
 	SEO                      SEO
 	CreatedBy, UpdatedBy     sql.NullInt64
 	CreatedAt                time.Time
@@ -40,15 +41,16 @@ func (s *Store) SaveArticle(officeID int64, a *Article, actorID *int64) (int64, 
 		return 0, errors.New("terbit butuh isi konten")
 	}
 	a.Slug = slug
+	a.Locale = cleanLocale(a.Locale)
 	if a.ID == 0 {
 		res, err := s.db.Exec(`INSERT INTO website_articles(office_id, category_id, title, slug,
 			excerpt, content, cover_media_id, tags, author, status, scheduled_at, seo_title,
-			seo_desc, canonical_url, og_image, robots, created_by, updated_by)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			seo_desc, canonical_url, og_image, robots, created_by, updated_by, locale)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			officeID, nullInt(a.CategoryID), a.Title, a.Slug, a.Excerpt, a.Content,
 			nullInt(a.CoverMediaID), a.Tags, a.Author, a.Status, nullTime(a.ScheduledAt),
 			a.SEO.Title, a.SEO.Desc, a.SEO.Canonical, a.SEO.OGImage, seoRobots(a.SEO.Robots),
-			nullInt64(actorID), nullInt64(actorID))
+			nullInt64(actorID), nullInt64(actorID), a.Locale)
 		if err != nil {
 			return 0, dupErr(err, "slug sudah dipakai")
 		}
@@ -64,10 +66,10 @@ func (s *Store) SaveArticle(officeID int64, a *Article, actorID *int64) (int64, 
 	}
 	if _, err := s.db.Exec(`UPDATE website_articles SET category_id=?, title=?, slug=?, excerpt=?,
 		content=?, cover_media_id=?, tags=?, author=?, status=?, scheduled_at=?, seo_title=?,
-		seo_desc=?, canonical_url=?, og_image=?, robots=?, updated_by=? WHERE id=? AND office_id=?`,
+		seo_desc=?, canonical_url=?, og_image=?, robots=?, updated_by=?, locale=? WHERE id=? AND office_id=?`,
 		nullInt(a.CategoryID), a.Title, a.Slug, a.Excerpt, a.Content, nullInt(a.CoverMediaID),
 		a.Tags, a.Author, a.Status, nullTime(a.ScheduledAt), a.SEO.Title, a.SEO.Desc,
-		a.SEO.Canonical, a.SEO.OGImage, seoRobots(a.SEO.Robots), nullInt64(actorID), a.ID, officeID); err != nil {
+		a.SEO.Canonical, a.SEO.OGImage, seoRobots(a.SEO.Robots), nullInt64(actorID), a.Locale, a.ID, officeID); err != nil {
 		return 0, dupErr(err, "slug sudah dipakai")
 	}
 	s.Invalidate(officeID)
@@ -80,10 +82,12 @@ func (s *Store) SaveArticle(officeID int64, a *Article, actorID *int64) (int64, 
 type Service struct {
 	ID                       int64
 	Name, Slug, Description  string
+	ServiceCode              string
 	Content                  string
 	ImageMediaID             sql.NullInt64
 	Position                 int
 	Visible                  bool
+	Locale                   string
 	SEO                      SEO
 }
 
@@ -97,15 +101,17 @@ func (s *Store) SaveService(officeID int64, sv *Service) (int64, error) {
 		return 0, errors.New("nama layanan wajib diisi")
 	}
 	sv.Slug = slug
+	sv.Locale = cleanLocale(sv.Locale)
 	vis := 0
 	if sv.Visible {
 		vis = 1
 	}
 	if sv.ID == 0 {
 		res, err := s.db.Exec(`INSERT INTO website_services(office_id, name, slug, description,
-			content, image_media_id, position, visible, seo_title, seo_desc)
-			VALUES(?,?,?,?,?,?,?,?,?,?)`, officeID, sv.Name, sv.Slug, sv.Description,
-			sv.Content, nullInt(sv.ImageMediaID), sv.Position, vis, sv.SEO.Title, sv.SEO.Desc)
+			content, image_media_id, position, visible, seo_title, seo_desc, locale, service_code)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, officeID, sv.Name, sv.Slug, sv.Description,
+			sv.Content, nullInt(sv.ImageMediaID), sv.Position, vis, sv.SEO.Title, sv.SEO.Desc,
+			sv.Locale, nullStr(sv.ServiceCode))
 		if err != nil {
 			return 0, dupErr(err, "slug sudah dipakai")
 		}
@@ -114,9 +120,9 @@ func (s *Store) SaveService(officeID int64, sv *Service) (int64, error) {
 		return id, nil
 	}
 	if _, err := s.db.Exec(`UPDATE website_services SET name=?, slug=?, description=?, content=?,
-		image_media_id=?, position=?, visible=?, seo_title=?, seo_desc=? WHERE id=? AND office_id=?`,
+		image_media_id=?, position=?, visible=?, seo_title=?, seo_desc=?, locale=?, service_code=? WHERE id=? AND office_id=?`,
 		sv.Name, sv.Slug, sv.Description, sv.Content, nullInt(sv.ImageMediaID), sv.Position,
-		vis, sv.SEO.Title, sv.SEO.Desc, sv.ID, officeID); err != nil {
+		vis, sv.SEO.Title, sv.SEO.Desc, sv.Locale, nullStr(sv.ServiceCode), sv.ID, officeID); err != nil {
 		return 0, dupErr(err, "slug sudah dipakai")
 	}
 	s.Invalidate(officeID)
@@ -132,6 +138,7 @@ type FAQ struct {
 	Question, Answer   string
 	Position           int
 	Visible            bool
+	Locale             string
 }
 
 // SaveFAQ upserts an FAQ entry.
@@ -142,14 +149,15 @@ func (s *Store) SaveFAQ(officeID int64, f *FAQ) (int64, error) {
 	if f.Category == "" {
 		f.Category = "Umum"
 	}
+	f.Locale = cleanLocale(f.Locale)
 	vis := 0
 	if f.Visible {
 		vis = 1
 	}
 	if f.ID == 0 {
 		res, err := s.db.Exec(`INSERT INTO website_faqs(office_id, category, question, answer,
-			position, visible) VALUES(?,?,?,?,?,?)`, officeID, f.Category, f.Question,
-			f.Answer, f.Position, vis)
+			position, visible, locale) VALUES(?,?,?,?,?,?,?)`, officeID, f.Category, f.Question,
+			f.Answer, f.Position, vis, f.Locale)
 		if err != nil {
 			return 0, err
 		}
@@ -158,8 +166,8 @@ func (s *Store) SaveFAQ(officeID int64, f *FAQ) (int64, error) {
 		return id, nil
 	}
 	if _, err := s.db.Exec(`UPDATE website_faqs SET category=?, question=?, answer=?,
-		position=?, visible=? WHERE id=? AND office_id=?`, f.Category, f.Question,
-		f.Answer, f.Position, vis, f.ID, officeID); err != nil {
+		position=?, visible=?, locale=? WHERE id=? AND office_id=?`, f.Category, f.Question,
+		f.Answer, f.Position, vis, f.Locale, f.ID, officeID); err != nil {
 		return 0, err
 	}
 	s.Invalidate(officeID)

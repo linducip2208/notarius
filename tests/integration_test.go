@@ -501,7 +501,7 @@ func TestCMSLifecycle(t *testing.T) {
 	if _, err := cs.SavePage(office, p, nil); err != nil {
 		t.Fatal(err)
 	}
-	got, secs, err := cs.PublicPage(office, "beranda")
+	got, secs, err := cs.PublicPage(office, "beranda", "id")
 	if err != nil || got.Title != "Beranda" || len(secs) != 1 {
 		t.Fatalf("public read gagal: %+v %v", got, err)
 	}
@@ -521,7 +521,7 @@ func TestCMSLifecycle(t *testing.T) {
 	if n1, _ := cs.PublishDue(office); n1 != 1 {
 		t.Fatal("jadwal lewat harus terbit")
 	}
-	if _, _, err := cs.PublicPage(office, "jadwal"); err != nil {
+	if _, _, err := cs.PublicPage(office, "jadwal", "id"); err != nil {
 		t.Fatal("sesudah PublishDue harus tampil publik")
 	}
 	cs.RecordHistory(office, "page", pid, "publish", "DRAFT", "PUBLISHED", nil, "uji", "127.0.0.1")
@@ -534,7 +534,7 @@ func TestCMSLifecycle(t *testing.T) {
 	if _, err := cs.SavePage(office, priv, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := cs.PublicPage(office, "rahasia-internal"); err == nil {
+	if _, _, err := cs.PublicPage(office, "rahasia-internal", "id"); err == nil {
 		t.Fatal("draf tak boleh publik")
 	}
 }

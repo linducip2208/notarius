@@ -31,9 +31,15 @@ func (a *App) pubBase(office int64, r *http.Request) map[string]any {
 	st, _ := a.web.SiteOf(office)
 	var oname, ophone, oemail, oaddr, osite string
 	_ = a.db.QueryRow(`SELECT name, phone, email, address, website FROM offices WHERE id=?`, office).Scan(&oname, &ophone, &oemail, &oaddr, &osite)
+	lang := pubLang(r)
+	var ann string
+	var maint int
+	_ = a.db.QueryRow(`SELECT announcement, maintenance FROM website_settings WHERE office_id=?`, office).Scan(&ann, &maint)
 	return map[string]any{
 		"Brand": a.pubBrand(office), "Nav": nav, "Foot": foot, "Site": st,
 		"Office": map[string]any{"Name": oname, "Phone": ophone, "Email": oemail, "Addr": oaddr, "Site": osite},
+		"Lang": lang, "OtherLang": map[string]any{"en": "id", "id": "en"}[lang], "IsEN": lang == "en",
+		"Announcement": ann, "Maintenance": maint, "LoggedIn": mw.RoleOf(r) != "",
 	}
 }
 
@@ -56,7 +62,7 @@ func (a *App) publicHome(w http.ResponseWriter, r *http.Request) {
 		a.landing(w, r)
 		return
 	}
-	if p, secs, err := a.web.PublicPage(office, "beranda"); err == nil {
+	if p, secs, err := a.web.PublicPage(office, "beranda", pubLang(r)); err == nil {
 		data["Page"] = p
 		data["Sections"] = secs
 		data["HasCMS"] = true
@@ -85,7 +91,7 @@ func (a *App) publicPageSlug(slug string) func(http.ResponseWriter, *http.Reques
 		data := a.pubBase(office, r)
 		if slug == "tentang-kami" {
 			// Profil kantor selalu tampil (data publik); halaman CMS opsional memperkaya.
-			if p, secs, err := a.web.PublicPage(office, slug); err == nil {
+			if p, secs, err := a.web.PublicPage(office, slug, pubLang(r)); err == nil {
 				data["Page"] = p
 				data["Sections"] = secs
 				data["HasPage"] = true
@@ -96,7 +102,7 @@ func (a *App) publicPageSlug(slug string) func(http.ResponseWriter, *http.Reques
 			}
 			return
 		}
-		p, secs, err := a.web.PublicPage(office, slug)
+		p, secs, err := a.web.PublicPage(office, slug, pubLang(r))
 		if err != nil {
 			a.notFound(w, r)
 			return
@@ -119,7 +125,7 @@ func (a *App) publicArticles(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 	const per = 9
-	list, total, _ := a.web.PublicArticles(office, q.Get("q"), per, (page-1)*per)
+	list, total, _ := a.web.PublicArticles(office, pubLang(r), q.Get("q"), per, (page-1)*per)
 	pages := (total + per - 1) / per
 	data["List"] = list
 	data["Total"] = total
@@ -135,7 +141,7 @@ func (a *App) publicArticles(w http.ResponseWriter, r *http.Request) {
 func (a *App) publicArticle(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)
-	art, rel, err := a.web.PublicArticle(office, chi.URLParam(r, "slug"))
+	art, rel, err := a.web.PublicArticle(office, chi.URLParam(r, "slug"), pubLang(r))
 	if err != nil {
 		a.notFound(w, r)
 		return
@@ -151,7 +157,7 @@ func (a *App) publicArticle(w http.ResponseWriter, r *http.Request) {
 func (a *App) publicFAQ(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)
-	faqs, _ := a.web.PublicFAQs(office)
+	faqs, _ := a.web.PublicFAQs(office, pubLang(r))
 	// group by category preserving order
 	type group struct {
 		Name  string
@@ -177,7 +183,7 @@ func (a *App) publicFAQ(w http.ResponseWriter, r *http.Request) {
 func (a *App) publicContact(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)
-	if p, secs, err := a.web.PublicPage(office, "kontak"); err == nil {
+	if p, secs, err := a.web.PublicPage(office, "kontak", pubLang(r)); err == nil {
 		data["Page"] = p
 		data["Sections"] = secs
 		data["HasPage"] = true
@@ -191,7 +197,7 @@ func (a *App) publicContact(w http.ResponseWriter, r *http.Request) {
 func (a *App) publicServices(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)
-	list, _ := a.web.PublicServices(office)
+	list, _ := a.web.PublicServices(office, pubLang(r))
 	data["List"] = list
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.ExecuteTemplate(w, "pub_services", map[string]any{"Title": "Layanan Kami", "Data": data}); err != nil {
@@ -204,14 +210,25 @@ func (a *App) publicService(w http.ResponseWriter, r *http.Request) {
 	data := a.pubBase(office, r)
 	var sv cms.Service
 	var img sql.NullInt64
-	err := a.db.QueryRow(`SELECT id, name, slug, description, content, image_media_id, seo_title, seo_desc
-		FROM website_services WHERE office_id=? AND slug=? AND visible=1`, office, chi.URLParam(r, "slug")).Scan(
-		&sv.ID, &sv.Name, &sv.Slug, &sv.Description, &sv.Content, &img, &sv.SEO.Title, &sv.SEO.Desc)
+	var code sql.NullString
+	lang := pubLang(r)
+	err := a.db.QueryRow(`SELECT id, name, slug, description, content, image_media_id, seo_title, seo_desc, service_code
+		FROM website_services WHERE office_id=? AND slug=? AND locale=? AND visible=1`, office, chi.URLParam(r, "slug"), lang).Scan(
+		&sv.ID, &sv.Name, &sv.Slug, &sv.Description, &sv.Content, &img, &sv.SEO.Title, &sv.SEO.Desc, &code)
+	if err != nil {
+		// fallback bahasa default
+		err = a.db.QueryRow(`SELECT id, name, slug, description, content, image_media_id, seo_title, seo_desc, service_code
+			FROM website_services WHERE office_id=? AND slug=? AND locale='id' AND visible=1`, office, chi.URLParam(r, "slug")).Scan(
+			&sv.ID, &sv.Name, &sv.Slug, &sv.Description, &sv.Content, &img, &sv.SEO.Title, &sv.SEO.Desc, &code)
+	}
 	if err != nil {
 		a.notFound(w, r)
 		return
 	}
 	sv.ImageMediaID = img
+	if code.Valid {
+		sv.ServiceCode = code.String
+	}
 	data["Service"] = sv
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.ExecuteTemplate(w, "pub_service", map[string]any{"Title": sv.Name, "Data": data}); err != nil {
@@ -223,7 +240,7 @@ func (a *App) publicService(w http.ResponseWriter, r *http.Request) {
 func (a *App) publicGeneric(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)
-	p, secs, err := a.web.PublicPage(office, chi.URLParam(r, "slug"))
+	p, secs, err := a.web.PublicPage(office, chi.URLParam(r, "slug"), pubLang(r))
 	if err != nil {
 		a.notFound(w, r)
 		return
@@ -243,7 +260,9 @@ func (a *App) cmsSitemapURLs(base string) []string {
 		return nil
 	}
 	var out []string
-	out = append(out, base+"/artikel", base+"/faq", base+"/layanan-kami", base+"/kontak", base+"/tentang-kami")
+	out = append(out, base+"/artikel", base+"/faq", base+"/layanan-kami", base+"/kontak", base+"/tentang-kami",
+		base+"/kalkulator", base+"/konsultasi", base+"/booking", base+"/tim", base+"/galeri",
+		base+"/testimoni", base+"/arsip", base+"/cari")
 	pages, arts := a.web.SitemapURLs(office)
 	static := map[string]bool{"beranda": true, "tentang-kami": true, "kontak": true, "artikel": true, "faq": true, "layanan-kami": true, "layanan": true, "docs": true}
 	for _, sl := range pages {

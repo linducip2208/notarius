@@ -78,8 +78,12 @@ func (a *App) cmsDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	hist, _ := a.web.History(office, 10)
 	st, _ := a.web.SiteOf(office)
+	var newInq, newBook int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_inquiries WHERE office_id=? AND status='BARU'`, office).Scan(&newInq)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_bookings WHERE office_id=? AND status='MENUNGGU'`, office).Scan(&newBook)
 	a.render(w, r, "cms_dash", "Website", map[string]any{
 		"Counts": c, "Missing": miss, "History": hist, "Site": st,
+		"NewInq": newInq, "NewBook": newBook,
 	})
 }
 
@@ -129,8 +133,12 @@ func (a *App) sitePage(w http.ResponseWriter, r *http.Request) {
 	st, _ := a.web.SiteOf(a.officeOf(r))
 	var name, phone, email, addr, site string
 	_ = a.db.QueryRow(`SELECT name, phone, email, address, website FROM offices WHERE id=?`, a.officeOf(r)).Scan(&name, &phone, &email, &addr, &site)
+	var maint int
+	var ann string
+	_ = a.db.QueryRow(`SELECT maintenance, announcement FROM website_settings WHERE office_id=?`, a.officeOf(r)).Scan(&maint, &ann)
 	a.render(w, r, "cms_site", "Pengaturan Website", map[string]any{
 		"Site": st, "Office": map[string]any{"Name": name, "Phone": phone, "Email": email, "Addr": addr, "Site": site},
+		"Maint": maint, "Ann": ann,
 	})
 }
 
@@ -147,6 +155,15 @@ func (a *App) siteSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	ann := strings.TrimSpace(r.FormValue("announcement"))
+	if len(ann) > 500 {
+		ann = ann[:500]
+	}
+	maint := 0
+	if r.FormValue("maintenance") == "1" {
+		maint = 1
+	}
+	_, _ = a.db.Exec(`UPDATE website_settings SET announcement=?, maintenance=? WHERE office_id=?`, ann, maint, office)
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "website.seo.save", Entity: "office", EntityID: strconv.FormatInt(office, 10)})
 	http.Redirect(w, r, "/cms/site?flash=Pengaturan+website+disimpan", http.StatusSeeOther)
 }

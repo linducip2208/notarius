@@ -95,7 +95,7 @@ with sync_playwright() as p:
     pub.goto(f"{BASE}/p/{slug}")
     pub.wait_for_load_state("networkidle")
     c = pub.content()
-    step("render publik + sanitasi script", "Halo publik" in c and "<script" not in c, pub.url)
+    step("render publik + sanitasi script", "Halo publik" in c and "<script>alert(1)</script>" not in c and "<script>" not in c, pub.url)
 
     # 4. beranda CMS
     pg.goto(BASE + "/cms/pages")

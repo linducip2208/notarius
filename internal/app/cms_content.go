@@ -84,6 +84,7 @@ func (a *App) pageFromForm(r *http.Request, id int64) *cms.Page {
 		ID: id, Title: strings.TrimSpace(r.FormValue("title")), Slug: strings.TrimSpace(r.FormValue("slug")),
 		Excerpt: r.FormValue("excerpt"), Content: cms.SanitizeHTML(r.FormValue("content")),
 		FeaturedMediaID: feat, Template: "page", Status: strings.TrimSpace(r.FormValue("status")),
+		Locale: r.FormValue("locale"),
 		SEO: cms.SEO{Title: r.FormValue("seo_title"), Desc: r.FormValue("seo_desc"),
 			Canonical: strings.TrimSpace(r.FormValue("canonical_url")), OGImage: r.FormValue("og_image"),
 			Robots: r.FormValue("robots")},
@@ -122,7 +123,7 @@ func (a *App) cmsPageEdit(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	a.render(w, r, "cms_page_form", "Edit Halaman", map[string]any{"P": p, "Secs": secs})
+	a.render(w, r, "cms_page_form", "Edit Halaman", map[string]any{"P": p, "Secs": secs, "Preview": a.previewToken("page", id)})
 }
 
 func (a *App) loadPage(officeID, id int64) (cms.Page, []cms.Section, error) {
@@ -132,10 +133,10 @@ func (a *App) loadPage(officeID, id int64) (cms.Page, []cms.Section, error) {
 	var created, updated string
 	err := a.db.QueryRow(`SELECT id, title, slug, excerpt, content, featured_media_id, template,
 		status, seo_title, seo_desc, canonical_url, og_image, robots, created_at, updated_at,
-		scheduled_at, published_at FROM website_pages WHERE id=? AND office_id=? AND deleted_at IS NULL`,
+		scheduled_at, published_at, locale FROM website_pages WHERE id=? AND office_id=? AND deleted_at IS NULL`,
 		id, officeID).Scan(&p.ID, &p.Title, &p.Slug, &p.Excerpt, &p.Content, &feat, &p.Template,
 		&p.Status, &p.SEO.Title, &p.SEO.Desc, &p.SEO.Canonical, &p.SEO.OGImage, &p.SEO.Robots,
-		&created, &updated, &sched, &pub)
+		&created, &updated, &sched, &pub, &p.Locale)
 	if err != nil {
 		return p, nil, err
 	}
@@ -167,6 +168,7 @@ func (a *App) cmsPageUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.snapContentOffice(a.officeOf(r), "page", id, old.Title, old.Content)
 	a.web.RecordHistory(a.officeOf(r), "page", id, "update", old.Status, p.Status, a.uid(r), "", clientIPOf(r))
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "cms.page.update", Entity: "page", EntityID: strconv.FormatInt(id, 10), Detail: old.Status + "→" + p.Status})
 	http.Redirect(w, r, "/cms/pages/"+strconv.FormatInt(id, 10)+"?flash=Halaman+disimpan", http.StatusSeeOther)
@@ -324,10 +326,10 @@ func (a *App) cmsArticleEdit(w http.ResponseWriter, r *http.Request) {
 	var sched, pub sql.NullTime
 	err := a.db.QueryRow(`SELECT id, category_id, title, slug, excerpt, content, cover_media_id,
 		tags, author, status, seo_title, seo_desc, canonical_url, og_image, robots,
-		scheduled_at, published_at FROM website_articles WHERE id=? AND office_id=? AND deleted_at IS NULL`,
+		scheduled_at, published_at, locale FROM website_articles WHERE id=? AND office_id=? AND deleted_at IS NULL`,
 		id, a.officeOf(r)).Scan(&art.ID, &cat, &art.Title, &art.Slug, &art.Excerpt, &art.Content,
 		&cover, &art.Tags, &art.Author, &art.Status, &art.SEO.Title, &art.SEO.Desc,
-		&art.SEO.Canonical, &art.SEO.OGImage, &art.SEO.Robots, &sched, &pub)
+		&art.SEO.Canonical, &art.SEO.OGImage, &art.SEO.Robots, &sched, &pub, &art.Locale)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -344,7 +346,7 @@ func (a *App) cmsArticleEdit(w http.ResponseWriter, r *http.Request) {
 			cl = append(cl, map[string]any{"ID": cid, "Name": n})
 		}
 	}
-	a.render(w, r, "cms_article_form", "Edit Artikel", map[string]any{"A": art, "Cats": cl})
+	a.render(w, r, "cms_article_form", "Edit Artikel", map[string]any{"A": art, "Cats": cl, "Preview": a.previewToken("article", id)})
 }
 
 func articleFromForm(r *http.Request, id int64) *cms.Article {
@@ -370,6 +372,7 @@ func articleFromForm(r *http.Request, id int64) *cms.Article {
 		Slug: strings.TrimSpace(r.FormValue("slug")), Excerpt: r.FormValue("excerpt"),
 		Content: cms.SanitizeHTML(r.FormValue("content")), CoverMediaID: cover,
 		Tags: r.FormValue("tags"), Author: r.FormValue("author"), Status: strings.TrimSpace(r.FormValue("status")),
+		Locale: r.FormValue("locale"),
 		SEO: cms.SEO{Title: r.FormValue("seo_title"), Desc: r.FormValue("seo_desc"),
 			Canonical: strings.TrimSpace(r.FormValue("canonical_url")), OGImage: r.FormValue("og_image"),
 			Robots: r.FormValue("robots")},
@@ -402,7 +405,8 @@ func (a *App) cmsArticleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var old string
-	_ = a.db.QueryRow(`SELECT status FROM website_articles WHERE id=? AND office_id=? AND deleted_at IS NULL`, id, a.officeOf(r)).Scan(&old)
+	var oldTitle, oldContent string
+	_ = a.db.QueryRow(`SELECT status, title, content FROM website_articles WHERE id=? AND office_id=? AND deleted_at IS NULL`, id, a.officeOf(r)).Scan(&old, &oldTitle, &oldContent)
 	if old == "" {
 		http.NotFound(w, r)
 		return
@@ -421,6 +425,7 @@ func (a *App) cmsArticleUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.snapContentOffice(a.officeOf(r), "article", id, oldTitle, oldContent)
 	a.web.RecordHistory(a.officeOf(r), "article", id, "update", old, art.Status, a.uid(r), "", clientIPOf(r))
 	http.Redirect(w, r, "/cms/articles?flash=Artikel+disimpan", http.StatusSeeOther)
 }
@@ -458,6 +463,7 @@ func (a *App) cmsServiceSave(w http.ResponseWriter, r *http.Request) {
 	sv := &cms.Service{Name: strings.TrimSpace(r.FormValue("name")), Slug: strings.TrimSpace(r.FormValue("slug")),
 		Description: r.FormValue("description"), Content: cms.SanitizeHTML(r.FormValue("content")),
 		Position: pos, Visible: r.FormValue("visible") != "0",
+		Locale: r.FormValue("locale"), ServiceCode: strings.TrimSpace(r.FormValue("service_code")),
 		SEO: cms.SEO{Title: r.FormValue("seo_title"), Desc: r.FormValue("seo_desc")}}
 	if v := r.FormValue("image_media_id"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
@@ -475,18 +481,18 @@ func (a *App) cmsServices(w http.ResponseWriter, r *http.Request) {
 	if !a.requireWeb(w, r, rbac.PermWebArticles) {
 		return
 	}
-	list, _ := a.web.PublicServices(a.officeOf(r))
+	list, _ := a.web.PublicServices(a.officeOf(r), "id")
 	// Admin sees all incl. hidden: reload with visible flag.
-	rows, _ := a.db.Query(`SELECT id, name, slug, description, position, visible FROM website_services WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
+	rows, _ := a.db.Query(`SELECT id, name, slug, description, position, visible, locale, service_code FROM website_services WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
 	var out []map[string]any
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var id int64
-			var n, s, d string
+			var n, s, d, loc, code string
 			var p, v int
-			_ = rows.Scan(&id, &n, &s, &d, &p, &v)
-			out = append(out, map[string]any{"ID": id, "Name": n, "Slug": s, "Desc": d, "Pos": p, "Vis": v == 1})
+			_ = rows.Scan(&id, &n, &s, &d, &p, &v, &loc, &code)
+			out = append(out, map[string]any{"ID": id, "Name": n, "Slug": s, "Desc": d, "Pos": p, "Vis": v == 1, "Loc": loc, "Code": code})
 		}
 	}
 	_ = list
@@ -497,16 +503,16 @@ func (a *App) cmsFAQ(w http.ResponseWriter, r *http.Request) {
 	if !a.requireWeb(w, r, rbac.PermWebArticles) {
 		return
 	}
-	rows, _ := a.db.Query(`SELECT id, category, question, position, visible FROM website_faqs WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
+	rows, _ := a.db.Query(`SELECT id, category, question, position, visible, locale FROM website_faqs WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
 	var out []map[string]any
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var id int64
-			var c, q string
+			var c, q, loc string
 			var p, v int
-			_ = rows.Scan(&id, &c, &q, &p, &v)
-			out = append(out, map[string]any{"ID": id, "Cat": c, "Q": q, "Pos": p, "Vis": v == 1})
+			_ = rows.Scan(&id, &c, &q, &p, &v, &loc)
+			out = append(out, map[string]any{"ID": id, "Cat": c, "Q": q, "Pos": p, "Vis": v == 1, "Loc": loc})
 		}
 	}
 	a.render(w, r, "cms_faq", "FAQ Website", map[string]any{"Rows": out})
@@ -519,7 +525,8 @@ func (a *App) cmsFAQSave(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	pos, _ := strconv.Atoi(r.FormValue("position"))
 	f := &cms.FAQ{Category: r.FormValue("category"), Question: r.FormValue("question"),
-		Answer: cms.SanitizeHTML(r.FormValue("answer")), Position: pos, Visible: r.FormValue("visible") != "0"}
+		Answer: cms.SanitizeHTML(r.FormValue("answer")), Position: pos, Visible: r.FormValue("visible") != "0",
+		Locale: r.FormValue("locale")}
 	if _, err := a.web.SaveFAQ(a.officeOf(r), f); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

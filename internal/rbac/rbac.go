@@ -49,6 +49,8 @@ const (
 	PermWebBranding     = "website.branding.manage"
 	PermWebDomain       = "website.domain.manage"
 	PermWebAudit        = "website.audit.view"
+	PermWebInquiries    = "website.inquiries.manage"
+	PermWebEngagement   = "website.engagement.manage"
 )
 
 var rolePerms = map[string][]string{
@@ -61,6 +63,7 @@ var rolePerms = map[string][]string{
 		PermWebsiteView, PermWebsiteManage, PermWebPagesView, PermWebPagesCreate,
 		PermWebPagesUpdate, PermWebPagesDelete, PermWebPagesPublish, PermWebArticles,
 		PermWebNav, PermWebMedia, PermWebSEO, PermWebBranding, PermWebDomain, PermWebAudit,
+		PermWebInquiries, PermWebEngagement,
 	},
 	RoleNotary: {
 		PermViewClient, PermCreateClient, PermEditClient, PermViewIdentity, PermVerifyIdentity,
@@ -68,18 +71,21 @@ var rolePerms = map[string][]string{
 		PermViewFinance, PermManageTemplates, PermViewReports, PermLegalize, PermGovSubmit,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate,
 		PermWebPagesPublish, PermWebArticles, PermWebMedia,
+		PermWebInquiries, PermWebEngagement,
 	},
 	RoleSubstitute: {
 		PermViewClient, PermViewIdentity, PermDraftDeed, PermEditDeed, PermApproveDeed,
 		PermViewProtocol, PermViewReports, PermLegalize,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate,
 		PermWebPagesPublish, PermWebArticles, PermWebMedia,
+		PermWebInquiries, PermWebEngagement,
 	},
 	RoleStaff: {
 		PermViewClient, PermCreateClient, PermEditClient, PermViewIdentity,
 		PermDraftDeed, PermEditDeed, PermViewReports, PermRequestService,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate, PermWebMedia,
 		PermWebArticles,
+		PermWebInquiries, PermWebEngagement,
 	},
 	RoleFinance: {
 		PermViewClient, PermViewFinance, PermManageFinance, PermViewReports,

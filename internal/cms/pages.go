@@ -25,6 +25,7 @@ type Page struct {
 	FeaturedMediaID          sql.NullInt64
 	Template                 string
 	Status                   string
+	Locale                   string
 	SEO                      SEO
 	CreatedBy, UpdatedBy     sql.NullInt64
 	CreatedAt, UpdatedAt     time.Time
@@ -52,6 +53,16 @@ func cleanSlug(s string) (string, error) {
 	return s, nil
 }
 
+// cleanLocale allows only 'id' (default) or 'en'; anything else falls back.
+func cleanLocale(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "en":
+		return "en"
+	default:
+		return "id"
+	}
+}
+
 // SavePage creates or updates a page (slug unique per office). Publish rules:
 // PUBLISHED needs title+content; SCHEDULED needs future scheduled_at.
 func (s *Store) SavePage(officeID int64, p *Page, actorID *int64) (int64, error) {
@@ -74,13 +85,14 @@ func (s *Store) SavePage(officeID int64, p *Page, actorID *int64) (int64, error)
 		}
 	}
 	p.Slug = slug
+	p.Locale = cleanLocale(p.Locale)
 	if p.ID == 0 {
 		res, err := s.db.Exec(`INSERT INTO website_pages(office_id, title, slug, excerpt, content,
 			featured_media_id, template, status, scheduled_at, seo_title, seo_desc, canonical_url,
-			og_image, robots, created_by, updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			og_image, robots, created_by, updated_by, locale) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			officeID, p.Title, p.Slug, p.Excerpt, p.Content, nullInt(p.FeaturedMediaID),
 			p.Template, p.Status, nullTime(p.ScheduledAt), p.SEO.Title, p.SEO.Desc,
-			p.SEO.Canonical, p.SEO.OGImage, seoRobots(p.SEO.Robots), nullInt64(actorID), nullInt64(actorID))
+			p.SEO.Canonical, p.SEO.OGImage, seoRobots(p.SEO.Robots), nullInt64(actorID), nullInt64(actorID), p.Locale)
 		if err != nil {
 			return 0, dupErr(err, "slug sudah dipakai")
 		}
@@ -96,10 +108,10 @@ func (s *Store) SavePage(officeID int64, p *Page, actorID *int64) (int64, error)
 	}
 	if _, err := s.db.Exec(`UPDATE website_pages SET title=?, slug=?, excerpt=?, content=?,
 		featured_media_id=?, template=?, status=?, scheduled_at=?, seo_title=?, seo_desc=?,
-		canonical_url=?, og_image=?, robots=?, updated_by=? WHERE id=? AND office_id=?`,
+		canonical_url=?, og_image=?, robots=?, updated_by=?, locale=? WHERE id=? AND office_id=?`,
 		p.Title, p.Slug, p.Excerpt, p.Content, nullInt(p.FeaturedMediaID), p.Template,
 		p.Status, nullTime(p.ScheduledAt), p.SEO.Title, p.SEO.Desc, p.SEO.Canonical,
-		p.SEO.OGImage, seoRobots(p.SEO.Robots), nullInt64(actorID), p.ID, officeID); err != nil {
+		p.SEO.OGImage, seoRobots(p.SEO.Robots), nullInt64(actorID), p.Locale, p.ID, officeID); err != nil {
 		return 0, dupErr(err, "slug sudah dipakai")
 	}
 	s.Invalidate(officeID)
@@ -144,6 +156,13 @@ func nullInt(v sql.NullInt64) any {
 		return v.Int64
 	}
 	return nil
+}
+
+func nullStr(v string) any {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	return v
 }
 
 func nullInt64(p *int64) any {

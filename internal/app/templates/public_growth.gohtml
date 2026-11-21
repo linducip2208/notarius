@@ -1,0 +1,92 @@
+{{define "pub_kalkulator"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>Kalkulator Estimasi Biaya</h1>
+<p class="meta">Transparan: tarif dasar layanan + komponen biaya resmi (PNBP/materai/administrasi). <strong>Bukan harga final</strong> — final setelah verifikasi berkas &amp; kompleksitas perkara.</p>
+<form method="get" action="/kalkulator" style="display:flex;gap:8px;margin-bottom:22px"><select name="code">{{range .Data.Opts}}<option value="{{.Code}}"{{if eq $.Data.Code .Code}} selected{{end}}>{{.Name}}</option>{{end}}</select><button class="btn" type="submit">Hitung</button></form>
+{{if .Data.Name}}<div class="card"><h2 style="margin-top:0">{{.Data.Name}}</h2>
+<table style="width:100%"><tbody>
+<tr><td>Tarif dasar layanan</td><td style="text-align:right">{{.Data.BaseFmt}}</td></tr>
+{{range .Data.Comps}}<tr><td>{{.Name}}</td><td style="text-align:right">{{.Fmt}}</td></tr>{{end}}
+<tr><td><strong>Estimasi awal</strong></td><td style="text-align:right"><strong>{{.Data.TotalFmt}}</strong></td></tr>
+</tbody></table>
+<p class="meta">Belum termasuk: biaya pihak ketiga di luar kewenangan notaris (mis. pajak, bank) yang bersifat situasional.</p>
+<p><a class="btn" href="/konsultasi">Lanjut Konsultasi →</a></p></div>{{end}}
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_konsultasi"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:640px"><h1>Formulir Konsultasi</h1>
+{{if .Data.Sent}}<div class="card" style="border-color:#2da44e"><strong>Terkirim.</strong> Staf kami akan menghubungi Anda. Untuk hal mendesak, hubungi nomor kantor di bawah.</div>
+{{else}}<p class="meta">Isi kebutuhan Anda — masuk langsung ke meja staf (bukan email gelap).</p>
+<form method="post" action="/konsultasi">
+<div style="margin-bottom:12px"><label>Nama lengkap<br/><input name="name" required maxlength="160"/></label></div>
+<div style="margin-bottom:12px"><label>Kontak (HP/email)<br/><input name="contact" required maxlength="160"/></label></div>
+<div style="margin-bottom:12px"><label>Jenis layanan<br/><input name="service" maxlength="160" placeholder="cth. Pendirian PT"/></label></div>
+<div style="margin-bottom:12px"><label>Kebutuhan<br/><textarea name="message" rows="5" required maxlength="2000"></textarea></label></div>
+<button class="btn" type="submit">Kirim Konsultasi</button>
+</form>{{end}}
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_booking"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:640px"><h1>Booking Jadwal Kunjungan</h1>
+{{if .Data.Sent}}<div class="card" style="border-color:#2da44e"><strong>Booking diterima.</strong> Tunggu konfirmasi staf melalui kontak Anda.</div>
+{{else}}
+{{if .Data.Err}}<div class="card" style="border-color:#cf222e"><strong>Gagal:</strong> {{.Data.Err}}</div>{{end}}
+{{if .Data.Slots}}<p class="meta">Jadwal rutin mingguan (kuota per slot):</p><ul>{{range .Data.Slots}}<li>{{.Weekday}}, {{.Span}} — kuota {{.Quota}}</li>{{end}}</ul>{{end}}
+<form method="post" action="/booking">
+<div style="margin-bottom:12px"><label>Nama lengkap<br/><input name="name" required maxlength="160"/></label></div>
+<div style="margin-bottom:12px"><label>Kontak HP/WA (wajib valid, untuk konfirmasi)<br/><input name="contact" required maxlength="20" placeholder="0812xxxxxxx"/></label></div>
+<div style="margin-bottom:12px"><label>Tanggal<br/><input type="date" name="date" required min="{{.Data.Min}}" max="{{.Data.Max}}"/></label></div>
+<div style="margin-bottom:12px"><label>Jam (HH:MM)<br/><input name="start" placeholder="09:00" required pattern="[0-9]{2}:[0-9]{2}"/></label></div>
+<div style="margin-bottom:12px"><label>Keperluan<br/><input name="purpose" maxlength="255"/></label></div>
+<button class="btn" type="submit">Ajukan Booking</button>
+</form>{{end}}
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_team"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1>Tim Kami</h1>
+<div class="cards">{{range .Data.Rows}}<div class="card">{{if .HasPhoto}}<img src="/media/{{.Photo}}" alt="{{.Name}}" style="width:100%;border-radius:10px" loading="lazy"/>{{end}}<h3 style="margin:12px 0 0">{{.Name}}</h3><p class="meta">{{.Title}}</p></div>{{else}}<p class="meta">Profil tim segera hadir.</p>{{end}}</div>
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_gallery"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap"><h1>Galeri Kegiatan</h1>
+<div class="cards">{{range .Data.Rows}}<div class="card"><img src="/media/{{.Media}}" alt="{{.Caption}}" style="width:100%;border-radius:10px" loading="lazy"/><p class="meta">{{.Caption}}</p></div>{{else}}<p class="meta">Galeri segera hadir.</p>{{end}}</div>
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_testimoni"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>Kata Klien</h1>
+<p class="meta">Hanya pengalaman asli yang terverifikasi yang kami tampilkan.</p>
+{{range .Data.Rows}}<div class="card" style="margin-bottom:14px"><div>“{{.Content}}”</div><p class="meta">— {{.Name}}{{if .Verify}} · terverifikasi: {{.Verify}}{{end}}</p></div>{{else}}<p class="meta">Belum ada testimoni tayang.</p>{{end}}
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_cari"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>Pencarian Situs</h1>
+<form method="get" action="/cari" style="display:flex;gap:8px;margin-bottom:22px"><input name="q" value="{{.Data.Q}}" placeholder="Kata kunci…"/><button class="btn" type="submit">Cari</button></form>
+{{if .Data.Q}}{{if .Data.Hits}}{{range .Data.Hits}}<div class="card" style="margin-bottom:12px"><span class="tag">{{.Kind}}</span> <a href="{{.URL}}"><strong>{{.Title}}</strong></a><p class="meta">{{.Snip}}</p></div>{{end}}{{else}}<p class="meta">Tidak ada hasil untuk “{{.Data.Q}}”.</p>{{end}}{{end}}
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_arsip"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:640px"><h1>Arsip Artikel</h1>
+<ul>{{range .Data.Months}}<li><a href="/arsip/{{.Month}}">{{.Label}}</a> ({{.Count}})</li>{{else}}<li class="meta">Belum ada artikel terbit.</li>{{end}}</ul>
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_arsip_list"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:640px"><h1>Arsip {{.Data.Month}}</h1>
+<p><a href="/arsip">← Semua arsip</a></p>
+<ul>{{range .Data.Rows}}<li><a href="/artikel/{{.Slug}}">{{.Title}}</a> <span class="meta">{{.Date}}</span></li>{{else}}<li class="meta">Kosong.</li>{{end}}</ul>
+</div></section></main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_preview_page"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<div class="wrap"><p class="meta" style="background:#fff8c5;padding:8px 12px;border-radius:8px">MODE PRATINJAU DRAF — tidak terlihat publik.</p></div>
+<section class="sec"><div class="wrap"><h1 style="font-size:2.1rem">{{.Data.Page.Title}}</h1><p class="meta">{{.Data.Page.Excerpt}}</p><div>{{cmsHTML .Data.Page.Content}}</div>
+{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_preview_article"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<div class="wrap"><p class="meta" style="background:#fff8c5;padding:8px 12px;border-radius:8px">MODE PRATINJAU DRAF — tidak terlihat publik.</p></div>
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>{{.Data.Article.Title}}</h1><p class="meta">{{.Data.Article.Excerpt}}</p><div>{{cmsHTML .Data.Article.Content}}</div></div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
+{{define "pub_maintenance"}}<!doctype html>
+<html lang="id"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Pemeliharaan — Kembali Segera</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:90vh;margin:0;background:#f6f8fb;color:#1a2333}.box{text-align:center;max-width:480px;padding:32px}</style></head>
+<body><div class="box"><h1>Situs dalam pemeliharaan</h1><p>Kami segera kembali. Untuk keperluan mendesak, hubungi kantor langsung.</p><p><a href="/login">Login staf</a></p></div></body></html>{{end}}

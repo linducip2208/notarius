@@ -40,3 +40,4 @@
 | Bug nyata diperbaiki | jadwal UTC-vs-WIB; template CMS `.P.Robots`/`.A.Robots`; map-vs-struct di dasbor DMS; scan kolom pendWF | dengan tes sebagai bukti |
 | restore VPS | — | BACKLOG (B-09) |
 | pen-test | — | BACKLOG (butuh pihak ketiga) |
+| CMS growth 14 ide | cms_growth.py SEMUA HIJAU | kalkulator, konsultasi, booking->janji temu, tim/galeri/testimoni terverifikasi, i18n, cari, arsip, preview HMAC, versi+rollback, kualitas, statistik, ekspor ZIP, banner, maintenance 503 |

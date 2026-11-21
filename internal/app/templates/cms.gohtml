@@ -9,15 +9,23 @@
 <div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">FAQ / Nav</div><div class="h1 mb-0">{{.Data.Counts.FAQ}}/{{.Data.Counts.Nav}}</div><a href="/cms/faq">FAQ</a> · <a href="/cms/nav">Nav</a></div></div></div>
 <div class="col-sm-6 col-lg-2"><div class="card"><div class="card-body"><div class="subheader">Draf menunggu</div><div class="h1 mb-0">{{.Data.Counts.Drafts}}</div><div class="small text-secondary">termasuk review</div></div></div></div>
 </div>
+{{if .Data.NewInq}}<div class="alert alert-warning mb-3" role="alert"><strong>{{.Data.NewInq}} konsultasi baru</strong> menunggu tanggapan. <a href="/cms/inquiries?st=BARU">Buka →</a>{{if .Data.NewBook}} · <strong>{{.Data.NewBook}} booking</strong> menunggu keputusan. <a href="/cms/bookings?st=MENUNGGU">Buka →</a>{{end}}</div>{{else if .Data.NewBook}}<div class="alert alert-warning mb-3" role="alert"><strong>{{.Data.NewBook}} booking</strong> menunggu keputusan. <a href="/cms/bookings?st=MENUNGGU">Buka →</a></div>{{end}}
 <div class="row"><div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Aksi cepat</h3></div>
 <div class="card-body d-flex flex-wrap gap-2">
 <a class="btn btn-primary" href="/cms/pages/new">+ Halaman</a>
 <a class="btn btn-outline-primary" href="/cms/articles/new">+ Artikel</a>
 <a class="btn btn-outline-primary" href="/cms/media">Unggah media</a>
+<a class="btn btn-outline-primary" href="/cms/inquiries">Konsultasi masuk{{if .Data.NewInq}} ({{.Data.NewInq}}){{end}}</a>
+<a class="btn btn-outline-primary" href="/cms/bookings">Booking{{if .Data.NewBook}} ({{.Data.NewBook}}){{end}}</a>
+<a class="btn btn-outline-primary" href="/cms/slots">Slot</a>
 <a class="btn btn-ghost-primary" href="/" target="_blank">Lihat website ↗</a>
 <a class="btn btn-ghost-primary" href="/cms/setup">Setup</a>
 <a class="btn btn-ghost-primary" href="/cms/history">Riwayat publikasi</a>
+<a class="btn btn-ghost-primary" href="/cms/versions">Versi konten</a>
+<a class="btn btn-ghost-primary" href="/cms/quality">Kualitas</a>
+<a class="btn btn-ghost-primary" href="/cms/stats">Statistik</a>
+<a class="btn btn-ghost-primary" href="/cms/export">Ekspor ZIP</a>
 </div></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Butuh SEO (terbit tanpa judul/deskripsi)</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Missing}}<div class="list-group-item">{{.Kind}}: <strong>{{.Title}}</strong></div>{{else}}<div class="list-group-item text-secondary">Semua konten terbit sudah ber-SEO. Bagus.</div>{{end}}</div></div>
@@ -81,6 +89,8 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-12 mb-2"><label class="form-label">Deskripsi situs</label><textarea class="form-control" name="site_desc" rows="2">{{.Data.Site.SiteDesc}}</textarea></div>
 <div class="col-12 mb-2"><label class="form-label">OG image default (ref/URL)</label><input class="form-control" name="default_og" value="{{.Data.Site.DefaultOG}}"/></div>
 <div class="col-12 mb-2"><label class="form-label">Base URL publik (cth. https://kantor.id)</label><input class="form-control" name="base_url" value="{{.Data.Site.BaseURL}}" placeholder="kosongkan = host aktif"/></div>
+<div class="col-12 mb-2"><label class="form-label">Banner pengumuman (kosongkan = sembunyi, maks 500)</label><input class="form-control" name="announcement" value="{{.Data.Ann}}" placeholder="cth. Libur bersama 25–26 Des, buka kembali 29 Des"/></div>
+<div class="col-12 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="maintenance" value="1"{{if .Data.Maint}} checked{{end}}/> Mode pemeliharaan (publik anonim melihat halaman 503; staf tetap bisa login)</label></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
 </div></form></div>
 <div class="card"><div class="card-body">
@@ -135,6 +145,7 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-12 mb-2"><label class="form-label">Ringkasan</label><input class="form-control" name="excerpt" value="{{if .Data.P}}{{.Data.P.Excerpt}}{{end}}"/></div>
 <div class="col-12 mb-2"><label class="form-label">Konten (HTML aman: p/h/b/i/list/link/gambar)</label><textarea class="form-control" name="content" rows="8">{{if .Data.P}}{{.Data.P.Content}}{{end}}</textarea></div>
 <div class="col-md-4 mb-2"><label class="form-label">Status</label><select class="form-select" name="status" data-cur="{{if .Data.P}}{{.Data.P.Status}}{{end}}"><option>DRAFT</option><option>REVIEW</option><option>SCHEDULED</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Bahasa</label><select class="form-select" name="locale" data-cur="{{if .Data.P}}{{.Data.P.Locale}}{{end}}"><option value="id">Indonesia</option><option value="en">English</option></select></div>
 <div class="col-md-4 mb-2"><label class="form-label">Terjadwal (opsional)</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
 <div class="col-md-4 mb-2"><label class="form-label">ID media sampul</label><input class="form-control" name="featured_media_id" placeholder="cth. 3"/></div>
 <div class="col-md-6 mb-2"><label class="form-label">SEO title</label><input class="form-control" name="seo_title" value="{{if .Data.P}}{{.Data.P.SEO.Title}}{{end}}"/></div>
@@ -164,7 +175,7 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-12"><button class="btn btn-outline-primary w-100" type="submit">+ Section</button></div>
 </div></form></div>
 <script>(function(){document.querySelectorAll('select[data-cur]').forEach(function(s){var v=s.getAttribute('data-cur');if(!v)return;for(var i=0;i<s.options.length;i++){if(s.options[i].value===v||s.options[i].text===v){s.selectedIndex=i;break;}}});})();</script>
-<div class="card"><div class="card-body"><a class="btn btn-ghost-primary w-100" href="/p/{{.Data.P.Slug}}" target="_blank">Pratinjau publik ↗</a><p class="text-secondary small mt-2 mb-0">Terbit + simpan dulu; draf tidak tampil di URL publik.</p></div></div>{{end}}
+<div class="card"><div class="card-body"><a class="btn btn-ghost-primary w-100" href="/p/{{.Data.P.Slug}}" target="_blank">Pratinjau publik ↗</a>{{if .Data.Preview}}<a class="btn btn-outline-primary w-100 mt-2" href="/p/preview?kind=page&id={{.Data.P.ID}}&token={{.Data.Preview}}" target="_blank">Pratinjau draf (praterbit) ↗</a>{{end}}<p class="text-secondary small mt-2 mb-0">Terbit + simpan dulu; draf tidak tampil di URL publik.</p></div></div>{{end}}
 </div></div>
 {{template "page_close" .}}{{end}}
 
@@ -193,11 +204,12 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-md-3 mb-2"><label class="form-label">Tag (koma)</label><input class="form-control" name="tags" value="{{if .Data.A}}{{.Data.A.Tags}}{{end}}"/></div>
 <div class="col-md-3 mb-2"><label class="form-label">ID cover</label><input class="form-control" name="cover_media_id" placeholder="cth. 5"/></div>
 <div class="col-md-4 mb-2"><label class="form-label">Status</label><select class="form-select" name="status" data-cur="{{if .Data.A}}{{.Data.A.Status}}{{end}}"><option>DRAFT</option><option>REVIEW</option><option>SCHEDULED</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
-<div class="col-md-4 mb-2"><label class="form-label">Terjadwal</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
+<div class="col-md-2 mb-2"><label class="form-label">Bahasa</label><select class="form-select" name="locale" data-cur="{{if .Data.A}}{{.Data.A.Locale}}{{end}}"><option value="id">ID</option><option value="en">EN</option></select></div>
+<div class="col-md-2 mb-2"><label class="form-label">Terjadwal</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
 <div class="col-md-4 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.A}}{{.Data.A.SEO.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option></select></div>
 <div class="col-md-6 mb-2"><label class="form-label">SEO title</label><input class="form-control" name="seo_title"/></div>
 <div class="col-md-6 mb-2"><label class="form-label">SEO desc</label><input class="form-control" name="seo_desc"/></div>
-<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+<div class="col-12 text-end d-flex gap-2 justify-content-end"><button class="btn btn-primary" type="submit">Simpan</button>{{if .Data.Preview}}<a class="btn btn-outline-primary" href="/p/preview?kind=article&id={{.Data.A.ID}}&token={{.Data.Preview}}" target="_blank">Pratinjau draf ↗</a>{{end}}</div>
 </div></form></div>
 <script>(function(){document.querySelectorAll('select[data-cur]').forEach(function(s){var v=s.getAttribute('data-cur');if(!v)return;for(var i=0;i<s.options.length;i++){if(s.options[i].value===v||s.options[i].text===v){s.selectedIndex=i;break;}}});})();</script>
 {{template "page_close" .}}{{end}}
@@ -207,16 +219,18 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <p class="text-secondary">Info layanan publik sesuai ruang lingkup jabatan Notaris. Bukan layanan operasional (<a href="/layanan">/layanan</a>).</p>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Layanan baru</h3></div>
 <form method="post" action="/cms/services"><div class="card-body row">{{template "csrf" .}}
-<div class="col-md-4 mb-2"><input class="form-control" name="name" placeholder="Nama layanan" required/></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="slug" placeholder="slug" required/></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="description" placeholder="Deskripsi singkat"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="name" placeholder="Nama layanan" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="slug" placeholder="slug" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="description" placeholder="Deskripsi singkat"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="service_code" placeholder="Kode katalog (opsional)"/></div>
+<div class="col-md-1 mb-2"><select class="form-select" name="locale"><option value="id">ID</option><option value="en">EN</option></select></div>
 <div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
 <div class="col-12 mb-2"><textarea class="form-control" name="content" rows="3" placeholder="Konten (HTML aman)"></textarea></div>
 </div></form></div>
-<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Slug</th><th>Urutan</th><th>Tampil</th></tr></thead>
-<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><code>{{.Slug}}</code></td><td>{{.Pos}}</td><td>{{.Vis}}</td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Slug</th><th>Kode</th><th>Bhs</th><th>Urut</th><th>Tampil</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><code>{{.Slug}}</code></td><td>{{.Code}}</td><td>{{.Loc}}</td><td>{{.Pos}}</td><td>{{.Vis}}</td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "cms_faq"}}{{template "head" .}}{{template "page_open" .}}
@@ -224,14 +238,15 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">FAQ baru (hanya yang tampil yang publik)</h3></div>
 <form method="post" action="/cms/faq"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><input class="form-control" name="category" placeholder="Kategori" value="Umum"/></div>
-<div class="col-md-6 mb-2"><input class="form-control" name="question" placeholder="Pertanyaan" required/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="question" placeholder="Pertanyaan" required/></div>
+<div class="col-md-1 mb-2"><select class="form-select" name="locale"><option value="id">ID</option><option value="en">EN</option></select></div>
 <div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
 <div class="col-12 mb-2"><textarea class="form-control" name="answer" rows="2" placeholder="Jawaban (HTML aman, tanpa klaim palsu)"></textarea></div>
 </div></form></div>
-<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Kategori</th><th>Pertanyaan</th><th>Urut</th><th>Tampil</th><th></th></tr></thead>
-<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Cat}}</td><td>{{.Q}}</td><td>{{.Pos}}</td><td>{{.Vis}}</td><td><form method="post" action="/cms/faq/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus FAQ?')">Hapus</button></form></td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada FAQ.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Kategori</th><th>Pertanyaan</th><th>Bhs</th><th>Urut</th><th>Tampil</th><th></th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td>{{.Cat}}</td><td>{{.Q}}</td><td>{{.Loc}}</td><td>{{.Pos}}</td><td>{{.Vis}}</td><td><form method="post" action="/cms/faq/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus FAQ?')">Hapus</button></form></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada FAQ.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "cms_nav"}}{{template "head" .}}{{template "page_open" .}}

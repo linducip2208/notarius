@@ -38,12 +38,12 @@ func TestCMSPerf(t *testing.T) {
 	seedDur := time.Since(t0)
 	t.Logf("seed 1600 rows: %v", seedDur)
 	t1 := time.Now()
-	if _, _, err := cs.PublicPage(office, "halaman-50"); err != nil {
+	if _, _, err := cs.PublicPage(office, "halaman-50", "id"); err != nil {
 		t.Fatal(err)
 	}
 	pageDur := time.Since(t1)
 	t2 := time.Now()
-	list, total, err := cs.PublicArticles(office, "Artikel", 9, 0)
+	list, total, err := cs.PublicArticles(office, "id", "Artikel", 9, 0)
 	if err != nil || total != 500 || len(list) != 9 {
 		t.Fatalf("listing salah: %v %d %d", err, total, len(list))
 	}

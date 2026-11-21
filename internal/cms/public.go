@@ -136,15 +136,26 @@ func tagAttr(attrs, key string) string {
 // ---- public reads (published only, office-scoped) ----
 
 // PublicPage returns a PUBLISHED non-deleted page by slug (+ visible sections).
-func (s *Store) PublicPage(officeID int64, slug string) (Page, []Section, error) {
+// Locale falls back to 'id' when the requested translation is missing.
+func (s *Store) PublicPage(officeID int64, slug, locale string) (Page, []Section, error) {
+	locale = cleanLocale(locale)
+	for _, loc := range []string{locale, "id"} {
+		if p, secs, err := s.publicPageLoc(officeID, slug, loc); err == nil {
+			return p, secs, nil
+		}
+	}
+	return Page{}, nil, sql.ErrNoRows
+}
+
+func (s *Store) publicPageLoc(officeID int64, slug, locale string) (Page, []Section, error) {
 	var p Page
 	var feat sql.NullInt64
 	var sched, pub sql.NullTime
 	err := s.db.QueryRow(`SELECT id, title, slug, excerpt, content, featured_media_id,
 		template, status, seo_title, seo_desc, canonical_url, og_image, robots,
 		created_at, scheduled_at, published_at
-		FROM website_pages WHERE office_id=? AND slug=? AND status='PUBLISHED' AND deleted_at IS NULL`,
-		officeID, slug).Scan(&p.ID, &p.Title, &p.Slug, &p.Excerpt, &p.Content, &feat,
+		FROM website_pages WHERE office_id=? AND slug=? AND locale=? AND status='PUBLISHED' AND deleted_at IS NULL`,
+		officeID, slug, locale).Scan(&p.ID, &p.Title, &p.Slug, &p.Excerpt, &p.Content, &feat,
 		&p.Template, &p.Status, &p.SEO.Title, &p.SEO.Desc, &p.SEO.Canonical, &p.SEO.OGImage,
 		&p.SEO.Robots, &p.CreatedAt, &sched, &pub)
 	if err != nil {
@@ -187,9 +198,21 @@ func (s *Store) SectionsOf(pageID int64, visibleOnly bool) ([]Section, error) {
 }
 
 // PublicArticles lists published articles newest first (search + pagination).
-func (s *Store) PublicArticles(officeID int64, q string, limit, offset int) ([]Article, int, error) {
-	where := `office_id=? AND status='PUBLISHED' AND deleted_at IS NULL`
-	args := []any{officeID}
+// Empty 'en' result falls back to 'id' so untranslated offices never look empty.
+func (s *Store) PublicArticles(officeID int64, locale, q string, limit, offset int) ([]Article, int, error) {
+	locale = cleanLocale(locale)
+	list, total, err := s.publicArticlesLoc(officeID, locale, q, limit, offset)
+	if err != nil || (locale == "en" && total == 0 && strings.TrimSpace(q) == "") {
+		if fb, ft, ferr := s.publicArticlesLoc(officeID, "id", q, limit, offset); ferr == nil && (err != nil || ft > 0) {
+			return fb, ft, ferr
+		}
+	}
+	return list, total, err
+}
+
+func (s *Store) publicArticlesLoc(officeID int64, locale, q string, limit, offset int) ([]Article, int, error) {
+	where := `office_id=? AND locale=? AND status='PUBLISHED' AND deleted_at IS NULL`
+	args := []any{officeID, locale}
 	if strings.TrimSpace(q) != "" {
 		where += ` AND (title LIKE ? OR excerpt LIKE ? OR tags LIKE ?)`
 		like := "%" + strings.TrimSpace(q) + "%"
@@ -215,15 +238,25 @@ func (s *Store) PublicArticles(officeID int64, q string, limit, offset int) ([]A
 }
 
 // PublicArticle returns one published article + related (same category).
-func (s *Store) PublicArticle(officeID int64, slug string) (Article, []Article, error) {
+func (s *Store) PublicArticle(officeID int64, slug, locale string) (Article, []Article, error) {
+	locale = cleanLocale(locale)
+	for _, loc := range []string{locale, "id"} {
+		if a, rel, err := s.publicArticleLoc(officeID, slug, loc); err == nil {
+			return a, rel, nil
+		}
+	}
+	return Article{}, nil, sql.ErrNoRows
+}
+
+func (s *Store) publicArticleLoc(officeID int64, slug, locale string) (Article, []Article, error) {
 	var a Article
 	var cat sql.NullInt64
 	var sched, pub sql.NullTime
 	err := s.db.QueryRow(`SELECT id, category_id, title, slug, excerpt, content, cover_media_id,
 		tags, author, status, seo_title, seo_desc, canonical_url, og_image, robots,
 		created_at, scheduled_at, published_at
-		FROM website_articles WHERE office_id=? AND slug=? AND status='PUBLISHED' AND deleted_at IS NULL`,
-		officeID, slug).Scan(&a.ID, &cat, &a.Title, &a.Slug, &a.Excerpt, &a.Content,
+		FROM website_articles WHERE office_id=? AND slug=? AND locale=? AND status='PUBLISHED' AND deleted_at IS NULL`,
+		officeID, slug, locale).Scan(&a.ID, &cat, &a.Title, &a.Slug, &a.Excerpt, &a.Content,
 		&a.CoverMediaID, &a.Tags, &a.Author, &a.Status, &a.SEO.Title, &a.SEO.Desc,
 		&a.SEO.Canonical, &a.SEO.OGImage, &a.SEO.Robots, &a.CreatedAt, &sched, &pub)
 	if err != nil {
@@ -247,10 +280,18 @@ func (s *Store) PublicArticle(officeID int64, slug string) (Article, []Article, 
 	return a, rel, nil
 }
 
-// PublicFAQs lists visible FAQs ordered.
-func (s *Store) PublicFAQs(officeID int64) ([]FAQ, error) {
+// PublicFAQs lists visible FAQs ordered (locale with 'id' fallback).
+func (s *Store) PublicFAQs(officeID int64, locale string) ([]FAQ, error) {
+	locale = cleanLocale(locale)
+	if out, err := s.publicFAQsLoc(officeID, locale); err == nil && (locale == "id" || len(out) > 0) {
+		return out, err
+	}
+	return s.publicFAQsLoc(officeID, "id")
+}
+
+func (s *Store) publicFAQsLoc(officeID int64, locale string) ([]FAQ, error) {
 	rows, err := s.db.Query(`SELECT id, category, question, answer, position FROM website_faqs
-		WHERE office_id=? AND visible=1 ORDER BY position, id`, officeID)
+		WHERE office_id=? AND locale=? AND visible=1 ORDER BY position, id`, officeID, locale)
 	if err != nil {
 		return nil, err
 	}
@@ -286,11 +327,19 @@ func (s *Store) PublicNav(officeID int64, area string) ([]NavItem, error) {
 	return out, rows.Err()
 }
 
-// PublicServices lists visible service info entries.
-func (s *Store) PublicServices(officeID int64) ([]Service, error) {
+// PublicServices lists visible service info entries (locale with 'id' fallback).
+func (s *Store) PublicServices(officeID int64, locale string) ([]Service, error) {
+	locale = cleanLocale(locale)
+	if out, err := s.publicServicesLoc(officeID, locale); err == nil && (locale == "id" || len(out) > 0) {
+		return out, err
+	}
+	return s.publicServicesLoc(officeID, "id")
+}
+
+func (s *Store) publicServicesLoc(officeID int64, locale string) ([]Service, error) {
 	rows, err := s.db.Query(`SELECT id, name, slug, description, content, image_media_id,
-		position, seo_title, seo_desc FROM website_services
-		WHERE office_id=? AND visible=1 ORDER BY position, id`, officeID)
+		position, seo_title, seo_desc, service_code FROM website_services
+		WHERE office_id=? AND locale=? AND visible=1 ORDER BY position, id`, officeID, locale)
 	if err != nil {
 		return nil, err
 	}
@@ -298,8 +347,12 @@ func (s *Store) PublicServices(officeID int64) ([]Service, error) {
 	var out []Service
 	for rows.Next() {
 		var sv Service
+		var code sql.NullString
 		_ = rows.Scan(&sv.ID, &sv.Name, &sv.Slug, &sv.Description, &sv.Content,
-			&sv.ImageMediaID, &sv.Position, &sv.SEO.Title, &sv.SEO.Desc)
+			&sv.ImageMediaID, &sv.Position, &sv.SEO.Title, &sv.SEO.Desc, &code)
+		if code.Valid {
+			sv.ServiceCode = code.String
+		}
 		out = append(out, sv)
 	}
 	return out, rows.Err()

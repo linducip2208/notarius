@@ -1,5 +1,5 @@
 {{define "pub_head"}}<!doctype html>
-<html lang="id">
+<html lang="{{if .Data.Lang}}{{.Data.Lang}}{{else}}id{{end}}">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -7,6 +7,7 @@
 {{if .Data.SEODesc}}<meta name="description" content="{{.Data.SEODesc}}"/>{{else if .Data.Site.SiteDesc}}<meta name="description" content="{{.Data.Site.SiteDesc}}"/>{{end}}
 <meta property="og:title" content="{{.Title}} — {{.Data.Brand.AppName}}"/>
 {{if .Data.OG}}<meta property="og:image" content="{{.Data.OG}}"/>{{end}}
+{{if .Data.Office.Name}}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Notary","name":"{{.Data.Office.Name}}","address":"{{.Data.Office.Addr}}","telephone":"{{.Data.Office.Phone}}","email":"{{.Data.Office.Email}}"}</script>{{end}}
 <link rel="icon" type="image/png" href="{{if .Data.Brand.FaviconURL}}{{.Data.Brand.FaviconURL}}{{else}}/assets/brand/favicon.svg{{end}}"/>
 <style>
 :root{--pri:{{.Data.Brand.Primary}};--sec:{{.Data.Brand.Secondary}};--acc:{{.Data.Brand.Accent}};--rad:{{.Data.Brand.ButtonRadius}}}
@@ -35,12 +36,14 @@ input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;bo
 </head>{{end}}
 
 {{define "pub_nav"}}<a class="skip" href="#isi">Lewati ke konten</a>
+{{if .Data.Announcement}}<div style="background:#fff8c5;color:#1a2333;text-align:center;padding:8px 16px;font-size:.9rem">{{.Data.Announcement}}</div>{{end}}
+{{if .Data.Maintenance}}{{if .Data.LoggedIn}}<div style="background:#ffebe9;color:#82071e;text-align:center;padding:8px 16px;font-size:.9rem">MODE PEMELIHARAAN aktif — pengunjung anonim melihat halaman 503. <a href="/cms/site">Matikan di Pengaturan Website</a></div>{{end}}{{end}}
 <header class="top"><div class="wrap">
 {{if .Data.Brand.LogoURL}}<img src="{{.Data.Brand.LogoURL}}" alt="{{.Data.Brand.AppName}}"/>{{end}}
 <span class="nm">{{.Data.Brand.AppName}}</span>
 {{if .Data.Brand.Tagline}}<span style="opacity:.7;font-size:.85rem">{{.Data.Brand.Tagline}}</span>{{end}}
 <button class="burger" aria-label="Menu" onclick="document.getElementById('mnav').classList.toggle('open')">☰</button>
-<nav id="mnav" aria-label="Navigasi utama">{{range .Data.Nav}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}</nav>
+<nav id="mnav" aria-label="Navigasi utama">{{range .Data.Nav}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}<a href="/cari" aria-label="Cari">⌕</a><a href="?lang={{.Data.OtherLang}}" aria-label="Ganti bahasa">{{.Data.OtherLang}}</a></nav>
 </div></header>{{end}}
 
 {{define "pub_foot"}}<footer><div class="wrap">
@@ -121,5 +124,6 @@ input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;bo
 
 {{define "pub_service"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
 <section class="sec"><div class="wrap" style="max-width:760px"><h1>{{.Data.Service.Name}}</h1><p class="meta">{{.Data.Service.Description}}</p><div>{{cmsHTML .Data.Service.Content}}</div>
-<p><a class="btn" href="/kontak">Konsultasi →</a></p></div></section>
+{{if .Data.Service.ServiceCode}}<p><a class="btn" href="/layanan/{{.Data.Service.ServiceCode}}">Lihat Syarat &amp; Estimasi Biaya →</a></p>{{end}}
+<p><a class="btn ghost" href="/konsultasi">Konsultasi →</a></p></div></section>
 </main>{{template "pub_foot" .}}{{end}}
