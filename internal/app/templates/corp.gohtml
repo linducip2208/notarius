@@ -1,0 +1,33 @@
+{{define "corp_wizard"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/requests/{{.Data.Req.ID}}">Permohonan #{{.Data.Req.ID}}</a></li><li class="breadcrumb-item active">Wizard Korporat</li></ol></nav>
+<div class="card mb-3"><div class="card-body">
+<h3 class="card-title">Wizard: {{.Data.Company.Name}} ({{.Data.Company.EntityType}}) — {{.Data.Done}}/{{.Data.Total}} langkah</h3>
+<div class="progress mb-2"><div class="progress-bar" role="progressbar" style="width:{{if .Data.Total}}calc(100% * {{.Data.Done}} / {{.Data.Total}}){{else}}0%{{end}}"></div></div>
+{{range .Data.Steps}}<div class="mb-1">{{if .Done}}✅{{else}}⬜{{end}} <strong>{{.Title}}</strong> <span class="text-secondary small">— {{.Hint}}</span></div>{{end}}
+{{range .Data.Warnings}}<div class="alert alert-warning mt-2 mb-0 py-2">⚠️ {{.}}</div>{{end}}
+</div></div>
+<div class="row"><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">1 · Identitas & Modal</h3></div>
+<form method="post" action="/requests/{{.Data.Req.ID}}/corp"><div class="card-body row">{{template "csrf" .}}
+<div class="col-4 mb-2"><select class="form-select" name="entity_type"><option>PT</option><option>CV</option><option>Firma</option><option>Yayasan</option><option>Koperasi</option><option>Perkumpulan</option></select></div>
+<div class="col-8 mb-2"><input class="form-control" name="name" placeholder="Nama badan usaha" value="{{.Data.Company.Name}}" required/></div>
+<div class="col-6 mb-2"><input class="form-control" name="domicile" placeholder="Kedudukan" value="{{.Data.Company.Domicile}}"/></div>
+<div class="col-6 mb-2"><input class="form-control" name="address" placeholder="Alamat" value="{{.Data.Company.Address}}"/></div>
+<div class="col-4 mb-2"><input class="form-control" name="authorized" placeholder="Modal dasar" value="{{.Data.Company.Authorized}}"/></div>
+<div class="col-4 mb-2"><input class="form-control" name="issued" placeholder="Ditempatkan" value="{{.Data.Company.Issued}}"/></div>
+<div class="col-4 mb-2"><input class="form-control" name="paid" placeholder="Disetor" value="{{.Data.Company.Paid}}"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">2 · Pemegang Saham</h3></div>
+<div class="card-body">{{range .Data.Shareholders}}<div class="small mb-1">{{.Name}} — {{.Shares}} lbr</div>{{else}}<p class="text-secondary small">Belum ada.</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/shareholders">{{template "csrf" .}}<div class="d-flex gap-1"><input class="form-control" name="name" placeholder="Nama" required/><input class="form-control" name="shares" placeholder="Lbr" value="1" style="max-width:80px"/><button class="btn btn-outline-primary" type="submit">+</button></div></form></div></div>
+</div><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">3 · Pengurus</h3></div>
+<div class="card-body">{{range .Data.Officers}}<div class="small mb-1">{{.Role}} — {{.Name}}{{if .Title}} ({{.Title}}){{end}}</div>{{else}}<p class="text-secondary small">Belum ada.</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/officers">{{template "csrf" .}}<div class="d-flex gap-1"><select class="form-select" name="role" style="max-width:150px"><option>DIREKTUR</option><option>KOMISARIS</option><option>PENGURUS</option><option>PENGAWAS</option><option>SEKUTU</option></select><input class="form-control" name="name" placeholder="Nama" required/><button class="btn btn-outline-primary" type="submit">+</button></div></form></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">4 · Beneficial Owner</h3></div>
+<div class="card-body">{{range .Data.BOs}}<div class="small mb-1">{{.Name}} — {{.OwnershipPct}}%{{if .IsPEP}} <span class="badge bg-red-lt">PEP</span>{{end}}</div>{{else}}<p class="text-secondary small">Belum ada.</p>{{end}}
+<form method="post" action="/requests/{{.Data.Req.ID}}/bo">{{template "csrf" .}}<div class="d-flex gap-1"><input class="form-control" name="name" placeholder="Nama" required/><input class="form-control" name="pct" placeholder="%" style="max-width:70px"/><button class="btn btn-outline-primary" type="submit">+</button></div></form>
+<p class="text-secondary small mt-2 mb-0">NIK hanya disimpan 4 digit terakhir (UU PDP).</p></div></div>
+</div></div>
+{{template "page_close" .}}{{end}}

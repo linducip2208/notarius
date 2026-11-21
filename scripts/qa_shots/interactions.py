@@ -116,7 +116,9 @@ with sync_playwright() as p:
         ins = pg.locator('button:has-text("Sisipkan")').first
         if ins.count():
             ins.click()
-        pg.fill("#deedbody", pg.locator("#deedbody").input_value() + "\nUji interaksi 9.")
+        pg.locator("#deedbody").click()
+        pg.keyboard.press("End")
+        pg.keyboard.type("\nUji interaksi 9.")
         pg.fill('form[action$="/version"] input[name="note"]', "interaksi-9")
         pg.locator('form[action$="/version"] button[type="submit"]').click()
         pg.wait_for_load_state("networkidle")
@@ -145,6 +147,11 @@ with sync_playwright() as p:
     step("11 repertorium filter tahun", "year=2026" in pg.url and "Repertorium" in pg.content())
     has_print = "Cetak" in pg.content() or "print" in pg.content().lower()
     step("11 tombol cetak ada", has_print)
+    # 11b. aksesibilitas: skip link + landmark main + label pencarian
+    pg.goto(BASE + "/app")
+    pg.wait_for_load_state("networkidle")
+    c = pg.content()
+    step("11b a11y landmark", 'href="#konten"' in c and 'id="konten"' in c and 'aria-label="Navigasi utama"' in c)
 
     # 12. logout → sesi mati
     try:

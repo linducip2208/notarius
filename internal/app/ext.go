@@ -25,6 +25,7 @@ import (
 	"notaryos/internal/notify"
 	"notaryos/internal/pdf"
 	"notaryos/internal/rbac"
+	"notaryos/internal/safehtml"
 )
 
 // ---- MFA ----
@@ -339,6 +340,37 @@ func (a *App) officerAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.officer.add", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10)})
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pengurus+ditambah", http.StatusSeeOther)
+}
+
+// corpWizard renders the guided per-entity corporate flow with completeness
+// progress. All saves reuse the existing corp endpoints (single source of truth).
+func (a *App) corpWizard(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) && !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	d, err := a.reqs.Get(a.officeOf(r), reqID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	co, shs, offs, _ := a.corp.GetByRequest(reqID)
+	var bos []corp.BeneficialOwner
+	if co.ID != 0 {
+		bos, _ = a.corp.BeneficialOwners(co.ID)
+	}
+	steps, warns := corp.WizardProgress(co, shs, offs, len(bos))
+	done := 0
+	for _, s := range steps {
+		if s.Done {
+			done++
+		}
+	}
+	a.render(w, r, "corp_wizard", "Wizard Korporat", map[string]any{
+		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "BOs": bos,
+		"Steps": steps, "Warnings": warns, "Done": done, "Total": len(steps),
+	})
 }
 
 func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {
@@ -697,7 +729,7 @@ func (a *App) deedPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	draft := status != "SIGNED" && status != "ARCHIVED"
-	out := pdf.Export(title, body, draft)
+	out := pdf.Export(title, safehtml.ToText(body), draft)
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"akta-"+strconv.FormatInt(id, 10)+".pdf\"")
 	w.Write(out)
@@ -717,7 +749,7 @@ func (a *App) deedDOCX(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	draft := status != "SIGNED" && status != "ARCHIVED"
-	out := docx.Export(title, body, draft)
+	out := docx.Export(title, safehtml.ToText(body), draft)
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"akta-"+strconv.FormatInt(id, 10)+".docx\"")
 	w.Write(out)
@@ -907,9 +939,9 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(c, "%d", &cmpN)
 		contents := map[int]string{}
 		for _, v := range vers {
-			contents[v.No] = v.Content
+			contents[v.No] = safehtml.ToText(v.Content)
 		}
-		contents[d.Version] = body
+		contents[d.Version] = safehtml.ToText(body)
 		if aStr, ok := contents[cmpN]; ok {
 			cmpA = aStr
 			if bStr, ok2 := contents[cmpN-1]; ok2 {
@@ -925,7 +957,8 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
-		"Seal": deedSeal(id), "Sigs": deedSigs(a.db, id),
+		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
+		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
 	})
 }
 
@@ -941,7 +974,7 @@ func (a *App) deedSaveVersion(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := a.deeds.SaveVersion(id, r.FormValue("content"), a.uid(r), r.FormValue("note")); err != nil {
+	if err := a.deeds.SaveVersion(id, safehtml.Sanitize(r.FormValue("content")), a.uid(r), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

@@ -50,6 +50,7 @@
 
 {{define "dms_detail"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/dms/library">Library</a></li><li class="breadcrumb-item active">#{{.Data.M.ID}}</li></ol></nav>
+{{range .Data.Rels}}{{if eq .Relation "DIGABUNG_KE"}}<div class="alert alert-info">Berkas ini digabung ke kanonis <a href="/documents/{{.RelatedID}}">#{{.RelatedID}}</a>. Berkas tetap tersimpan & dapat diunduh.</div>{{end}}{{end}}
 <div class="row"><div class="col-lg-7">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">{{if .Data.M.Disp}}{{.Data.M.Disp}}{{else}}{{.Data.M.Name}}{{end}}</h3><div class="ms-auto d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Pratinjau</a><a class="btn btn-sm btn-primary" href="/files/{{.Data.M.ID}}">Unduh</a></div></div>
 <div class="card-body">
@@ -75,7 +76,7 @@
 <tbody>{{range .Data.Vers}}<tr><td>v{{.No}}</td><td><code>{{.Hash}}</code></td><td>{{.Size}}</td><td>{{.Note}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-secondary" href="/documents/{{$.Data.M.ID}}/version/{{.No}}">Unduh</a><form method="post" action="/documents/{{$.Data.M.ID}}/restore/{{.No}}">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" onclick="return confirm('Pulihkan sebagai versi baru?')">Restore</button></form></div></td></tr>
 {{else}}<tr><td colspan="5" class="text-center text-secondary">Belum ada versi (unggah pertama tercatat sebagai v1 saat dibuat).</td></tr>{{end}}</tbody></table></div></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Relasi Dokumen</h3></div>
-<div class="list-group list-group-flush">{{range .Data.Rels}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.RelatedType}}</span>#{{.RelatedID}} <span class="text-secondary">· {{.Relation}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada relasi tercatat.</div>{{end}}</div>
+<div class="list-group list-group-flush">{{range .Data.Rels}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.RelatedType}}</span>{{if eq .Relation "DIGABUNG_KE"}}<a href="/documents/{{.RelatedID}}">#{{.RelatedID}}</a> <span class="badge bg-yellow-lt">DIGABUNG_KE kanonis</span>{{else}}#{{.RelatedID}} <span class="text-secondary">· {{.Relation}}</span>{{end}}</div>{{else}}<div class="list-group-item text-secondary">Belum ada relasi tercatat.</div>{{end}}</div>
 <div class="card-body border-top"><form method="post" action="/documents/{{.Data.M.ID}}/link" class="row g-2">{{template "csrf" .}}
 <div class="col-md-4"><select class="form-select" name="related_type"><option value="client">client</option><option value="request">request</option><option value="deed">deed</option><option value="invoice">invoice</option><option value="service">service</option><option value="company">company</option><option value="repertorium">repertorium</option><option value="will">will</option><option value="legalization">legalization</option></select></div>
 <div class="col-md-3"><input class="form-control" name="related_id" placeholder="ID terkait" required/></div>
@@ -84,8 +85,9 @@
 </div>
 <div class="col-lg-5">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Pratinjau</h3></div>
-<div class="card-body text-center">{{if eq .Data.M.MIME "application/pdf"}}<p class="text-secondary">PDF — buka di tab baru (otorisasi + tercatat).</p>{{else if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau dokumen"/>{{else}}<p class="text-secondary">Pratinjau hanya untuk PDF/gambar. Unduh untuk format lain.</p>{{end}}
+<div class="card-body text-center">{{if eq .Data.M.MIME "application/pdf"}}<p class="text-secondary">PDF — buka di tab baru (otorisasi + tercatat).</p>{{else if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau dokumen"/>{{else if hasSuffix .Data.M.Name ".docx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks DOCX"></iframe><p class="text-secondary small mt-1">Teks saja (format diabaikan) — dokumen asli tetap sumber resmi.</p>{{else if hasSuffix .Data.M.Name ".xlsx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks XLSX"></iframe><p class="text-secondary small mt-1">Nilai sel saja — file asli tetap sumber resmi.</p>{{else}}<p class="text-secondary">Pratinjau: PDF/gambar/DOCX/XLSX. Unduh untuk format lain.</p>{{end}}
 <div class="d-flex gap-2 justify-content-center"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a>
+<form method="post" action="/documents/{{.Data.M.ID}}/scan">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit" title="Pindai ClamAV on-demand (butuh CLAMAV_ADDR)">🛡 Pindai</button></form>
 <form method="post" action="/documents/{{.Data.M.ID}}/favorite">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★ Favorit</button></form></div></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Workflow</h3></div>
 <div class="card-body"><p>Status: <span class="badge bg-blue-lt">{{.Data.M.WF}}</span></p>
@@ -171,7 +173,7 @@
 {{define "dms_duplicates"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Duplikat</li></ol></nav>
 <div class="card"><div class="card-header"><h3 class="card-title">Kandidat Duplikat (SHA-256 sama)</h3></div>
-<div class="list-group list-group-flush">{{range .Data}}<div class="list-group-item"><code>{{.SHA}}</code><div class="small text-secondary">ID: {{.IDs}} ({{.N}} berkas) — tinjau manual; tautkan relasi bila memang sama, jangan hapus otomatis.</div></div>
+<div class="list-group list-group-flush">{{range .Data}}<div class="list-group-item"><code>{{.SHA}}</code><div class="small text-secondary">ID: {{.IDs}} ({{.N}} berkas) — tinjau manual; tautkan relasi bila memang sama, jangan hapus otomatis.</div><form method="post" action="/dms/duplicates/merge" class="mt-1">{{template "csrf" $}}<input type="hidden" name="ids" value="{{.IDs}}"/><button class="btn btn-sm btn-outline-primary" type="submit" onclick="return confirm('Gabungkan ke ID terkecil? Berkas tetap tersimpan, hanya ditautkan.')">Gabungkan ke kanonis</button></form></div>
 {{else}}<div class="list-group-item text-secondary">Tidak ada duplikat terdeteksi.</div>{{end}}</div></div>
 {{template "page_close" .}}{{end}}
 

@@ -823,7 +823,42 @@ func (s *Store) DuplicateCandidates(officeID int64) ([]map[string]any, error) {
 	return out, rows.Err()
 }
 
-// Expiring lists docs expiring within 30 days.
+// MergeDuplicates links dupIDs into canonicalID (same SHA-256, same office).
+// No bytes are deleted — merged files stay downloadable; relations record
+// DIGABUNG_KE so detail pages banner-redirect to the canonical record.
+func (s *Store) MergeDuplicates(officeID, canonicalID int64, dupIDs []int64) (int, error) {
+	var sha string
+	if err := s.db.QueryRow(`SELECT sha256 FROM files WHERE id=? AND office_id=?`,
+		canonicalID, officeID).Scan(&sha); err != nil {
+		return 0, errors.New("kanonis tidak ditemukan di kantor ini")
+	}
+	if sha == "" {
+		return 0, errors.New("kanonis tanpa hash — tolak gabung")
+	}
+	n := 0
+	for _, id := range dupIDs {
+		if id == canonicalID {
+			continue
+		}
+		var dsha string
+		if err := s.db.QueryRow(`SELECT sha256 FROM files WHERE id=? AND office_id=?`,
+			id, officeID).Scan(&dsha); err != nil || dsha != sha {
+			continue // beda isi/kantor — lewati jujur, bukan gagal total
+		}
+		var have int
+		_ = s.db.QueryRow(`SELECT COUNT(*) FROM doc_relations WHERE file_id=? AND related_type='file' AND related_id=? AND relation='DIGABUNG_KE'`,
+			id, canonicalID).Scan(&have)
+		if have > 0 {
+			continue
+		}
+		if _, err := s.db.Exec(`INSERT INTO doc_relations(file_id, related_type, related_id, relation)
+			VALUES(?,'file',?,'DIGABUNG_KE')`, id, canonicalID); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
 func (s *Store) Expiring(officeID int64) ([]map[string]any, error) {
 	rows, err := s.db.Query(`SELECT id, original_name, expiry_date FROM files
 		WHERE office_id=? AND expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)

@@ -8,16 +8,17 @@
 <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 <link rel="stylesheet" href="/assets/notarius/tokens.css"/>
+<style>.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
 <script src="/assets/vendor/htmx.min.js"></script>
 </head>{{end}}
 
-{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:#101f3c">
+{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:#101f3c" aria-label="Navigasi utama">
 <div class="container-fluid">
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
 <h1 class="navbar-brand navbar-brand-autodark mt-2"><img src="/assets/brand/saktinotaris-logo-b.png" alt="SaktiNotaris" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/> <span class="text-white">SaktiNotaris</span></h1>
 {{if .Acting}}<div class="px-3"><div class="alert alert-warning py-2 mb-2 small">Mode lintas-kantor AKTIF ({{.OfficeName}}). <form method="post" action="/offices/act" class="d-inline">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning" type="submit">Keluar mode</button></form></div></div>{{end}}
 <div class="collapse navbar-collapse" id="sidebar-menu">
-<form method="get" action="/search" class="px-3 mb-2"><input class="form-control" name="q" placeholder="Cari klien/akta…"/></form>
+<form method="get" action="/search" class="px-3 mb-2" role="search"><input class="form-control" name="q" placeholder="Cari klien/akta…" aria-label="Pencarian cepat"/></form>
 <ul class="navbar-nav pt-lg-3" id="mainnav">
 <li class="nav-item"><span class="nav-link disabled text-uppercase small">Workspace</span></li>
 <li class="nav-item"><a class="nav-link" href="/app">🏠 Dashboard</a></li>
@@ -70,12 +71,13 @@
 {{define "flash"}}{{if .Flash}}<div class="alert alert-success" role="alert">{{.Flash}}</div>{{end}}{{end}}
 
 {{define "page_open"}}<body>
+<a class="skip-link btn btn-primary" href="#konten">Lewati ke konten utama</a>
 <div class="page">
 {{template "sidebar" .}}
 <div class="page-wrapper">
 <header class="navbar navbar-expand-md d-print-none"><div class="container-xl d-flex align-items-center gap-2 py-2">
 <nav aria-label="breadcrumb" class="d-none d-lg-block"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/app">Beranda</a></li><li class="breadcrumb-item active">{{.Title}}</li></ol></nav>
-<form method="get" action="/search" class="flex-fill d-none d-md-block"><div class="input-icon"><span class="input-icon-addon">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…"/></div></form>
+<form method="get" action="/search" class="flex-fill d-none d-md-block" role="search"><div class="input-icon"><span class="input-icon-addon" aria-hidden="true">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…" aria-label="Pencarian menu, klien, atau dokumen"/></div></form>
 <div class="dropdown">
 <button class="btn btn-primary" data-bs-toggle="dropdown">+ Buat</button>
 <div class="dropdown-menu dropdown-menu-end">
@@ -86,9 +88,9 @@
 {{if can .Role "finance.manage"}}<a class="dropdown-item" href="/finance">💰 Invoice Baru</a>{{end}}
 </div>
 </div>
-<a class="btn btn-ghost-secondary" href="/tasks" title="Tugas">☰</a>
+<a class="btn btn-ghost-secondary" href="/tasks" title="Tugas" aria-label="Daftar tugas">☰</a>
 <div class="dropdown">
-<a href="#" class="btn btn-ghost-secondary position-relative" data-bs-toggle="dropdown" title="Notifikasi">🔔{{if .Unread}}<span class="badge bg-red position-absolute top-0 start-100 translate-middle">{{.Unread}}</span>{{end}}</a>
+<a href="#" class="btn btn-ghost-secondary position-relative" data-bs-toggle="dropdown" title="Notifikasi" aria-label="Notifikasi" aria-haspopup="true">🔔{{if .Unread}}<span class="badge bg-red position-absolute top-0 start-100 translate-middle">{{.Unread}}</span>{{end}}</a>
 <div class="dropdown-menu dropdown-menu-end" style="width:320px">
 <div class="dropdown-header">Notifikasi</div>
 {{range .TopNotifs}}<div class="dropdown-item-text"><div>{{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
@@ -108,10 +110,10 @@
 </div>
 </div></header>
 <div class="page-header d-print-none"><div class="container-xl"><h2 class="page-title">{{.Title}}</h2></div></div>
-<div class="page-body"><div class="container-xl">
+<main class="page-body" id="konten"><div class="container-xl">
 {{template "flash" .}}{{end}}
 
-{{define "page_close"}}</div></div>
+{{define "page_close"}}</div></main>
 </div>
 </div>
 <script src="/assets/vendor/tabler.min.js"></script>

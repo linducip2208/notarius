@@ -19,6 +19,7 @@ import (
 	"notaryos/internal/remind"
 	"notaryos/internal/requests"
 	"notaryos/internal/users"
+	"sync"
 )
 
 var db *sql.DB
@@ -409,5 +410,44 @@ func TestRemindersSLA(t *testing.T) {
 	}
 	if sla2 != 0 {
 		t.Fatalf("COMPLETED ikut dieskalasi: %d", sla2)
+	}
+}
+
+func TestApproveConcurrent(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	ds := deeds.NewStore(db)
+	did, err := ds.CreateDraft(office, nil, "Akta Konkuren", "PT", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE deed_drafts SET status='IN_REVIEW' WHERE id=?`, did); err != nil {
+		t.Fatal(err)
+	}
+	const n = 8
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	won := 0
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if err := ds.Approve(did, fmt.Sprintf("KONK-%d-%d", did, i), 1); err == nil {
+				mu.Lock()
+				won++
+				mu.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+	if won != 1 {
+		t.Fatalf("tepat 1 approve harus menang, menang=%d", won)
+	}
+	var status string
+	var repert int
+	_ = db.QueryRow(`SELECT status FROM deed_drafts WHERE id=?`, did).Scan(&status)
+	_ = db.QueryRow(`SELECT COUNT(*) FROM repertorium WHERE deed_id=?`, did).Scan(&repert)
+	if status != "APPROVED" || repert != 1 {
+		t.Fatalf("status=%s repertorium=%d, harus APPROVED/1", status, repert)
 	}
 }

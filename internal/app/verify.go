@@ -285,12 +285,12 @@ func (a *App) officesPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		ID            int64
-		Name, Plan    string
-		Clients       int
-		Pending       int
-		Outstanding   int64
-		Acting        bool
+		ID          int64
+		Name, Plan  string
+		Clients     int
+		Pending     int
+		Outstanding int64
+		Acting      bool
 	}
 	var out []row
 	rs, _ := a.db.Query(`SELECT id, name, plan FROM offices ORDER BY id`)

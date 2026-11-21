@@ -4,20 +4,25 @@ package app
 // shares, archive, retention, checklist, admin. All office-scoped, audited.
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
 	"notaryos/internal/audit"
-	"notaryos/internal/plan"
+	"notaryos/internal/files"
+	"notaryos/internal/malware"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/notify"
+	"notaryos/internal/officex"
+	"notaryos/internal/plan"
 	"notaryos/internal/rbac"
 )
 
@@ -268,7 +273,15 @@ func (a *App) dmsPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 	if m.MIME != "application/pdf" && !strings.HasPrefix(m.MIME, "image/") {
-		http.Error(w, "pratinjau hanya untuk PDF/gambar; unduh untuk format lain", http.StatusUnsupportedMediaType)
+		if text, ok := a.previewOfficeText(m, rc); ok {
+			a.dms.LogAccess(id, a.uid(r), "PREVIEW", clientIPOf(r), r.UserAgent())
+			a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.preview", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "teks-ooxml"})
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("Content-Disposition", "inline")
+			_, _ = io.WriteString(w, text)
+			return
+		}
+		http.Error(w, "pratinjau hanya untuk PDF/gambar/DOCX/XLSX; unduh untuk format lain", http.StatusUnsupportedMediaType)
 		return
 	}
 	a.dms.LogAccess(id, a.uid(r), "PREVIEW", clientIPOf(r), r.UserAgent())
@@ -278,7 +291,59 @@ func (a *App) dmsPreview(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, rc)
 }
 
+// dmsScan runs an on-demand ClamAV INSTREAM scan (honest: needs CLAMAV_ADDR;
+// without daemon it reports unavailable, never "clean").
+func (a *App) dmsScan(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	_, rc, err := a.uploads.Get(a.officeOf(r), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer rc.Close()
+	addr := os.Getenv("CLAMAV_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:3310"
+	}
+	sc := malware.Scanner{Addr: addr}
+	if err := sc.Ping(); err != nil {
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.scan.unavailable", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
+		http.Redirect(w, r, "/documents/"+strconv.FormatInt(id, 10)+"?flash=Pemindai+belum+tersedia+(CLAMAV_ADDR)", http.StatusSeeOther)
+		return
+	}
+	// Cap 64 MB streaming; larger files are rejected honestly.
+	lr := io.LimitReader(rc, 64<<20)
+	res, err := sc.Scan(lr)
+	if err != nil {
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.scan.error", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: err.Error()})
+		http.Redirect(w, r, "/documents/"+strconv.FormatInt(id, 10)+"?flash=Pindai+gagal:+periksa+daemon", http.StatusSeeOther)
+		return
+	}
+	if res.Infected {
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.scan.infected", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: res.Signature})
+		http.Redirect(w, r, "/documents/"+strconv.FormatInt(id, 10)+"?flash=TERINFEKSI:"+res.Signature, http.StatusSeeOther)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.scan.clean", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
+	http.Redirect(w, r, "/documents/"+strconv.FormatInt(id, 10)+"?flash=Bersih+(ClamAV)", http.StatusSeeOther)
+}
+
 // ---- versions ----
+
+// previewOfficeText extracts capped plain text for OOXML (max 8 MB di memori).
+func (a *App) previewOfficeText(m files.Meta, rc io.ReadCloser) (string, bool) {
+	if m.Size <= 0 || m.Size > 8<<20 {
+		return "", false
+	}
+	buf := make([]byte, m.Size)
+	if _, err := io.ReadFull(rc, buf); err != nil {
+		return "", false
+	}
+	return officex.Extract(m.Name, m.MIME, bytes.NewReader(buf), int64(len(buf)))
+}
 
 func (a *App) dmsNewVersion(w http.ResponseWriter, r *http.Request) {
 	if !a.requireStaff(w, r) {
@@ -679,6 +744,38 @@ func (a *App) dmsDuplicates(w http.ResponseWriter, r *http.Request) {
 	}
 	dups, _ := a.dms.DuplicateCandidates(a.officeOf(r))
 	a.render(w, r, "dms_duplicates", "Deteksi Duplikat", dups)
+}
+
+// dmsMerge links a duplicate group into its smallest-ID canonical record.
+// Bytes are never deleted; relations record the merge (audit trail kept).
+func (a *App) dmsMerge(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	var ids []int64
+	for _, part := range strings.Split(r.FormValue("ids"), ",") {
+		if id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64); err == nil && id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) < 2 {
+		http.Error(w, "butuh minimal 2 berkas untuk digabung", http.StatusBadRequest)
+		return
+	}
+	canonical := ids[0]
+	for _, id := range ids[1:] {
+		if id < canonical {
+			canonical = id
+		}
+	}
+	n, err := a.dms.MergeDuplicates(a.officeOf(r), canonical, ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.merge", Entity: "file", EntityID: strconv.FormatInt(canonical, 10), Detail: fmt.Sprintf("%d digabung", n)})
+	http.Redirect(w, r, "/dms/duplicates?flash="+strconv.Itoa(n)+"+berkas+digabung+ke+%23"+strconv.FormatInt(canonical, 10), http.StatusSeeOther)
 }
 
 // ---- admin: categories ----

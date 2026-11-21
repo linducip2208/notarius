@@ -7,17 +7,18 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"notaryos/internal/deliver"
 )
 
-// Sender delivers a reminder outside the app (WA gateway, email, ...).
-// LogSender is the honest default: tercatat, tidak diklaim terkirim ke WA.
-type Sender interface {
-	Send(to, message string) error
-}
+// Sender delivers a reminder outside the app (WA gateway via webhook, SMTP).
+// deliver.FromEnv selects the configured chain; default is in-app only.
+type Sender = deliver.Sender
 
+// LogSender is the honest default: tercatat in-app, tidak diklaim terkirim ke WA.
 type LogSender struct{}
 
-func (LogSender) Send(to, message string) error { return nil }
+func (LogSender) Send(_ int64, _ deliver.Contact, _, _ string) error { return nil }
 
 // RunOnce scans one office and creates notifications. Returns counts.
 // SLA: permohonan SUBMITTED/IN_REVIEW/NEEDS_DOCS yang tak bergerak >3 hari
@@ -54,6 +55,17 @@ func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks, sla
 			finance = append(finance, u.id)
 		}
 	}
+	// Kontak penerima untuk handoff eksternal (satu query, bukan N+1).
+	contacts := map[int64]deliver.Contact{}
+	if crows, err := db.Query(`SELECT id, name, COALESCE(email,''), COALESCE(phone,'') FROM users WHERE office_id=?`, officeID); err == nil && crows != nil {
+		defer crows.Close()
+		for crows.Next() {
+			var id int64
+			var c deliver.Contact
+			_ = crows.Scan(&id, &c.Name, &c.Email, &c.Phone)
+			contacts[id] = c
+		}
+	}
 	notify := func(uid int64, title, body string) {
 		var n int
 		_ = db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id=? AND title=? AND body=?
@@ -62,6 +74,8 @@ func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks, sla
 			return // sudah diingatkan 24 jam terakhir — anti-spam
 		}
 		_, _ = db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, uid, title, body)
+		// Handoff eksternal best-effort: gagal tidak menggagalkan pengingat in-app.
+		_ = send.Send(uid, contacts[uid], title, body)
 	}
 	// H-1 appointments.
 	arows, _ := db.Query(`SELECT c.full_name, a.purpose, a.scheduled_at FROM appointments a

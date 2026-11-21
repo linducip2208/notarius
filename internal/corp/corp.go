@@ -225,3 +225,78 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
+
+// WizardStep is one guided section of the corporate wizard.
+type WizardStep struct {
+	Key   string
+	Title string
+	Done  bool
+	Hint  string
+}
+
+// WizardProgress computes per-entity-type completeness steps plus honest warnings.
+// Pure function — unit tested.
+func WizardProgress(c Company, shs []Shareholder, offs []Officer, nbos int) (steps []WizardStep, warnings []string) {
+	hasCo := c.ID != 0 && c.Name != "" && c.Domicile != "" && c.EntityType != ""
+	steps = append(steps, WizardStep{Key: "identitas", Title: "Bentuk & identitas usaha",
+		Done: hasCo, Hint: "Pilih bentuk (PT/CV/Yayasan/dll), isi nama + domisili"})
+	needsCapital := c.EntityType == "PT" || c.EntityType == "Firma" || c.EntityType == "Koperasi"
+	capDone := hasCo && (!needsCapital || (c.Authorized > 0 && c.Issued > 0 && c.Paid > 0))
+	capHint := "CV/Yayasan tak wajib modal — langkah ini otomatis selesai"
+	if needsCapital {
+		capHint = "Isi modal dasar, ditempatkan, dan disetor"
+	}
+	steps = append(steps, WizardStep{Key: "modal", Title: "Permodalan", Done: capDone, Hint: capHint})
+	var nSekutu, nDirektur, nPengurus, nPengawas int
+	for _, o := range offs {
+		switch o.Role {
+		case "SEKUTU":
+			nSekutu++
+		case "DIREKTUR":
+			nDirektur++
+		case "PENGURUS":
+			nPengurus++
+		case "PENGAWAS":
+			nPengawas++
+		}
+	}
+	var ownDone bool
+	var ownHint string
+	switch c.EntityType {
+	case "CV":
+		ownDone = nSekutu >= 2
+		ownHint = "Minimal 2 sekutu (aktif + pasif)"
+	case "Yayasan":
+		ownDone = nPengurus >= 1 && nPengawas >= 1
+		ownHint = "Minimal 1 pengurus + 1 pengawas"
+	default: // PT dkk: pemegang saham
+		ownDone = len(shs) >= 1
+		ownHint = "Minimal 1 pemegang saham"
+	}
+	steps = append(steps, WizardStep{Key: "pemilik", Title: "Pemilik/pendiri", Done: ownDone, Hint: ownHint})
+	var mgrDone bool
+	var mgrHint string
+	switch c.EntityType {
+	case "CV":
+		mgrDone = nSekutu >= 1
+		mgrHint = "Sekutu aktif pengelola"
+	case "Yayasan":
+		mgrDone = nPengurus >= 3
+		mgrHint = "Lazimnya ketua + sekretaris + bendahara"
+	default:
+		mgrDone = nDirektur >= 1
+		mgrHint = "Minimal 1 direktur"
+	}
+	steps = append(steps, WizardStep{Key: "pengurus", Title: "Pengurus", Done: mgrDone, Hint: mgrHint})
+	boNeed := c.EntityType == "PT" || c.EntityType == "CV" || c.EntityType == "Firma"
+	boDone := !boNeed || nbos >= 1
+	steps = append(steps, WizardStep{Key: "bo", Title: "Beneficial Owner", Done: boDone,
+		Hint: "Wajib untuk PT/CV/Firma (ketentuan transparansi BO)"})
+	if needsCapital && c.Authorized > 0 && c.Paid < 0.25*c.Authorized {
+		warnings = append(warnings, "Modal disetor lazimnya ≥25% modal dasar (UU PT) — periksa kembali")
+	}
+	if c.Issued > c.Authorized {
+		warnings = append(warnings, "Modal ditempatkan melebihi modal dasar — tidak sah")
+	}
+	return steps, warnings
+}

@@ -23,23 +23,47 @@
 <dt class="col-4">Status</dt><dd class="col-8"><span class="badge bg-blue-lt">{{.Data.Deed.Status}}</span></dd>
 <dt class="col-4">Versi</dt><dd class="col-8">{{.Data.Deed.Version}} · terkunci={{.Data.Deed.Locked}}</dd>
 </dl>
-<pre class="p-3 bg-light border rounded" style="white-space:pre-wrap">{{.Data.Body}}</pre>
+<div class="p-3 bg-white border rounded" style="min-height:120px" id="deedview">{{safeHTML .Data.Body}}</div>
 {{if .Data.Seal}}<div class="alert alert-success mt-2 mb-0 small">Segel verifikasi: <code>{{.Data.Seal}}</code> · cek di <a href="/verify?code={{.Data.Seal}}">/verify</a><br/><span class="text-secondary">TTE internal (hash tersertifikasi sistem, bukan PSrE). Berlaku sebagai segel integritas naskah + identitas penandatangan tercatat.</span></div>{{end}}
 <div class="d-flex gap-2 mt-3">
 {{if and .Data.CanApprove (ne .Data.Deed.Status "APPROVED")}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/review">{{template "csrf" .}}<button class="btn btn-outline-primary" type="submit">Kirim Review</button></form>
-<form method="post" action="/deeds/{{.Data.Deed.ID}}/approve" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="number" placeholder="No. akta" required/><button class="btn btn-success" type="submit" onclick="return confirm('Sahkan akta? Repertorium otomatis.')">Sahkan</button></form>{{end}}
+<form method="post" action="/deeds/{{.Data.Deed.ID}}/approve" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="number" placeholder="No. akta" required/><button class="btn btn-success" type="submit" data-confirm="Sahkan akta? Repertorium otomatis.">Sahkan</button></form>{{end}}
 <a class="btn btn-ghost-primary" href="/deeds/{{.Data.Deed.ID}}/pdf">PDF</a>
 <a class="btn btn-ghost-primary" href="/deeds/{{.Data.Deed.ID}}/docx">DOCX</a>
 </div></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Revisi Baru (terversi)</h3></div>
-<form method="post" action="/deeds/{{.Data.Deed.ID}}/version"><div class="card-body">{{template "csrf" .}}
-<textarea id="deedbody" class="form-control mb-2" name="content" rows="6" placeholder="Isi revisi lengkap…">{{.Data.Body}}</textarea>
+<form method="post" action="/deeds/{{.Data.Deed.ID}}/version" id="deedform"><div class="card-body">{{template "csrf" .}}
+<div class="btn-toolbar gap-1 mb-2" role="toolbar" aria-label="Format">
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="bold"><b>B</b></button>
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="italic"><i>I</i></button>
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="underline"><u>U</u></button>
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="insertUnorderedList">• List</button>
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="formatBlock" data-val="h3">H</button>
+<button class="btn btn-sm btn-outline-secondary" type="button" data-cmd="removeFormat">Bersih</button>
+</div>
+<div id="deedbody" class="form-control mb-2" contenteditable="true" style="min-height:160px;overflow:auto" aria-label="Isi revisi">{{safeHTML .Data.Body}}</div>
+<input type="hidden" name="content" id="deedcontent"/>
 <input class="form-control mb-2" name="note" placeholder="Catatan revisi"/>
 <div class="d-flex gap-2"><button class="btn btn-primary" type="submit">Simpan Revisi</button><button class="btn btn-outline-primary" type="button" onclick="window.print()">Cetak / Pratinjau</button></div>
-<p class="text-secondary small mt-2">Final yang disahkan terkunci; perubahan setelahnya harus revisi tercatat baru.</p>
-</div></form></div>
+<p class="text-secondary small mt-2">Editor kaya tersanitasi server (b, i, u, list, h3/h4) — skrip & atribut dibuang. Final yang disahkan terkunci; perubahan setelahnya harus revisi tercatat baru.</p>
+</div></form>
+<script>
+document.addEventListener('click',function(e){var b=e.target.closest?e.target.closest('[data-confirm]'):null;if(b&&!confirm(b.getAttribute('data-confirm'))){e.preventDefault();e.stopPropagation();}},true);
+(function(){
+var ed=document.getElementById('deedbody');
+document.querySelectorAll('#deedform [data-cmd]').forEach(function(b){
+b.addEventListener('click',function(){ed.focus();try{document.execCommand(b.getAttribute('data-cmd'),false,b.getAttribute('data-val')||null);}catch(e){}});
+});
+document.getElementById('deedform').addEventListener('submit',function(){
+document.getElementById('deedcontent').value=document.getElementById('deedbody').innerHTML;
+});
+function insertClause(id){var t=document.getElementById(id);var ed=document.getElementById('deedbody');if(!t||!ed)return;ed.focus();try{document.execCommand('insertText',false,'\n\n'+t.value);}catch(e){ed.textContent+=('\n\n'+t.value);}}
+window.insertClause=insertClause;
+})();
+</script>
+</div>
 {{if .Data.Clauses}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Pustaka Klausul — klik untuk menyisipkan</h3></div>
-<div class="list-group list-group-flush">{{range .Data.Clauses}}<div class="list-group-item"><strong>{{.Title}}</strong> <span class="text-secondary small">{{.Tags}}</span><textarea id="clause-{{.ID}}" class="d-none">{{.Body}}</textarea><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:100px;overflow:auto">{{.Body}}</pre><button class="btn btn-sm btn-outline-primary" type="button" onclick="document.getElementById('deedbody').value+=('\n\n'+document.getElementById('clause-{{.ID}}').value)">Sisipkan ↓</button></div>{{end}}</div></div>{{end}}
+<div class="list-group list-group-flush">{{range .Data.Clauses}}<div class="list-group-item"><strong>{{.Title}}</strong> <span class="text-secondary small">{{.Tags}}</span><textarea id="clause-{{.ID}}" class="d-none">{{.Body}}</textarea><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:100px;overflow:auto">{{.Body}}</pre><button class="btn btn-sm btn-outline-primary" type="button" onclick="insertClause('clause-{{.ID}}')">Sisipkan ↓</button></div>{{end}}</div></div>{{end}}
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Informasi Akta</h3></div>
 <div class="card-body p-0"><table class="table mb-0"><tbody>
 <tr><td class="text-secondary">Nomor</td><td><strong>{{.Data.Deed.Number}}</strong></td></tr>
@@ -49,16 +73,19 @@
 <tr><td class="text-secondary">Dibuat</td><td>{{.Data.Props.Created}} oleh {{.Data.Props.Creator}}</td></tr>
 <tr><td class="text-secondary">Disahkan</td><td>{{.Data.Props.ApprovedBy}} {{.Data.Props.ApprovedAt}}</td></tr>
 <tr><td class="text-secondary">Hash isi</td><td><code>{{.Data.Props.Hash}}</code></td></tr>
-<tr><td class="text-secondary">TTE internal</td><td>{{range .Data.Sigs}}<div class="small mb-1">✍️ {{.Signer}} · <code>{{.Hash}}</code><br/><span class="text-secondary">{{.At}} {{.Note}}</span></div>{{else}}<span class="text-secondary">Belum ditandatangani.</span>{{end}}{{if and .Data.CanApprove (eq .Data.Deed.Status "APPROVED")}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1 mt-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-sm btn-dark" type="submit" onclick="return confirm('Tandatangani isi saat ini? Hash tercatat permanen.')">Tandatangani</button></form>{{end}}</td></tr>
+<tr><td class="text-secondary">TTE internal</td><td>{{range .Data.Sigs}}<div class="small mb-1">{{.Signer}} · <code>{{.Hash}}</code><br/><span class="text-secondary">{{.At}} {{.Note}}</span></div>{{else}}<span class="text-secondary">Belum ditandatangani.</span>{{end}}</td></tr>
 </tbody></table></div></div>
+{{if .Data.CanSign}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Tanda Tangan Elektronik Internal</h3></div>
+<div class="card-body"><p class="text-secondary small">Hash SHA-256 atas isi + identitas + segel tercatat permanen. Bukan PSrE.</p>
+<form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-dark" type="submit" data-confirm="Tandatangani isi saat ini? Hash tercatat permanen.">Tandatangani</button></form></div></div>{{end}}
 </div>
 <div class="col-lg-5"><div class="card"><div class="card-header"><h3 class="card-title">Riwayat Versi</h3></div>
-<div class="card-body">{{range .Data.Versions}}<div class="mb-3 pb-2 border-bottom"><strong>v{{.No}}</strong> <span class="text-secondary">{{.CreatedAt}} · {{.Hash}}</span><div class="small">{{.Note}}</div><div class="d-flex gap-2 mt-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{$.Data.Deed.ID}}?compare={{.No}}">Bandingkan</a></div><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{.Content}}</pre></div>{{else}}<p class="text-secondary">Belum ada revisi tersimpan.</p>{{end}}</div></div>
+<div class="card-body">{{range .Data.Versions}}<div class="mb-3 pb-2 border-bottom"><strong>v{{.No}}</strong> <span class="text-secondary">{{.CreatedAt}} · {{.Hash}}</span><div class="small">{{.Note}}</div><div class="d-flex gap-2 mt-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{$.Data.Deed.ID}}?compare={{.No}}">Bandingkan</a></div><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{plaintext .Content}}</pre></div>{{else}}<p class="text-secondary">Belum ada revisi tersimpan.</p>{{end}}</div></div>
 {{if .Data.CmpA}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Komparasi v{{.Data.CmpN}} vs sebelumnya</h3><div class="ms-auto"><span class="badge bg-green-lt">+{{.Data.DiffAdd}}</span> <span class="badge bg-red-lt">-{{.Data.DiffDel}}</span></div></div>
 <div class="card-body"><div class="border rounded" style="max-height:320px;overflow:auto">{{range .Data.DiffOps}}{{if eq .Kind "+"}}<div class="px-2" style="background:#e6f9ed">+ {{.Line}}</div>{{else if eq .Kind "-"}}<div class="px-2" style="background:#ffeef0">− {{.Line}}</div>{{else}}<div class="px-2 text-secondary">{{.Line}}</div>{{end}}{{end}}</div>
 <p class="text-secondary small mt-2 mb-0">Perbandingan baris-per-baris otomatis. Tetap baca naskah penuh sebelum menyetujui.</p></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Berdampingan</h3></div>
-<div class="card-body row"><div class="col-md-6"><strong>Sebelumnya</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{.Data.CmpB}}</pre></div><div class="col-md-6"><strong>v{{.Data.CmpN}}</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{.Data.CmpA}}</pre></div></div></div>{{end}}
+<div class="card-body row"><div class="col-md-6"><strong>Sebelumnya</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{plaintext .Data.CmpB}}</pre></div><div class="col-md-6"><strong>v{{.Data.CmpN}}</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{plaintext .Data.CmpA}}</pre></div></div></div>{{end}}
 </div></div>
 {{template "page_close" .}}{{end}}
 

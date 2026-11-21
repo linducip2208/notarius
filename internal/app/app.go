@@ -23,6 +23,7 @@ import (
 	"notaryos/internal/corp"
 	"notaryos/internal/cryptoxx"
 	"notaryos/internal/deeds"
+	"notaryos/internal/deliver"
 	"notaryos/internal/dms"
 	"notaryos/internal/doctpl"
 	"notaryos/internal/files"
@@ -35,6 +36,7 @@ import (
 	"notaryos/internal/rbac"
 	"notaryos/internal/remind"
 	"notaryos/internal/requests"
+	"notaryos/internal/safehtml"
 	"notaryos/internal/storage"
 	"notaryos/internal/users"
 	"notaryos/internal/wib"
@@ -101,11 +103,14 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"css":       func(s string) template.CSS { return template.CSS(s) },
 		"lower":     func(s string) string { return strings.ToLower(s) },
 		"hasPrefix": func(s, p string) bool { return strings.HasPrefix(s, p) },
+		"hasSuffix": func(s, p string) bool { return strings.HasSuffix(s, p) },
+		"safeHTML":  func(s string) template.HTML { return template.HTML(safehtml.Sanitize(s)) },
+		"plaintext": func(s string) string { return safehtml.ToText(s) },
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
 	}
-	fstore, err := storage.NewLocal(cfg.StorageDir)
+	fstore, err := storage.FromEnv(cfg.StorageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +186,7 @@ func (a *App) runReminders() (appt, overdue, tasks, sla int) {
 	for rows.Next() {
 		var oid int64
 		_ = rows.Scan(&oid)
-		pa, po, pt, ps, _ := remind.RunOnce(a.db, oid, remind.LogSender{})
+		pa, po, pt, ps, _ := remind.RunOnce(a.db, oid, deliver.FromEnv())
 		appt, overdue, tasks, sla = appt+pa, overdue+po, tasks+pt, sla+ps
 	}
 	return appt, overdue, tasks, sla
@@ -365,6 +370,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/requests/{id}/shareholders", a.shareholderAdd)
 		p.Post("/requests/{id}/officers", a.officerAdd)
 		p.Post("/requests/{id}/bo", a.boAdd)
+		p.Get("/requests/{id}/wizard", a.corpWizard)
 		p.Get("/appointments", a.appointments)
 		p.Post("/appointments", a.appointmentCreate)
 		p.Post("/appointments/{id}/status", a.appointmentStatus)
@@ -427,6 +433,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/documents/{id}/version/{v}", a.dmsDownloadVersion)
 		p.Post("/documents/{id}/restore/{v}", a.dmsRestoreVersion)
 		p.Post("/documents/{id}/workflow", a.dmsMove)
+		p.Post("/documents/{id}/scan", a.dmsScan)
 		p.Post("/documents/{id}/link", a.dmsLink)
 		p.Post("/documents/{id}/favorite", a.dmsFavorite)
 		p.Post("/documents/{id}/share", a.dmsShare)
@@ -441,6 +448,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/dms/retention", a.dmsRetention)
 		p.Post("/dms/holds/{hid}/release", a.dmsReleaseHold)
 		p.Get("/dms/duplicates", a.dmsDuplicates)
+		p.Post("/dms/duplicates/merge", a.dmsMerge)
 		p.Get("/dms/categories", a.dmsCategories)
 		p.Post("/dms/categories", a.dmsCategoryCreate)
 		p.Get("/dms/checklists", a.dmsChecklists)

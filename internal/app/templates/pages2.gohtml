@@ -35,7 +35,7 @@
 <select class="form-select" name="to"><option value="SUBMITTED">SUBMITTED</option><option value="IN_REVIEW">IN_REVIEW</option><option value="NEED_DOCS">NEED_DOCS</option><option value="APPROVED">APPROVED</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="CANCELLED">CANCELLED</option></select>
 <input class="form-control" name="note" placeholder="Catatan perubahan"/>
 <button class="btn btn-primary" type="submit">Ubah Status</button></form></div></div>
-<div class="card mt-3"><div class="card-header"><h3 class="card-title">Data Korporat</h3></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Data Korporat</h3><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/requests/{{.Data.Req.ID}}/wizard">Wizard Korporat →</a></div></div>
 <form method="post" action="/requests/{{.Data.Req.ID}}/corp"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-4 mb-2"><select class="form-select" name="entity_type"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Yayasan">Yayasan</option><option value="Koperasi">Koperasi</option><option value="Perkumpulan">Perkumpulan</option></select></div>
 <div class="col-md-8 mb-2"><input class="form-control" name="name" placeholder="Nama badan usaha" value="{{.Data.Company.Name}}" required/></div>
