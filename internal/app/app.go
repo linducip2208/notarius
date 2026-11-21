@@ -473,12 +473,8 @@ func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 `))
 }
 
-// layananIndex lists all active services (PSEO hub page).
+// layananIndex lists all active services (PSEO hub page, public for everyone).
 func (a *App) layananIndex(w http.ResponseWriter, r *http.Request) {
-	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/app", http.StatusSeeOther)
-		return
-	}
 	type svc struct {
 		Code, Category, Name string
 		Price                float64
@@ -508,12 +504,8 @@ func (a *App) layananIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// layananDetail renders one programmatic SEO page per service code.
+// layananDetail renders one programmatic SEO page per service code (public).
 func (a *App) layananDetail(w http.ResponseWriter, r *http.Request) {
-	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/app", http.StatusSeeOther)
-		return
-	}
 	code := strings.ToUpper(chi.URLParam(r, "code"))
 	var name, category string
 	var price float64
@@ -575,12 +567,8 @@ func docSteps() []docStep {
 	}
 }
 
-// docsIndex renders the tutorial hub.
+// docsIndex renders the tutorial hub (public, incl. logged-in users).
 func (a *App) docsIndex(w http.ResponseWriter, r *http.Request) {
-	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/app", http.StatusSeeOther)
-		return
-	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.ExecuteTemplate(w, "docs_index", map[string]any{"Steps": docSteps()}); err != nil {
 		a.log.Error("render", "page", "docs_index", "err", err)
@@ -588,12 +576,8 @@ func (a *App) docsIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// docsStep renders one tutorial step.
+// docsStep renders one tutorial step (public, incl. logged-in users).
 func (a *App) docsStep(w http.ResponseWriter, r *http.Request) {
-	if mw.RoleOf(r) != "" {
-		http.Redirect(w, r, "/app", http.StatusSeeOther)
-		return
-	}
 	slug := chi.URLParam(r, "step")
 	steps := docSteps()
 	idx := -1
