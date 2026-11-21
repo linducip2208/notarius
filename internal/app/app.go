@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -90,6 +91,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"wib":     func(t time.Time) string { return wib.Format(t) },
 		"wibdate": func(t time.Time) string { return wib.Date(t) },
 		"css":     func(s string) template.CSS { return template.CSS(s) },
+		"lower":   func(s string) string { return strings.ToLower(s) },
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
@@ -210,6 +212,11 @@ func (a *App) Router() http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
 	r.Get("/", a.landing)
+	r.Get("/robots.txt", a.robotsTxt)
+	r.Get("/sitemap.xml", a.sitemapXML)
+	r.Get("/llms.txt", a.llmsTxt)
+	r.Get("/layanan", a.layananIndex)
+	r.Get("/layanan/{code}", a.layananDetail)
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
 	r.Get("/login", a.loginForm)
 	r.With(limiter.Limit).Post("/login", a.login)
@@ -380,6 +387,149 @@ func (a *App) landing(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.ExecuteTemplate(w, "landing", nil); err != nil {
 		a.log.Error("render", "page", "landing", "err", err)
+		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+	}
+}
+
+// robotsTxt allows all crawlers on public marketing routes only.
+func (a *App) robotsTxt(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintln(w, "User-agent: *")
+	fmt.Fprintln(w, "Allow: /")
+	fmt.Fprintln(w, "Allow: /layanan")
+	fmt.Fprintln(w, "Allow: /assets/")
+	fmt.Fprintln(w, "Disallow: /app")
+	fmt.Fprintln(w, "Disallow: /clients")
+	fmt.Fprintln(w, "Disallow: /requests")
+	fmt.Fprintln(w, "Disallow: /deeds")
+	fmt.Fprintln(w, "Disallow: /finance")
+	fmt.Fprintln(w, "Disallow: /settings")
+	fmt.Fprintln(w, "Disallow: /login")
+	fmt.Fprintln(w, "Sitemap: /sitemap.xml")
+}
+
+// sitemapXML lists public marketing URLs (landing + layanan + statis).
+func (a *App) sitemapXML(w http.ResponseWriter, r *http.Request) {
+	base := "https://" + r.Host
+	if r.Host == "" || strings.HasPrefix(r.Host, "127.") || strings.HasPrefix(r.Host, "localhost") {
+		base = "https://notarius.example"
+	}
+	type url struct{ Loc, Changefreq, Priority string }
+	urls := []url{
+		{base + "/", "weekly", "1.0"},
+		{base + "/layanan", "weekly", "0.9"},
+	}
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT code FROM services WHERE is_active=1 ORDER BY code`)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var code string
+				_ = rows.Scan(&code)
+				urls = append(urls, url{base + "/layanan/" + strings.ToLower(code), "monthly", "0.8"})
+			}
+		}
+	}
+	for _, s := range []string{"#fitur", "#solusi", "#harga", "#faq"} {
+		urls = append(urls, url{base + "/" + s, "monthly", "0.5"})
+	}
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`))
+	for _, u := range urls {
+		fmt.Fprintf(w, "\n<url><loc>%s</loc><changefreq>%s</changefreq><priority>%s</priority></url>", u.Loc, u.Changefreq, u.Priority)
+	}
+	w.Write([]byte("\n</urlset>"))
+}
+
+// llmsTxt exposes a crawler- and LLM-friendly summary (GEO: factual, no hype).
+func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Write([]byte(`# NOTARIUS
+
+> Sistem manajemen kantor Notaris Indonesia (Go + MySQL + Tabler).
+> Catatan: informasi produk di bawah ini; bukan nasihat hukum.
+
+## Produk
+- Klien perorangan & badan hukum, verifikasi identitas manusia, beneficial owner.
+- Permohonan layanan 9 status; akta draf berversi dari template terapproved;
+  pengesahan notaris mengunci final + repertorium otomatis.
+- Register: repertorium, legalisasi/waarmerking/salinan/kutipan, protokol 25 tahun, wasiat terbatas.
+- Keuangan: invoice multi-baris anti-overpay, pembayaran, piutang, pengeluaran, tarif.
+- Keamanan: bcrypt-12, sesi server-side, MFA TOTP, RBAC 9 peran/19 izin, NIK AES-256-GCM,
+  audit imutabel, HSTS+CSP+CSRF+rate-limit.
+- Bukan PPAT/advokat. Tanpa API resmi AHU/OSS (asistensi manual + bukti).
+- Harga: konsultasi via penawaran resmi (tidak ada harga publik).
+
+## Halaman
+- / (landing) · /layanan (indeks) · /layanan/{kode} (detail per layanan, syarat + alur)
+- Aplikasi butuh akun: /login (demo: admin@contoh.id — sandi demo di halaman login).
+`))
+}
+
+// layananIndex lists all active services (PSEO hub page).
+func (a *App) layananIndex(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != "" {
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
+		return
+	}
+	type svc struct {
+		Code, Category, Name string
+		Price                float64
+	}
+	var out []svc
+	groups := map[string][]svc{}
+	var order []string
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT code, category, name, base_price FROM services WHERE is_active=1 ORDER BY category, name`)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s svc
+				_ = rows.Scan(&s.Code, &s.Category, &s.Name, &s.Price)
+				out = append(out, s)
+				if _, ok := groups[s.Category]; !ok {
+					order = append(order, s.Category)
+				}
+				groups[s.Category] = append(groups[s.Category], s)
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := a.tmpl.ExecuteTemplate(w, "layanan_index", map[string]any{"Groups": groups, "Order": order, "Total": len(out)}); err != nil {
+		a.log.Error("render", "page", "layanan_index", "err", err)
+		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+	}
+}
+
+// layananDetail renders one programmatic SEO page per service code.
+func (a *App) layananDetail(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != "" {
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
+		return
+	}
+	code := strings.ToUpper(chi.URLParam(r, "code"))
+	var name, category string
+	var price float64
+	var reqRaw sql.NullString
+	err := a.db.QueryRow(`SELECT name, category, base_price, requirements FROM services WHERE code=? AND is_active=1`, code).Scan(&name, &category, &price, &reqRaw)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	var reqs []string
+	if reqRaw.Valid && reqRaw.String != "" {
+		var arr []string
+		if json.Unmarshal([]byte(reqRaw.String), &arr) == nil {
+			reqs = arr
+		} else {
+			reqs = []string{reqRaw.String}
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := a.tmpl.ExecuteTemplate(w, "layanan_detail", map[string]any{
+		"Code": code, "Name": name, "Category": category, "Price": price, "Reqs": reqs,
+	}); err != nil {
+		a.log.Error("render", "page", "layanan_detail", "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
 }
