@@ -169,22 +169,22 @@ func (a *App) uid(r *http.Request) *int64 {
 }
 
 // runReminders executes the daily reminder scan for every office.
-func (a *App) runReminders() (appt, overdue, tasks int) {
+func (a *App) runReminders() (appt, overdue, tasks, sla int) {
 	if a.db == nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	}
 	rows, err := a.db.Query(`SELECT id FROM offices`)
 	if err != nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var oid int64
 		_ = rows.Scan(&oid)
-		pa, po, pt, _ := remind.RunOnce(a.db, oid, remind.LogSender{})
-		appt, overdue, tasks = appt+pa, overdue+po, tasks+pt
+		pa, po, pt, ps, _ := remind.RunOnce(a.db, oid, remind.LogSender{})
+		appt, overdue, tasks, sla = appt+pa, overdue+po, tasks+pt, sla+ps
 	}
-	return appt, overdue, tasks
+	return appt, overdue, tasks, sla
 }
 
 func (a *App) officeOf(r *http.Request) int64 {
@@ -1192,6 +1192,10 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 // ---- deeds ----
 
 func (a *App) deedList(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
 	list, _ := a.deeds.List(a.officeOf(r))
 	tpls, _ := a.tpl.List(a.officeOf(r))
 	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls})
@@ -1226,6 +1230,10 @@ func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 // ---- registers ----
 
 func (a *App) repertorium(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageRepert) {
+		a.forbidden(w, r)
+		return
+	}
 	type row struct {
 		No, Date, Desc, Parties string
 	}
@@ -1313,6 +1321,10 @@ func (a *App) repertoriumExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
+		a.forbidden(w, r)
+		return
+	}
 	type row struct {
 		Bundle string
 		Year   int
@@ -1451,6 +1463,10 @@ func (a *App) paymentCreate(w http.ResponseWriter, r *http.Request) {
 // ---- misc pages ----
 
 func (a *App) templatesPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) {
+		a.forbidden(w, r)
+		return
+	}
 	tpls, _ := a.tpl.List(a.officeOf(r))
 	clauses, _ := a.tpl.Clauses(a.officeOf(r))
 	a.render(w, r, "templates", "Template Dokumen", map[string]any{"Templates": tpls, "Clauses": clauses})
@@ -1509,7 +1525,21 @@ func (a *App) portal(w http.ResponseWriter, r *http.Request) {
 			_ = rows.Scan(&id, &title, &status)
 			list = append(list, map[string]any{"ID": id, "Title": title, "Status": status})
 		}
-		a.render(w, r, "portal", "Portal Klien", map[string]any{"Mine": list})
+		// Akta milik klien (unduh PDF diizinkan via canViewDeed server-side).
+		drows, _ := a.db.Query(`SELECT d.id, d.title, d.number, d.status FROM deed_drafts d
+			JOIN service_requests r ON r.id=d.request_id
+			WHERE r.client_id=? AND d.office_id=? ORDER BY d.id DESC`, clientID, a.officeOf(r))
+		var deeds []map[string]any
+		if drows != nil {
+			defer drows.Close()
+			for drows.Next() {
+				var did int64
+				var title, number, status string
+				_ = drows.Scan(&did, &title, &number, &status)
+				deeds = append(deeds, map[string]any{"ID": did, "Title": title, "Number": number, "Status": status})
+			}
+		}
+		a.render(w, r, "portal", "Portal Klien", map[string]any{"Mine": list, "Deeds": deeds})
 		return
 	}
 	list, _ := a.reqs.List(a.officeOf(r), "", 0)

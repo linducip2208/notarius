@@ -1,17 +1,17 @@
 # PROJECT GAP ANALYSIS — sisa jujur (bukan janji)
 
 P0 (fungsional, sebelum klaim produksi):
-- Uji restore backup di VPS target + dokumen hasilnya.
-- Matriks izin otomatis 9 peran × rute kunci (kini manual).
-- Uji beban: Approve konkuren + OCR queue + search FTS data besar.
-- Klik-penuh browser: INTERACTION_TESTS 12 skenario (E2E DMS sebagian jalan).
+- Uji restore backup: TERBUKTI (`docs/qa/RESTORE_TEST.md` — dump+restore 0 selisih, RTO <60 dtk). Uji di VPS produksi tetap wajib (B-09).
+- Matriks izin otomatis 9 peran × rute kunci: TERBUKTI (`scripts/qa_shots/matrix.py` → `docs/qa/PERMISSION_MATRIX.md`, 120 sel cocok). Menangkap 5 celah baca (deeds/repertorium/protocols/templates/tasks/tariffs) — DIPERBAIKI.
+- Uji beban: asap konkuren 20×10 baca → 50/50 tanpa 500 (`LOAD2`). Belum: Approve konkuren + OCR queue + FTS data besar (butuh harness khusus).
+- Klik-penuh browser: INTERACTION_TESTS 1-12 TERBUKTI (`scripts/qa_shots/interactions.py`).
 
 P1 (produk):
-- Rich-text editor akta (kini textarea + sisip klausul — jujur, bukan klaim editor).
+- Notifikasi SLA/eskalasi workflow: TERBUKTI (`remind.RunOnce` → `TestRemindersSLA`; permohonan SUBMITTED/IN_REVIEW/NEEDS_DOCS macet >3 hari dieskalasi, anti-spam 24 jam).
+- Unduh akta langsung dari portal klien: TERBUKTI (kartu "Akta Saya" + Unduh PDF, otorisasi via canViewDeed server-side).
+- Rich-text editor akta (kini: textarea + sisip klausul — jujur, bukan klaim editor).
 - Pratinjau DOCX/XLSX (kini: tolak jujur + sarankan unduh).
 - Penggabungan metadata duplikat (kini: tautan relasi manual).
-- Notifikasi SLA/eskalasi workflow (kini: daftar Perlu Tindakan pasif).
-- Unduh akta langsung dari portal klien (kini: via detail dengan izin staf).
 
 P2 (skala):
 - Engine search khusus (kini: MySQL FULLTEXT + LIKE fallback — cukup untuk skala kantor).

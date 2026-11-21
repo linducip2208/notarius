@@ -272,8 +272,8 @@ func (a *App) remindersRun(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	appt, overdue, tasks := a.runReminders()
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "reminders.run", Entity: "system", EntityID: "manual", Detail: fmt.Sprintf("janji=%d telat=%d tugas=%d", appt, overdue, tasks)})
+	appt, overdue, tasks, sla := a.runReminders()
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "reminders.run", Entity: "system", EntityID: "manual", Detail: fmt.Sprintf("janji=%d telat=%d tugas=%d sla=%d", appt, overdue, tasks, sla)})
 	http.Redirect(w, r, "/tasks?flash=Pengingat+dibangkitkan", http.StatusSeeOther)
 }
 

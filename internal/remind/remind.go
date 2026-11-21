@@ -20,7 +20,9 @@ type LogSender struct{}
 func (LogSender) Send(to, message string) error { return nil }
 
 // RunOnce scans one office and creates notifications. Returns counts.
-func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks int, err error) {
+// SLA: permohonan SUBMITTED/IN_REVIEW/NEEDS_DOCS yang tak bergerak >3 hari
+// dieskalasi ke assignee (atau seluruh staf bila tanpa assignee).
+func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks, sla int, err error) {
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 	today := time.Now().Format("2006-01-02")
 
@@ -31,7 +33,7 @@ func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks int,
 	rows, err := db.Query(`SELECT u.id, r.name FROM users u JOIN roles r ON r.id=u.role_id
 		WHERE u.office_id=? AND u.is_active=1`, officeID)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
 	for rows.Next() {
 		var u struct {
@@ -113,5 +115,28 @@ func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks int,
 			tasks++
 		}
 	}
-	return appt, overdue, tasks, nil
+	// SLA eskalasi: permohonan macet >3 hari tanpa pergerakan.
+	srows, _ := db.Query(`SELECT id, title, status, assignee_id, DATEDIFF(UTC_TIMESTAMP(), updated_at)
+		FROM service_requests WHERE office_id=? AND status IN ('SUBMITTED','IN_REVIEW','NEEDS_DOCS')
+		AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)`, officeID)
+	if srows != nil {
+		defer srows.Close()
+		for srows.Next() {
+			var id int64
+			var title, status string
+			var assignee sql.NullInt64
+			var age int
+			_ = srows.Scan(&id, &title, &status, &assignee, &age)
+			msg := fmt.Sprintf("#%d %s — %s, macet %d hari", id, title, status, age)
+			if assignee.Valid {
+				notify(assignee.Int64, "Permohonan macet (SLA)", msg)
+			} else {
+				for _, uid := range staff {
+					notify(uid, "Permohonan macet (SLA)", msg)
+				}
+			}
+			sla++
+		}
+	}
+	return appt, overdue, tasks, sla, nil
 }

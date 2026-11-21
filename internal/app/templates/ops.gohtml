@@ -137,6 +137,9 @@
 {{if .Data.Mine}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan Saya</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Status</th></tr></thead>
 <tbody>{{range .Data.Mine}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>{{end}}</tbody></table></div></div>
+{{if .Data.Deeds}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Akta Saya</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Nomor</th><th>Status</th><th></th></tr></thead>
+<tbody>{{range .Data.Deeds}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td>{{.Number}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td><a class="btn btn-sm btn-outline-primary" href="/deeds/{{.ID}}/pdf">Unduh PDF</a></td></tr>{{end}}</tbody></table></div></div>{{end}}
 {{else if .Data.Requests}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan (staf)</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Klien</th><th>Status</th></tr></thead>
 <tbody>{{range .Data.Requests}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td>{{.ClientName}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>{{end}}</tbody></table></div></div>

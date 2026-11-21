@@ -343,22 +343,71 @@ func TestRemindersRun(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO tasks(office_id, title, due_date) VALUES(?,?,CURDATE())`, office, "Siapkan berkas"); err != nil {
 		t.Fatal(err)
 	}
-	appt, overdue, tasks, err := remind.RunOnce(db, office, remind.LogSender{})
+	appt, overdue, tasks, sla, err := remind.RunOnce(db, office, remind.LogSender{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if appt != 1 || overdue != 1 || tasks != 1 {
 		t.Fatalf("pengingat kurang: janji=%d telat=%d tugas=%d", appt, overdue, tasks)
 	}
+	if sla != 0 {
+		t.Fatalf("SLA tak terduga: %d", sla)
+	}
 	// Anti-spam: jalan kedua tidak menambah baris dalam 24 jam.
 	var before int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM notifications`).Scan(&before)
-	if _, _, _, err := remind.RunOnce(db, office, remind.LogSender{}); err != nil {
+	if _, _, _, _, err := remind.RunOnce(db, office, remind.LogSender{}); err != nil {
 		t.Fatal(err)
 	}
 	var after int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM notifications`).Scan(&after)
 	if after != before {
 		t.Fatalf("duplikat pengingat: %d -> %d", before, after)
+	}
+}
+
+func TestRemindersSLA(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := clients.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "SLA", Phone: "0877000077"})
+	code := fmt.Sprintf("SLA-T-%d", time.Now().UnixNano())
+	if _, err := db.Exec(`INSERT INTO services(code, category, name) VALUES(?,'other','Uji SLA')`, code); err != nil {
+		t.Fatal(err)
+	}
+	var sid int64
+	_ = db.QueryRow(`SELECT id FROM services WHERE code=?`, code).Scan(&sid)
+	res, err := db.Exec(`INSERT INTO service_requests(office_id, client_id, service_id, status, title, created_at, updated_at)
+		VALUES(?,?,?,'SUBMITTED','Macet uji', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY))`,
+		office, cid, sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rid, _ := res.LastInsertId()
+	if _, err := users.NewStore(db).Create(&office, "staff", "Staf SLA", "sla@t.id", "", "Rahasia123"); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, sla, err := remind.RunOnce(db, office, remind.LogSender{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sla != 1 {
+		t.Fatalf("SLA harus 1, dapat %d", sla)
+	}
+	var n int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE title='Permohonan macet (SLA)'`).Scan(&n)
+	if n == 0 {
+		t.Fatal("notifikasi SLA tidak tercatat")
+	}
+	// COMPLETED tidak dieskalasi.
+	if _, err := db.Exec(`UPDATE service_requests SET status='COMPLETED' WHERE id=?`, rid); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, sla2, err := remind.RunOnce(db, office, remind.LogSender{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sla2 != 0 {
+		t.Fatalf("COMPLETED ikut dieskalasi: %d", sla2)
 	}
 }

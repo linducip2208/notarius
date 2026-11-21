@@ -15,4 +15,4 @@
 | 11 | Repertorium filter+cetak | filter + print | hasil + dialog cetak | |
 | 12 | Logout | Keluar | sesi mati, /login | |
 
-Status: BELUM DIJALANKAN (butuh sesi browser interaktif).
+Status: TEROTOMASI PENUH via `scripts/qa_shots/interactions.py` — 13/13 PASS (2026-11-21).

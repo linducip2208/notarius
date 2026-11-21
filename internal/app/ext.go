@@ -1018,6 +1018,10 @@ func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
 // ---- tasks ----
 
 func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
 	rows, _ := a.db.Query(`SELECT id, title, due_date, status FROM tasks WHERE office_id=? ORDER BY status, due_date LIMIT 200`, a.officeOf(r))
 	type task struct {
 		ID                 int64
@@ -1119,6 +1123,10 @@ func (a *App) expenseCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) tariffsPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
 	rows, _ := a.db.Query(`SELECT id, name, amount, is_active FROM price_items ORDER BY name LIMIT 200`)
 	type tariff struct {
 		ID     int64
