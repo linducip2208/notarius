@@ -33,5 +33,10 @@
 | UI interaksi | `interact.py` 11/11 + `confirm.py` 3/3 | dropdown/tab/sidebar/nav-mobile; confirm dismiss-vs-accept |
 | screenshot | `scripts/qa_shots/*.py` | 15+ halaman OK |
 | race detector | `go test -race` | BACKLOG (host Windows/AV) |
+| Fase-8 CRM enterprise | `clients/crm.go` + routes | pencarian lanjutan, statistik, catatan, inkonsisten beralasan, gabung snapshot+audit, ekspor CSV |
+| Fase-8 DMS enterprise | `dms/enterprise.go` + routes | field kustom tervalidasi, pencarian lanjutan + pagination + ekspor CSV, aksi massal, banding versi, matriks approval (gate APPROVED), preview watermark + audit, kuota (507 jujur), ekspor ZIP, kerahasiaan di preview/unduh/bagi, retensi-notify |
+| Fase-8 E2E | `cms.py` 24/24, `matrix.py` 8 peran × 26 rute, `fase1a/b`, `fase2`, `fase3` 14/14, `wizard.py` 5/5, `merge.py`, `interact.py` 11/11, `confirm.py` 3/3, `dms_e2e.py` | SEMUA HIJAU 2026-11-22 |
+| Fase-8 integrasi MySQL | `go test ./tests/` (biner AV-safe) | PASS penuh (termasuk TestClientsDuplicates + TestRemindersRun pasca-perbaikan zona waktu) |
+| Bug nyata diperbaiki | jadwal UTC-vs-WIB; template CMS `.P.Robots`/`.A.Robots`; map-vs-struct di dasbor DMS; scan kolom pendWF | dengan tes sebagai bukti |
 | restore VPS | — | BACKLOG (B-09) |
 | pen-test | — | BACKLOG (butuh pihak ketiga) |

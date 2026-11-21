@@ -45,9 +45,21 @@
 <div class="col-md-4 mb-2"><input class="form-control" name="issued" placeholder="Modal ditempatkan" value="{{.Data.Company.Issued}}"/></div>
 <div class="col-md-4 mb-2"><input class="form-control" name="paid" placeholder="Modal disetor" value="{{.Data.Company.Paid}}"/></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan Korporat</button></div>
+</div></form>
+<form method="post" action="/requests/{{.Data.Req.ID}}/corp/legal"><div class="card-body row border-top">{{template "csrf" .}}
+<div class="col-12 mb-1"><strong>Legalitas terverifikasi manual</strong> <span class="text-secondary small">(salin dari dokumen fisik/SK — bukan integrasi AHU/OSS)</span></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="deed_no" placeholder="No. akta pendirian" value="{{.Data.Legal.DeedNo}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="date" name="deed_date" value="{{.Data.Legal.DeedDate}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="ahu_no" placeholder="No. SK AHU" value="{{.Data.Legal.AHUNo}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="amendment_no" placeholder="No. akta perubahan" value="{{.Data.Legal.AmendmentNo}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="date" name="amendment_date" value="{{.Data.Legal.AmendmentDate}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="nib" placeholder="NIB" value="{{.Data.Legal.NIB}}"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="npwp" placeholder="NPWP badan" value="{{.Data.Legal.NPWP}}"/></div>
+<div class="col-md-6 mb-2 text-end"><button class="btn btn-outline-primary" type="submit">Simpan Legalitas</button></div>
 </div></form></div>
 <div class="row"><div class="col-md-6"><div class="card mt-3"><div class="card-header"><h3 class="card-title">Pemegang Saham</h3></div>
-<div class="card-body">{{range .Data.Shareholders}}<div class="mb-1">{{.Name}} — {{.Shares}} lbr @ {{.Nominal}}</div>{{else}}<p class="text-secondary">Belum ada.</p>{{end}}
+<div class="card-body">{{range .Data.Shareholders}}<div class="mb-2">{{.Name}} — {{.Shares}} lbr @ {{.Nominal}}
+<form method="post" action="/requests/{{$.Data.Req.ID}}/shareholders/{{.ID}}/link" class="d-flex gap-1 mt-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="client_id" placeholder="ID klien tertaut" style="max-width:130px"/><button class="btn btn-sm btn-ghost-primary" type="submit" title="Tautkan ke data klien">Tautkan</button></form></div>{{else}}<p class="text-secondary">Belum ada.</p>{{end}}
 <form method="post" action="/requests/{{.Data.Req.ID}}/shareholders">{{template "csrf" .}}
 <div class="mb-2"><input class="form-control" name="name" placeholder="Nama" required/></div>
 <div class="row"><div class="col-6 mb-2"><input class="form-control" name="shares" placeholder="Lembar" value="1"/></div>

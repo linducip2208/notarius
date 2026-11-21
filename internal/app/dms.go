@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
 	"notaryos/internal/audit"
+	"notaryos/internal/config"
 	"notaryos/internal/files"
 	"notaryos/internal/malware"
 	mw "notaryos/internal/middleware"
@@ -75,12 +76,18 @@ func (a *App) dmsDashboard(w http.ResponseWriter, r *http.Request) {
 		defer pendWF.Close()
 		for pendWF.Next() {
 			var x row
-			_ = pendWF.Scan(&x.ID, &x.Name, &x.WF, &x.At)
+			_ = pendWF.Scan(&x.ID, &x.Name, &x.WF)
 			pwf = append(pwf, x)
 		}
 	}
+	wfStats, _ := a.dms.WorkflowStats(office)
+	byMime, _ := a.dms.StorageByMIME(office)
+	var quota, used int64
+	_ = a.db.QueryRow(`SELECT storage_quota_bytes FROM offices WHERE id=?`, office).Scan(&quota)
+	used = a.dms.StorageUsage(office)
 	a.render(w, r, "dms_dashboard", "DMS Overview", map[string]any{
 		"Stats": st, "Recent": rows, "Dups": dups, "Expiring": exp, "Jobs": jobs, "PendingWF": pwf,
+		"WFStats": wfStats, "ByMIME": byMime, "Quota": quota, "Used": used,
 	})
 }
 
@@ -94,9 +101,18 @@ func (a *App) dmsLibrary(w http.ResponseWriter, r *http.Request) {
 	like := "%" + q.Get("q") + "%"
 	cat, _ := strconv.ParseInt(q.Get("cat"), 10, 64)
 	wf, vst, conf := q.Get("wf"), q.Get("vst"), q.Get("conf")
+	mime := q.Get("mime")
 	fav := q.Get("fav") == "1"
+	page := config.MustInt(q.Get("page"), 1)
+	if page < 1 {
+		page = 1
+	}
+	perPage := config.MustInt(q.Get("per_page"), 20)
+	if perPage != 10 && perPage != 20 && perPage != 50 && perPage != 100 {
+		perPage = 20
+	}
 	query := `SELECT f.id, COALESCE(f.display_name,f.original_name), f.mime, f.size_bytes,
-		f.ocr_status, f.verification_status, f.workflow_status, f.created_at FROM files f WHERE f.office_id=?`
+		f.ocr_status, f.verification_status, f.workflow_status, f.confidentiality, f.created_at FROM files f WHERE f.office_id=?`
 	args := []any{a.officeOf(r)}
 	if qq := strings.TrimSpace(q.Get("q")); qq != "" {
 		query += ` AND (f.original_name LIKE ? OR COALESCE(f.display_name,'') LIKE ? OR f.doc_number LIKE ?)`
@@ -118,31 +134,74 @@ func (a *App) dmsLibrary(w http.ResponseWriter, r *http.Request) {
 		query += ` AND f.confidentiality=?`
 		args = append(args, conf)
 	}
+	if mime != "" {
+		query += ` AND f.mime LIKE ?`
+		args = append(args, mime+"%")
+	}
+	if v := q.Get("from"); v != "" {
+		query += ` AND DATE(f.created_at)>=?`
+		args = append(args, v)
+	}
+	if v := q.Get("to"); v != "" {
+		query += ` AND DATE(f.created_at)<=?`
+		args = append(args, v)
+	}
 	if fav {
 		if id := a.uid(r); id != nil {
 			query += ` AND EXISTS(SELECT 1 FROM doc_favorites WHERE user_id=? AND file_id=f.id)`
 			args = append(args, *id)
 		}
 	}
-	query += ` ORDER BY f.id DESC LIMIT 100`
+	var total int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM (`+query+`) t`, args...).Scan(&total)
+	sort := q.Get("sort")
+	switch sort {
+	case "name":
+		query += ` ORDER BY 2`
+	case "size_desc":
+		query += ` ORDER BY f.size_bytes DESC`
+	case "size_asc":
+		query += ` ORDER BY f.size_bytes ASC`
+	default:
+		query += ` ORDER BY f.id DESC`
+	}
+	pages := (total + perPage - 1) / perPage
+	if pages < 1 {
+		pages = 1
+	}
+	if page > pages {
+		page = pages
+	}
+	query += ` LIMIT ? OFFSET ?`
+	args = append(args, perPage, (page-1)*perPage)
 	rows, _ := a.db.Query(query, args...)
 	type doc struct {
-		ID, Size                     int64
-		Name, MIME, OCR, Ver, WF, At string
+		ID, Size                 int64
+		Name, MIME, OCR, Ver    string
+		WF, Conf, At            string
 	}
 	var out []doc
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var d doc
-			_ = rows.Scan(&d.ID, &d.Name, &d.MIME, &d.Size, &d.OCR, &d.Ver, &d.WF, &d.At)
+			_ = rows.Scan(&d.ID, &d.Name, &d.MIME, &d.Size, &d.OCR, &d.Ver, &d.WF, &d.Conf, &d.At)
+			if !dmsCanSee(mw.RoleOf(r), d.Conf) {
+				continue
+			}
 			out = append(out, d)
 		}
 	}
 	cats, _ := a.dms.Categories(a.officeOf(r))
+	qq := r.URL.Query()
+	qq.Del("page")
+	qs := qq.Encode()
 	a.render(w, r, "dms_library", "Document Library", map[string]any{
 		"Docs": out, "Cats": cats, "Q": q.Get("q"), "Cat": cat,
-		"WF": wf, "VST": vst, "Conf": conf, "Fav": fav,
+		"WF": wf, "VST": vst, "Conf": conf, "Fav": fav, "MIME": mime,
+		"From": q.Get("from"), "To": q.Get("to"), "Sort": sort,
+		"Page": page, "Pages": pages, "Total": total, "PerPage": perPage, "QS": qs,
+		"Prev": max(page-1, 1), "Next": min(page+1, pages),
 	})
 }
 
@@ -194,9 +253,14 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 	ocrs, _ := a.uploads.OCRResults(id)
 	cats, _ := a.dms.Categories(a.officeOf(r))
 	locs, _ := a.dms.Locations(a.officeOf(r))
+	fields, _ := a.dms.CustomFields(a.officeOf(r))
+	fvals, _ := a.dms.FieldValues(id)
+	pendingAppr, totalAppr := a.dms.ApprovalState(id)
 	a.render(w, r, "dms_detail", "Dokumen #"+strconv.FormatInt(id, 10), map[string]any{
 		"M": m, "Vers": vers, "Rels": rels, "Timeline": tl, "Holds": holds,
 		"Hist": hist, "Access": alog, "OCRs": ocrs, "Cats": cats, "Locs": locs,
+		"Fields": fields, "FieldVals": fvals, "CanSee": dmsCanSee(mw.RoleOf(r), m.Conf),
+		"ApprPending": pendingAppr, "ApprTotal": totalAppr,
 	})
 }
 
@@ -215,9 +279,15 @@ func (a *App) dmsSaveMeta(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("category_id"); v != "" {
 		cat = v
 	}
+	conf := strings.ToUpper(strings.TrimSpace(r.FormValue("confidentiality")))
+	switch conf {
+	case "PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED":
+	default:
+		conf = "INTERNAL"
+	}
 	_, err := a.db.Exec(`UPDATE files SET display_name=?, doc_number=?, category_id=?, doc_date=?, expiry_date=?, confidentiality=? WHERE id=?`,
 		nullStrOpt(r.FormValue("display_name")), nullStrOpt(r.FormValue("doc_number")), cat,
-		nullStrOpt(r.FormValue("doc_date")), nullStrOpt(r.FormValue("expiry_date")), r.FormValue("confidentiality"), id)
+		nullStrOpt(r.FormValue("doc_date")), nullStrOpt(r.FormValue("expiry_date")), conf, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -266,6 +336,12 @@ func (a *App) dmsPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var conf string
+	_ = a.db.QueryRow(`SELECT confidentiality FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&conf)
+	if !a.canSeeDoc(r, conf) {
+		a.forbidden(w, r)
+		return
+	}
 	m, rc, err := a.uploads.Get(a.officeOf(r), id)
 	if err != nil {
 		http.NotFound(w, r)
@@ -357,6 +433,10 @@ func (a *App) dmsNewVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+	if a.overQuota(a.officeOf(r), hdr.Size) {
+		http.Error(w, "kuota penyimpanan kantor terlampaui — hubungi administrator", http.StatusInsufficientStorage)
+		return
+	}
 	nid, err := a.uploads.SaveUpload(a.officeOf(r), "doc_version", id, hdr.Filename, hdr.Header.Get("Content-Type"), f, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -382,6 +462,12 @@ func (a *App) dmsDownloadVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var conf string
+	_ = a.db.QueryRow(`SELECT confidentiality FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&conf)
+	if !a.canSeeDoc(r, conf) {
+		a.forbidden(w, r)
+		return
+	}
 	vn, _ := strconv.Atoi(chi.URLParam(r, "v"))
 	vers, err := a.dms.Versions(a.officeOf(r), id)
 	if err != nil {
@@ -450,6 +536,18 @@ func (a *App) dmsMove(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	to := r.FormValue("to")
+	// Rantai persetujuan bertingkat: siapkan langkah saat masuk APPROVAL;
+	// APPROVED diblokir sampai seluruh langkah disetujui (bila rantai ada).
+	if to == "APPROVAL" {
+		if err := a.dms.EnsureApprovals(a.officeOf(r), id); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if to == "APPROVED" && !a.chainSatisfied(a.officeOf(r), id) {
+		http.Error(w, "rantai persetujuan belum lengkap — kumpulkan semua persetujuan dulu", http.StatusConflict)
+		return
+	}
 	if err := a.dms.Move(a.officeOf(r), id, to, a.uid(r), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -505,6 +603,12 @@ func (a *App) dmsShare(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	hours, _ := strconv.Atoi(r.FormValue("hours"))
 	maxDl, _ := strconv.ParseInt(r.FormValue("max"), 10, 64)
+	var conf string
+	_ = a.db.QueryRow(`SELECT confidentiality FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&conf)
+	if conf == "RESTRICTED" {
+		http.Error(w, "berkas terbatas tidak dapat dibagikan via tautan publik", http.StatusForbidden)
+		return
+	}
 	sh, err := a.dms.CreateShare(a.officeOf(r), id, hours, maxDl, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -522,9 +626,14 @@ func (a *App) dmsSharedDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	var ref, mime, name string
 	var oid int64
-	if err := a.db.QueryRow(`SELECT ref, mime, original_name, office_id FROM files WHERE id=?`, fid).
-		Scan(&ref, &mime, &name, &oid); err != nil {
+	var conf string
+	if err := a.db.QueryRow(`SELECT ref, mime, original_name, office_id, confidentiality FROM files WHERE id=?`, fid).
+		Scan(&ref, &mime, &name, &oid, &conf); err != nil {
 		http.NotFound(w, r)
+		return
+	}
+	if conf == "RESTRICTED" {
+		http.Error(w, "berkas terbatas tidak dapat dibagikan via tautan publik", http.StatusForbidden)
 		return
 	}
 	rc, err := a.files.Open(ref)

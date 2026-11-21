@@ -99,8 +99,10 @@ func (s *Store) Schedule(officeID, clientID int64, requestID *int64, at time.Tim
 	if at.Before(time.Now().Add(-time.Hour)) {
 		return 0, errors.New("jadwal tidak boleh di masa lalu")
 	}
+	// Simpan waktu dinding lokal (WIB) apa adanya: dashboard & pengingat
+	// membandingkan DATE()/CURDATE() dalam zona yang sama. Jangan .UTC().
 	res, err := s.db.Exec(`INSERT INTO appointments(office_id, client_id, request_id, scheduled_at, purpose)
-		VALUES(?,?,?,?,?)`, officeID, clientID, requestID, at.UTC(), purpose)
+		VALUES(?,?,?,?,?)`, officeID, clientID, requestID, at.Format("2006-01-02 15:04:05"), purpose)
 	if err != nil {
 		return 0, err
 	}

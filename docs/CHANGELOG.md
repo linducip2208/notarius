@@ -1,5 +1,12 @@
 # CHANGELOG
-## [0.3.0] — 2026-11-20 — Continuous execution FINAL (100%)
+## [Fase-8] — 2026-11-22 — Enterprise CRM + DMS lanjutan (uncommitted → verifikasi)
+- Migrasi 016_client_crm + 017_dms_enterprise (idempoten) teraplikasi di DB prod & test.
+- CRM: pencarian lanjutan, statistik, catatan, tandai inkonsisten (alasan wajib), pratinjau/penggabungan duplikat, ekspor CSV.
+- Korporat: referensi legal manual (no AHU/OSS), taut pemegang saham→klien.
+- DMS: field kustom tervalidasi, pencarian lanjutan + pagination + ekspor CSV, aksi massal, banding versi, matriks persetujuan bertingkat (gate APPROVED), pratinjau watermark + audit, analitik + kuota (blok 507 + pesan jujur), ekspor ZIP per kantor, penegakan kerahasiaan di preview/unduh/bagi, retensi-notify tanpa hapus otomatis.
+- Template: library bulk/pagination/filter tanggal-MIME-urut, dashboard kuota, lisensi informasional, linimasa akta.
+- Bug diperbaiki (dengan tes): Schedule menyimpan UTC sementara pembanding WIB → simpan waktu dinding lokal (TestRemindersRun flake zona waktu).
+- Smoke: 11/11 rute baru 200; go vet bersih; integrasi MySQL penuh (lihat bawah).
 - Build fix: 3 handler hilang (deedApprove, deedToReview, govCheck) diimplementasi + route + audit; `go vet/build` hijau.
 - F-009 COMPLETED: beneficial_owners (migrasi 008) + UI + validasi TPPU + PEP flag + test integrasi.
 - F-014 COMPLETED: serah-terima wasiat (handover notaris-only + audit + UI + test ganda-gagal).

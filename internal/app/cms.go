@@ -232,6 +232,10 @@ func (a *App) mediaUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if a.overQuota(a.officeOf(r), int64(len(safe))) {
+		http.Error(w, "kuota penyimpanan kantor terlampaui — hubungi administrator", http.StatusInsufficientStorage)
+		return
+	}
 	ref := cms.MediaRef(hdr.Filename, time.Now(), randHex(8))
 	if err := a.files.Save(ref, bytes.NewReader(safe)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

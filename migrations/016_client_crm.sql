@@ -1,0 +1,87 @@
+-- 016_client_crm.sql — profil klien profesional, KYC, CRM, data korporat.
+-- Semua kolom baru NULLABLE/berdefault aman untuk data lama.
+
+ALTER TABLE clients
+  ADD COLUMN reg_number VARCHAR(40) NULL,
+  ADD COLUMN birth_place VARCHAR(100) NULL,
+  ADD COLUMN birth_date DATE NULL,
+  ADD COLUMN gender ENUM('L','P') NULL,
+  ADD COLUMN nationality VARCHAR(80) NULL DEFAULT 'Indonesia',
+  ADD COLUMN marital_status VARCHAR(40) NULL,
+  ADD COLUMN occupation VARCHAR(120) NULL,
+  ADD COLUMN education VARCHAR(120) NULL,
+  ADD COLUMN passport_no VARCHAR(40) NULL,
+  ADD COLUMN id_address TEXT NULL,
+  ADD COLUMN domicile_address TEXT NULL,
+  ADD COLUMN province VARCHAR(80) NULL,
+  ADD COLUMN city VARCHAR(80) NULL,
+  ADD COLUMN district VARCHAR(80) NULL,
+  ADD COLUMN village VARCHAR(80) NULL,
+  ADD COLUMN postal_code VARCHAR(10) NULL,
+  ADD COLUMN alt_phone VARCHAR(50) NULL,
+  ADD COLUMN wa_number VARCHAR(50) NULL,
+  ADD COLUMN correspondence_address TEXT NULL,
+  ADD COLUMN first_client_date DATE NULL,
+  ADD COLUMN source VARCHAR(120) NULL,
+  ADD COLUMN pic_user_id BIGINT UNSIGNED NULL,
+  ADD COLUMN status ENUM('ACTIVE','INACTIVE','ARCHIVED') NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN internal_notes TEXT NULL,
+  ADD COLUMN labels VARCHAR(255) NOT NULL DEFAULT '',
+  ADD CONSTRAINT fk_clients_pic FOREIGN KEY (pic_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  ADD UNIQUE KEY uq_client_reg (office_id, reg_number);
+
+ALTER TABLE identities
+  ADD COLUMN status ENUM('UNCHECKED','PENDING','VERIFIED','REJECTED','NEEDS_REVISION') NOT NULL DEFAULT 'UNCHECKED',
+  ADD COLUMN verified_note VARCHAR(500) NULL,
+  ADD COLUMN doc_expiry DATE NULL,
+  ADD COLUMN inconsistent_flag TINYINT(1) NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS identity_verifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  identity_id BIGINT UNSIGNED NOT NULL,
+  actor_id BIGINT UNSIGNED NULL,
+  from_status VARCHAR(20) NULL,
+  to_status VARCHAR(20) NOT NULL,
+  note VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (identity_id) REFERENCES identities(id) ON DELETE CASCADE,
+  INDEX idx_idv_ident (identity_id)
+);
+
+CREATE TABLE IF NOT EXISTS client_notes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  office_id BIGINT UNSIGNED NOT NULL,
+  client_id BIGINT UNSIGNED NOT NULL,
+  kind ENUM('NOTE','MEETING','FOLLOWUP','COMPLAINT') NOT NULL DEFAULT 'NOTE',
+  title VARCHAR(255) NOT NULL,
+  body TEXT NULL,
+  occurred_at TIMESTAMP NULL,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE RESTRICT,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  INDEX idx_cnote_client (client_id, occurred_at)
+);
+
+CREATE TABLE IF NOT EXISTS client_merges (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  office_id BIGINT UNSIGNED NOT NULL,
+  winner_id BIGINT UNSIGNED NOT NULL,
+  loser_id BIGINT UNSIGNED NOT NULL,
+  snapshot JSON NULL,
+  actor_id BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE RESTRICT,
+  FOREIGN KEY (winner_id) REFERENCES clients(id) ON DELETE RESTRICT,
+  FOREIGN KEY (loser_id) REFERENCES clients(id) ON DELETE RESTRICT,
+  INDEX idx_cmerge_office (office_id)
+);
+
+ALTER TABLE companies
+  ADD COLUMN deed_no VARCHAR(100) NULL,
+  ADD COLUMN deed_date DATE NULL,
+  ADD COLUMN amendment_no VARCHAR(100) NULL,
+  ADD COLUMN amendment_date DATE NULL,
+  ADD COLUMN ahu_no VARCHAR(100) NULL,
+  ADD COLUMN npwp VARCHAR(32) NULL,
+  ADD COLUMN nib VARCHAR(32) NULL;

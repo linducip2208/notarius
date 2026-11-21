@@ -1,0 +1,73 @@
+{{define "dms_fields"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Field Kustom</li></ol></nav>
+<p class="text-secondary">Skema metadata per kantor. Tipe tervalidasi server; nilai wajib dicek saat isi.</p>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Field baru</h3></div>
+<form method="post" action="/dms/fields"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><input class="form-control" name="name" placeholder="Nama field" required/></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="ftype"><option value="text">Teks</option><option value="number">Angka</option><option value="date">Tanggal</option><option value="select">Pilihan</option><option value="bool">Ya/Tidak</option></select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="options" placeholder="Opsi koma (untuk Pilihan)"/></div>
+<div class="col-md-1 mb-2"><input class="form-control" type="number" name="position" value="0"/></div>
+<div class="col-md-2 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="required" value="1"/> Wajib</label></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Tipe</th><th>Opsi</th><th>Wajib</th><th>Urut</th></tr></thead>
+<tbody>{{range .Data.Fields}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><span class="badge bg-azure-lt">{{.Type}}</span></td><td>{{.Options}}</td><td>{{.Required}}</td><td>{{.Position}}</td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada field kustom.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_compare"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/documents/{{.Data.ID}}">#{{.Data.ID}}</a></li><li class="breadcrumb-item active">Bandingkan</li></ol></nav>
+<form method="get" action="/documents/{{.Data.ID}}/compare"><div class="card mb-3"><div class="card-body d-flex gap-2 align-items-end flex-wrap">
+<div><label class="form-label">Versi A</label><select class="form-select" name="a">{{range .Data.Vers}}<option value="{{.No}}"{{if eq $.Data.A (printf "%d" .No)}} selected{{end}}>v{{.No}} — {{.Note}}</option>{{end}}</select></div>
+<div><label class="form-label">Versi B</label><select class="form-select" name="b">{{range .Data.Vers}}<option value="{{.No}}"{{if eq $.Data.B (printf "%d" .No)}} selected{{end}}>v{{.No}} — {{.Note}}</option>{{end}}</select></div>
+<div><button class="btn btn-primary" type="submit">Bandingkan</button></div>
+{{if .Data.Summary}}<div class="ms-auto"><strong>{{.Data.Summary}}</strong><div class="text-secondary small">A: {{.Data.NoteA}} · B: {{.Data.NoteB}}</div></div>{{end}}
+</div></div></form>
+{{if .Data.Ops}}<div class="card"><div class="card-body"><div class="border rounded" style="max-height:480px;overflow:auto">{{range .Data.Ops}}{{if eq .Kind "+"}}<div class="px-2" style="background:#e6f9ed">+ {{.Line}}</div>{{else if eq .Kind "-"}}<div class="px-2" style="background:#ffeef0">− {{.Line}}</div>{{else}}<div class="px-2 text-secondary">{{.Line}}</div>{{end}}{{end}}</div>
+<p class="text-secondary small mt-2 mb-0">Perbandingan teks baris-per-baris. Biner (PDF/gambar pindai) hanya dibandingkan via hash.</p></div></div>
+{{else if .Data.Summary}}<div class="alert alert-info">{{.Data.Summary}}</div>{{end}}
+{{template "page_close" .}}{{end}}
+
+{{define "dms_chain"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Rantai Persetujuan</li></ol></nav>
+<p class="text-secondary">Urutan peran yang harus menyetujui sebelum berkas bisa FINAL/APPROVED. Kosong = tanpa gate.</p>
+<div class="card"><div class="card-header"><h3 class="card-title">Rantai aktif</h3></div>
+<div class="card-body">{{range .Data.Chain}}<div class="mb-1">Langkah {{.Order}}: <span class="badge bg-blue-lt">{{.Role}}</span></div>{{else}}<p class="text-secondary">Belum ada rantai — semua pengguna staf dapat memindahkan workflow.</p>{{end}}</div>
+<form method="post" action="/dms/chain"><div class="card-body border-top row">{{template "csrf" .}}
+<div class="col-md-2 mb-2"><label class="form-label">Langkah 1</label><select class="form-select" name="role1"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
+<div class="col-md-2 mb-2"><label class="form-label">Langkah 2</label><select class="form-select" name="role2"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
+<div class="col-md-2 mb-2"><label class="form-label">Langkah 3</label><select class="form-select" name="role3"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
+<div class="col-md-2 mb-2"><label class="form-label">Langkah 4</label><select class="form-select" name="role4"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
+<div class="col-md-2 mb-2"><label class="form-label">Langkah 5</label><select class="form-select" name="role5"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan Rantai</button></div>
+</div></form></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_preview_wm"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/documents/{{.Data.ID}}">#{{.Data.ID}}</a></li><li class="breadcrumb-item active">Pratinjau Berwatermark</li></ol></nav>
+<p class="text-secondary">Watermark tampil di layar + tercatat di audit akses. Bukan watermark permanen pada berkas.</p>
+<div class="card"><div class="card-body">
+<div style="position:relative;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden;min-height:420px;display:flex;align-items:center;justify-content:center;background:#f8fafc">
+<span class="text-secondary">Pratinjau: {{.Data.Name}} — buka <a href="/documents/{{.Data.ID}}/preview" target="_blank">pratinjau penuh</a>.</span>
+<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden">
+<span style="transform:rotate(-24deg);font-size:2.2rem;font-weight:800;color:rgba(180,30,30,.28);white-space:nowrap">{{.Data.User}} · {{.Data.ID}} · RAHASIA KANTOR</span>
+</div></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_search_adv"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Pencarian Lanjutan</li></ol></nav>
+<div class="card mb-3"><form method="get" action="/dms/search/adv"><div class="card-body row">
+<div class="col-md-4 mb-2"><input class="form-control" name="q" value="{{.Data.Q}}" placeholder="Teks / nama / nomor"/></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="wf"><option value="">Workflow: semua</option><option>RECEIVED</option><option>CLASSIFICATION</option><option>ADMIN_REVIEW</option><option>VERIFICATION</option><option>REVISION_REQUIRED</option><option>APPROVAL</option><option>APPROVED</option><option>FINALIZED</option><option>ARCHIVED</option><option>REJECTED</option></select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="vst"><option value="">Verifikasi: semua</option><option>UNVERIFIED</option><option>PENDING</option><option>VERIFIED</option><option>REJECTED</option></select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="conf"><option value="">Semua tingkat</option><option>PUBLIC</option><option>INTERNAL</option><option>CONFIDENTIAL</option><option>RESTRICTED</option></select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="mime"><option value="">Semua MIME</option><option value="application/pdf">PDF</option><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">DOCX</option><option value="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">XLSX</option></select></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="date" name="from" value="{{.Data.From}}"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="date" name="to" value="{{.Data.To}}"/></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="sort"><option value="">Terbaru</option><option value="name">Nama A–Z</option><option value="size_desc">Terbesar</option><option value="size_asc">Terkecil</option></select></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Cari</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>Status</th><th>Kerahasiaan</th></tr></thead>
+<tbody>{{range .Data.Hits}}<tr><td><a href="/documents/{{.ID}}">{{.ID}}</a></td><td>{{.Name}}</td><td>{{.MIME}}</td><td>{{.Size}}</td><td>{{.WF}}</td><td><span class="badge {{if eq .Conf "RESTRICTED"}}bg-red-lt{{else}}bg-azure-lt{{end}}">{{.Conf}}</span></td></tr>{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Tidak ada hasil. Isi filter lalu tekan Cari.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}

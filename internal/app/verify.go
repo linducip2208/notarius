@@ -256,6 +256,10 @@ func (a *App) portalPayConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+	if a.overQuota(oid, hdr.Size) {
+		http.Error(w, "kuota penyimpanan kantor terlampaui — hubungi kantor", http.StatusInsufficientStorage)
+		return
+	}
 	fid, err := a.uploads.SaveUpload(oid, "payment_proof", invID, hdr.Filename, hdr.Header.Get("Content-Type"), f, uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

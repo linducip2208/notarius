@@ -141,7 +141,7 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-md-6 mb-2"><label class="form-label">SEO desc</label><input class="form-control" name="seo_desc" value="{{if .Data.P}}{{.Data.P.SEO.Desc}}{{end}}"/></div>
 <div class="col-md-6 mb-2"><label class="form-label">Canonical</label><input class="form-control" name="canonical_url" value="{{if .Data.P}}{{.Data.P.SEO.Canonical}}{{end}}"/></div>
 <div class="col-md-3 mb-2"><label class="form-label">OG image</label><input class="form-control" name="og_image" value="{{if .Data.P}}{{.Data.P.SEO.OGImage}}{{end}}"/></div>
-<div class="col-md-3 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.P}}{{.Data.P.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option><option value="index,nofollow">index,nofollow</option><option value="noindex,nofollow">noindex,nofollow</option></select></div>
+<div class="col-md-3 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.P}}{{.Data.P.SEO.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option><option value="index,nofollow">index,nofollow</option><option value="noindex,nofollow">noindex,nofollow</option></select></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
 </div></form></div>
 {{if .Data.Secs}}<div class="card"><div class="card-header"><h3 class="card-title">Sections ({{len .Data.Secs}})</h3></div>
@@ -194,7 +194,7 @@ document.querySelectorAll('form[action="/cms/branding"] input,form[action="/cms/
 <div class="col-md-3 mb-2"><label class="form-label">ID cover</label><input class="form-control" name="cover_media_id" placeholder="cth. 5"/></div>
 <div class="col-md-4 mb-2"><label class="form-label">Status</label><select class="form-select" name="status" data-cur="{{if .Data.A}}{{.Data.A.Status}}{{end}}"><option>DRAFT</option><option>REVIEW</option><option>SCHEDULED</option><option>PUBLISHED</option><option>ARCHIVED</option></select></div>
 <div class="col-md-4 mb-2"><label class="form-label">Terjadwal</label><input class="form-control" type="datetime-local" name="scheduled_at"/></div>
-<div class="col-md-4 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.A}}{{.Data.A.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option></select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Robots</label><select class="form-select" name="robots" data-cur="{{if .Data.A}}{{.Data.A.SEO.Robots}}{{end}}"><option value="index,follow">index,follow</option><option value="noindex,follow">noindex,follow</option></select></div>
 <div class="col-md-6 mb-2"><label class="form-label">SEO title</label><input class="form-control" name="seo_title"/></div>
 <div class="col-md-6 mb-2"><label class="form-label">SEO desc</label><input class="form-control" name="seo_desc"/></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>

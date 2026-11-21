@@ -9,9 +9,14 @@
 <div class="row row-deck row-cards mb-3">
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Kedaluwarsa ≤30 hari</div><div class="h1">{{.Data.Stats.Expiring}}</div><a href="/dms/retention">Lihat</a></div></div></div>
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Antrean OCR</div><div class="h1">{{.Data.Stats.OCRQueued}}</div><a href="/dms/ocr">Proses</a></div></div></div>
-<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Storage Terpakai</div><div class="h1">{{.Data.Stats.StorageBytes}}</div><span class="text-secondary small">bytes</span></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Storage Terpakai</div><div class="h1">{{.Data.Used}}</div><span class="text-secondary small">bytes{{if .Data.Quota}} dari kuota {{.Data.Quota}}{{else}} · kuota belum diset{{end}}</span></div></div></div>
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Grup Duplikat</div><div class="h1">{{.Data.Stats.Duplicates}}</div><a href="/dms/duplicates">Tinjau</a></div></div></div>
 </div>
+<div class="row g-3 mb-3">
+<div class="col-lg-6"><div class="card"><div class="card-header"><h3 class="card-title">Per Workflow</h3></div>
+<div class="list-group list-group-flush">{{range $k, $v := .Data.WFStats}}<div class="list-group-item d-flex"><span class="badge bg-blue-lt me-2">{{$k}}</span><span class="ms-auto">{{$v}}</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada data.</div>{{end}}</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header"><h3 class="card-title">Per Tipe Berkas</h3></div>
+<div class="list-group list-group-flush">{{range $k, $v := .Data.ByMIME}}<div class="list-group-item d-flex"><span class="me-2">{{$k}}</span><span class="ms-auto">{{$v}} bytes</span></div>{{else}}<div class="list-group-item text-secondary">Belum ada data.</div>{{end}}</div></div></div></div>
 <div class="row g-3">
 <div class="col-lg-6">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Perlu Tindakan Workflow</h3></div>
@@ -33,19 +38,30 @@
 
 {{define "dms_library"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Document Library</li></ol></nav>
-<div class="card"><div class="card-header"><h3 class="card-title">Document Library</h3><div class="ms-auto d-flex gap-2"><a class="btn btn-outline-primary" href="/dms/search">Pencarian Lanjut</a><a class="btn btn-outline-primary" href="/dms/duplicates">Duplikat</a></div></div>
-<form method="get" action="/dms/library"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
+<div class="card"><div class="card-header"><h3 class="card-title">Document Library ({{.Data.Total}})</h3><div class="ms-auto d-flex gap-2"><a class="btn btn-outline-primary" href="/dms/search/adv">Pencarian Lanjutan</a><a class="btn btn-outline-primary" href="/dms/duplicates">Duplikat</a><a class="btn btn-outline-primary" href="/dms/fields">Field Kustom</a><a class="btn btn-outline-primary" href="/dms/chain">Rantai Persetujuan</a><a class="btn btn-outline-primary" href="/dms/library/export">Ekspor CSV</a></div></div>
+<form method="get" action="/dms/library" id="filterform"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
 <input class="form-control" style="max-width:240px" type="search" name="q" placeholder="Cari nama / nomor…" value="{{.Data.Q}}"/>
 <select class="form-select" style="max-width:170px" name="cat"><option value="0">Semua Kategori</option>{{range .Data.Cats}}<option value="{{.ID}}" {{if eq $.Data.Cat .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select>
-<select class="form-select" style="max-width:170px" name="wf"><option value="">Semua Workflow</option><option {{if eq .Data.WF "VERIFICATION"}}selected{{end}}>VERIFICATION</option><option {{if eq .Data.WF "APPROVAL"}}selected{{end}}>APPROVAL</option><option {{if eq .Data.WF "FINALIZED"}}selected{{end}}>FINALIZED</option><option {{if eq .Data.WF "ARCHIVED"}}selected{{end}}>ARCHIVED</option></select>
-<select class="form-select" style="max-width:150px" name="vst"><option value="">Verifikasi: semua</option><option {{if eq .Data.VST "PENDING"}}selected{{end}}>PENDING</option><option {{if eq .Data.VST "VERIFIED"}}selected{{end}}>VERIFIED</option><option {{if eq .Data.VST "REJECTED"}}selected{{end}}>REJECTED</option></select>
+<select class="form-select" style="max-width:170px" name="wf"><option value="">Semua Workflow</option><option {{if eq .Data.WF "RECEIVED"}}selected{{end}}>RECEIVED</option><option {{if eq .Data.WF "CLASSIFICATION"}}selected{{end}}>CLASSIFICATION</option><option {{if eq .Data.WF "ADMIN_REVIEW"}}selected{{end}}>ADMIN_REVIEW</option><option {{if eq .Data.WF "VERIFICATION"}}selected{{end}}>VERIFICATION</option><option {{if eq .Data.WF "APPROVAL"}}selected{{end}}>APPROVAL</option><option {{if eq .Data.WF "APPROVED"}}selected{{end}}>APPROVED</option><option {{if eq .Data.WF "FINALIZED"}}selected{{end}}>FINALIZED</option><option {{if eq .Data.WF "ARCHIVED"}}selected{{end}}>ARCHIVED</option></select>
+<select class="form-select" style="max-width:150px" name="vst"><option value="">Verifikasi: semua</option><option {{if eq .Data.VST "UNVERIFIED"}}selected{{end}}>UNVERIFIED</option><option {{if eq .Data.VST "PENDING"}}selected{{end}}>PENDING</option><option {{if eq .Data.VST "VERIFIED"}}selected{{end}}>VERIFIED</option><option {{if eq .Data.VST "REJECTED"}}selected{{end}}>REJECTED</option></select>
 <select class="form-select" style="max-width:150px" name="conf"><option value="">Semua akses</option><option {{if eq .Data.Conf "INTERNAL"}}selected{{end}}>INTERNAL</option><option {{if eq .Data.Conf "CONFIDENTIAL"}}selected{{end}}>CONFIDENTIAL</option><option {{if eq .Data.Conf "RESTRICTED"}}selected{{end}}>RESTRICTED</option></select>
+<select class="form-select" style="max-width:150px" name="mime"><option value="">Semua MIME</option><option value="application/pdf" {{if eq .Data.MIME "application/pdf"}}selected{{end}}>PDF</option><option value="image/" {{if eq .Data.MIME "image/"}}selected{{end}}>Gambar</option><option value="application/vnd.openxmlformats-officedocument" {{if eq .Data.MIME "application/vnd.openxmlformats-officedocument"}}selected{{end}}>Office</option><option value="text/" {{if eq .Data.MIME "text/"}}selected{{end}}>Teks</option></select>
+<input class="form-control" style="max-width:150px" type="date" name="from" value="{{.Data.From}}"/>
+<input class="form-control" style="max-width:150px" type="date" name="to" value="{{.Data.To}}"/>
+<select class="form-select" style="max-width:140px" name="sort"><option value="">Terbaru</option><option value="name" {{if eq .Data.Sort "name"}}selected{{end}}>Nama A–Z</option><option value="size_desc" {{if eq .Data.Sort "size_desc"}}selected{{end}}>Terbesar</option><option value="size_asc" {{if eq .Data.Sort "size_asc"}}selected{{end}}>Terkecil</option></select>
+<select class="form-select" style="max-width:90px" name="per_page"><option {{if eq .Data.PerPage 10}}selected{{end}}>10</option><option {{if eq .Data.PerPage 20}}selected{{end}}>20</option><option {{if eq .Data.PerPage 50}}selected{{end}}>50</option><option {{if eq .Data.PerPage 100}}selected{{end}}>100</option></select>
 <label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="fav" value="1" {{if .Data.Fav}}checked{{end}}/> Favorit saya</label>
 <button class="btn btn-primary" type="submit">Filter</button>
 </div></form>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>OCR</th><th>Verifikasi</th><th>Workflow</th><th></th></tr></thead>
-<tbody>{{range .Data.Docs}}<tr><td>{{.ID}}</td><td><a href="/documents/{{.ID}}">{{.Name}}</a></td><td>{{.MIME}}</td><td>{{.Size}}</td><td>{{.OCR}}</td><td><span class="badge bg-azure-lt">{{.Ver}}</span></td><td><span class="badge bg-blue-lt">{{.WF}}</span></td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.ID}}">Buka</a><form method="post" action="/documents/{{.ID}}/favorite">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★</button></form></div></td></tr>
-{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada dokumen. Unggah dari halaman detail klien.</td></tr>{{end}}</tbody></table></div></div>
+<form method="post" action="/dms/bulk" id="bulkform">{{template "csrf" .}}
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th><input type="checkbox" id="checkall" aria-label="Pilih semua"/></th><th>ID</th><th>Nama</th><th>MIME</th><th>Ukuran</th><th>OCR</th><th>Verifikasi</th><th>Workflow</th><th></th></tr></thead>
+<tbody>{{range .Data.Docs}}<tr><td><input type="checkbox" name="ids" value="{{.ID}}" form="bulkform" aria-label="Pilih {{.Name}}"/></td><td>{{.ID}}</td><td><a href="/documents/{{.ID}}">{{.Name}}</a></td><td>{{.MIME}}</td><td>{{.Size}}</td><td>{{.OCR}}</td><td><span class="badge bg-azure-lt">{{.Ver}}</span></td><td><span class="badge bg-blue-lt">{{.WF}}</span></td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.ID}}">Buka</a><form method="post" action="/documents/{{.ID}}/favorite">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★</button></form></div></td></tr>
+{{else}}<tr><td colspan="9" class="text-center text-secondary py-4">Belum ada dokumen. Unggah dari halaman detail klien.</td></tr>{{end}}</tbody></table></div>
+<div class="card-footer d-flex gap-2 align-items-center flex-wrap"><span class="text-secondary">Halaman {{.Data.Page}} dari {{.Data.Pages}} · {{.Data.Total}} berkas</span>
+<ul class="pagination mb-0 ms-auto"><li class="page-item {{if eq .Data.Page 1}}disabled{{end}}"><a class="page-link" href="/dms/library?{{.Data.QS}}&page={{.Data.Prev}}">«</a></li><li class="page-item active"><a class="page-link" href="#">{{.Data.Page}}</a></li><li class="page-item {{if eq .Data.Page .Data.Pages}}disabled{{end}}"><a class="page-link" href="/dms/library?{{.Data.QS}}&page={{.Data.Next}}">»</a></li></ul>
+<span class="text-secondary">Aksi massal:</span><select class="form-select" style="max-width:170px" name="action" form="bulkform"><option value="verify">Verifikasi</option><option value="approve">Setujui (APPROVED)</option></select><button class="btn btn-outline-primary" type="submit" form="bulkform" onclick="return confirm('Terapkan ke berkas terpilih?')">Terapkan</button></div>
+</form>
+<script>(function(){var c=document.getElementById('checkall');if(!c)return;c.addEventListener('change',function(){document.querySelectorAll('#bulkform input[name="ids"]').forEach(function(x){x.checked=c.checked;});});})();</script></div>
 {{template "page_close" .}}{{end}}
 
 {{define "dms_detail"}}{{template "head" .}}{{template "page_open" .}}
@@ -54,7 +70,7 @@
 <div class="row"><div class="col-lg-7">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">{{if .Data.M.Disp}}{{.Data.M.Disp}}{{else}}{{.Data.M.Name}}{{end}}</h3><div class="ms-auto d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Pratinjau</a><a class="btn btn-sm btn-primary" href="/files/{{.Data.M.ID}}">Unduh</a></div></div>
 <div class="card-body">
-<p class="text-secondary">{{.Data.M.MIME}} · {{.Data.M.Size}} bytes · OCR: {{.Data.M.OCR}} · Verifikasi: <span class="badge bg-azure-lt">{{.Data.M.Ver}}</span> · Workflow: <span class="badge bg-blue-lt">{{.Data.M.WF}}</span></p>
+<p class="text-secondary">{{.Data.M.MIME}} · {{.Data.M.Size}} bytes · OCR: {{.Data.M.OCR}} · Verifikasi: <span class="badge bg-azure-lt">{{.Data.M.Ver}}</span> · Workflow: <span class="badge bg-blue-lt">{{.Data.M.WF}}</span> · Akses: <span class="badge {{if eq .Data.M.Conf "RESTRICTED"}}bg-red-lt{{else}}bg-green-lt{{end}}">{{.Data.M.Conf}}</span>{{if not .Data.CanSee}} <span class="badge bg-red-lt">BACA SAJA — level Anda tidak cukup</span>{{end}}</p>
 <form method="post" action="/documents/{{.Data.M.ID}}/meta"><div class="row">{{template "csrf" .}}
 <div class="col-md-6 mb-2"><label class="form-label">Nama tampil</label><input class="form-control" name="display_name" value="{{.Data.M.Disp}}"/></div>
 <div class="col-md-6 mb-2"><label class="form-label">Nomor dokumen</label><input class="form-control" name="doc_number" value="{{.Data.M.Num}}"/></div>
@@ -64,6 +80,13 @@
 <div class="col-md-6 mb-2"><label class="form-label">Klasifikasi</label><select class="form-select" name="confidentiality"><option {{if eq .Data.M.Conf "INTERNAL"}}selected{{end}}>INTERNAL</option><option {{if eq .Data.M.Conf "CONFIDENTIAL"}}selected{{end}}>CONFIDENTIAL</option><option {{if eq .Data.M.Conf "RESTRICTED"}}selected{{end}}>RESTRICTED</option><option {{if eq .Data.M.Conf "PUBLIC"}}selected{{end}}>PUBLIC</option></select></div>
 <div class="col-md-6 mb-2 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit">Simpan Metadata</button></div>
 </div></form>
+{{if .Data.Fields}}<div class="card-body border-top"><h4>Field Kustom</h4>
+<form method="post" action="/documents/{{.Data.M.ID}}/fields"><div class="row">{{template "csrf" .}}
+{{range .Data.Fields}}<div class="col-md-6 mb-2"><label class="form-label">{{.Name}}{{if .Required}} *{{end}}</label>
+<input class="form-control" name="field_{{.ID}}" value="{{index $.Data.FieldVals .ID}}" placeholder="{{if .Options}}{{.Options}}{{else}}{{.Type}}{{end}}"/>
+<div class="form-hint">Tipe: {{.Type}}{{if .Options}} · opsi: {{.Options}}{{end}}</div></div>{{end}}
+<div class="col-12 text-end"><button class="btn btn-outline-primary" type="submit">Simpan Field</button></div>
+</div></form></div>{{end}}
 </div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Verifikasi Manusia (wajib)</h3></div>
 <div class="card-body"><form method="post" action="/documents/{{.Data.M.ID}}/verify" class="d-flex gap-2">{{template "csrf" .}}
@@ -74,7 +97,15 @@
 <div class="card-body"><form method="post" action="/documents/{{.Data.M.ID}}/version" enctype="multipart/form-data"><div class="d-flex gap-2">{{template "csrf" .}}<input class="form-control" type="file" name="file" required/><input class="form-control" style="max-width:220px" name="note" placeholder="Catatan versi"/><button class="btn btn-primary" type="submit">Unggah</button></div></form>
 <div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>v</th><th>SHA-256</th><th>Ukuran</th><th>Catatan</th><th></th></tr></thead>
 <tbody>{{range .Data.Vers}}<tr><td>v{{.No}}</td><td><code>{{.Hash}}</code></td><td>{{.Size}}</td><td>{{.Note}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-secondary" href="/documents/{{$.Data.M.ID}}/version/{{.No}}">Unduh</a><form method="post" action="/documents/{{$.Data.M.ID}}/restore/{{.No}}">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" onclick="return confirm('Pulihkan sebagai versi baru?')">Restore</button></form></div></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary">Belum ada versi (unggah pertama tercatat sebagai v1 saat dibuat).</td></tr>{{end}}</tbody></table></div></div></div>
+{{else}}<tr><td colspan="5" class="text-center text-secondary">Belum ada versi (unggah pertama tercatat sebagai v1 saat dibuat).</td></tr>{{end}}</tbody></table></div>
+<div class="card-body border-top d-flex gap-2"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/compare?a=1&b=2">Bandingkan v1↔v2</a><span class="text-secondary small">Pilih versi di halaman banding.</span></div></div>
+{{if gt .Data.ApprTotal 0}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Persetujuan Bertingkat ({{.Data.ApprPending}} menunggu dari {{.Data.ApprTotal}})</h3></div>
+<div class="card-body"><form method="post" action="/documents/{{.Data.M.ID}}/approve" class="d-flex gap-2">{{template "csrf" .}}
+<input class="form-control" type="number" name="step" min="1" placeholder="Langkah" style="max-width:100px" required/>
+<input class="form-control" name="note" placeholder="Catatan"/>
+<button class="btn btn-success" type="submit" name="decision" value="approve">Setujui</button>
+<button class="btn btn-outline-danger" type="submit" name="decision" value="reject" onclick="return confirm('Tolak langkah ini?')">Tolak</button>
+</form><p class="text-secondary small mt-2 mb-0">Hanya peran yang ditugaskan pada langkah tersebut yang dapat memutuskan. APPROVED diblokir sampai semua langkah disetujui.</p></div></div>{{end}}
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Relasi Dokumen</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Rels}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.RelatedType}}</span>{{if eq .Relation "DIGABUNG_KE"}}<a href="/documents/{{.RelatedID}}">#{{.RelatedID}}</a> <span class="badge bg-yellow-lt">DIGABUNG_KE kanonis</span>{{else}}#{{.RelatedID}} <span class="text-secondary">· {{.Relation}}</span>{{end}}</div>{{else}}<div class="list-group-item text-secondary">Belum ada relasi tercatat.</div>{{end}}</div>
 <div class="card-body border-top"><form method="post" action="/documents/{{.Data.M.ID}}/link" class="row g-2">{{template "csrf" .}}
@@ -86,7 +117,8 @@
 <div class="col-lg-5">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Pratinjau</h3></div>
 <div class="card-body text-center">{{if eq .Data.M.MIME "application/pdf"}}<p class="text-secondary">PDF — buka di tab baru (otorisasi + tercatat).</p>{{else if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau dokumen"/>{{else if hasSuffix .Data.M.Name ".docx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks DOCX"></iframe><p class="text-secondary small mt-1">Teks saja (format diabaikan) — dokumen asli tetap sumber resmi.</p>{{else if hasSuffix .Data.M.Name ".xlsx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks XLSX"></iframe><p class="text-secondary small mt-1">Nilai sel saja — file asli tetap sumber resmi.</p>{{else}}<p class="text-secondary">Pratinjau: PDF/gambar/DOCX/XLSX. Unduh untuk format lain.</p>{{end}}
-<div class="d-flex gap-2 justify-content-center"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a>
+<div class="d-flex gap-2 justify-content-center flex-wrap"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a>
+<a class="btn btn-sm btn-ghost-secondary" href="/documents/{{.Data.M.ID}}/previewwm" target="_blank" title="Overlay nama pengguna + ID (audit tercatat)">Watermark</a>
 <form method="post" action="/documents/{{.Data.M.ID}}/scan">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit" title="Pindai ClamAV on-demand (butuh CLAMAV_ADDR)">🛡 Pindai</button></form>
 <form method="post" action="/documents/{{.Data.M.ID}}/favorite">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">★ Favorit</button></form></div></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Workflow</h3></div>

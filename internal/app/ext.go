@@ -180,6 +180,10 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+	if a.overQuota(a.officeOf(r), hdr.Size) {
+		http.Error(w, "kuota penyimpanan kantor terlampaui — hubungi administrator", http.StatusInsufficientStorage)
+		return
+	}
 	id, err := a.uploads.SaveUpload(a.officeOf(r), "client", clientID, hdr.Filename, hdr.Header.Get("Content-Type"), f, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -216,13 +220,19 @@ func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/clients?flash=OCR+selesai", http.StatusSeeOther)
 }
 
-// fileDownload streams a private file after office-scope authorization (F-024).
+// fileDownload streams a private file after office-scope + confidentiality authorization.
 func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) && !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
 		a.forbidden(w, r)
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var conf string
+	_ = a.db.QueryRow(`SELECT confidentiality FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&conf)
+	if !a.canSeeDoc(r, conf) {
+		a.forbidden(w, r)
+		return
+	}
 	m, rc, err := a.uploads.Get(a.officeOf(r), id)
 	if err != nil {
 		http.NotFound(w, r)
@@ -251,8 +261,10 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	co, shs, offs, _ := a.corp.GetByRequest(id)
 	var bos []corp.BeneficialOwner
+	var legal corp.Legal
 	if co.ID != 0 {
 		bos, _ = a.corp.BeneficialOwners(co.ID)
+		legal, _ = a.corp.LegalOf(co.ID)
 	}
 	subs, _ := a.govs.List(a.officeOf(r))
 	checklist, _ := a.dms.ChecklistForRequest(a.officeOf(r), id)
@@ -268,7 +280,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		pct = done * 100 / total
 	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
-		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
+		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 	})
 }
@@ -373,8 +385,67 @@ func (a *App) corpWizard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {
-	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) && !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+// corpLegalSave stores manually-verified corporate registry references (no AHU API).
+func (a *App) corpLegalSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermDraftDeed) && !rbac.Has(mw.RoleOf(r), rbac.PermEditDeed) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	co, _, _, _ := a.corp.GetByRequest(reqID)
+	if co.ID == 0 {
+		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
+		return
+	}
+	err := a.corp.SaveLegal(co.ID, corp.Legal{
+		DeedNo: r.FormValue("deed_no"), DeedDate: r.FormValue("deed_date"),
+		AmendmentNo: r.FormValue("amendment_no"), AmendmentDate: r.FormValue("amendment_date"),
+		AHUNo: r.FormValue("ahu_no"), NPWP: r.FormValue("npwp"), NIB: r.FormValue("nib"),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.legal.save", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10)})
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Data+legal+tersimpan", http.StatusSeeOther)
+}
+
+// shareholderLink binds a shareholder row to an existing client (for cross-linking).
+func (a *App) shareholderLink(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	sid, _ := strconv.ParseInt(chi.URLParam(r, "sid"), 10, 64)
+	cid, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	co, _, _, _ := a.corp.GetByRequest(reqID)
+	if co.ID == 0 {
+		http.Error(w, "perusahaan tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if _, err := a.clients.Get(a.officeOf(r), cid); err != nil {
+		http.Error(w, "klien tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if _, err := a.db.Exec(`UPDATE shareholders SET client_id=? WHERE id=? AND company_id=?`, nullCID(cid), sid, co.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "corp.shareholder.link", Entity: "company", EntityID: strconv.FormatInt(co.ID, 10), Detail: fmt.Sprintf("sh#%d->c#%d", sid, cid)})
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pemegang+saham+tertaut", http.StatusSeeOther)
+}
+
+func nullCID(id int64) any {
+	if id <= 0 {
+		return nil
+	}
+	return id
+}
+
+func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) && !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -959,7 +1030,47 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
+		"Timeline":   a.deedTimeline(id),
 	})
+}
+
+// deedTimeline unions versions, approval, and TTE signatures chronologically.
+func (a *App) deedTimeline(deedID int64) []map[string]any {
+	type ev struct {
+		at, kind, text string
+	}
+	var evs []ev
+	rows, err := a.db.Query(`SELECT version, note, created_at FROM deed_versions WHERE deed_id=? ORDER BY id`, deedID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var v int
+			var note, at string
+			_ = rows.Scan(&v, &note, &at)
+			evs = append(evs, ev{at, "Revisi", "v" + strconv.Itoa(v) + " — " + note})
+		}
+	}
+	var approvedBy, approvedAt, number string
+	_ = a.db.QueryRow(`SELECT COALESCE(u.name,''), COALESCE(d.approved_at,''), COALESCE(d.number,'')
+		FROM deed_drafts d LEFT JOIN users u ON u.id=d.approved_by WHERE d.id=?`, deedID).
+		Scan(&approvedBy, &approvedAt, &number)
+	if approvedAt != "" {
+		evs = append(evs, ev{approvedAt, "Pengesahan", "No. " + number + " oleh " + approvedBy})
+	}
+	srows, _ := a.db.Query(`SELECT signer_name, created_at FROM deed_signatures WHERE deed_id=? ORDER BY id`, deedID)
+	if srows != nil {
+		defer srows.Close()
+		for srows.Next() {
+			var who, at string
+			_ = srows.Scan(&who, &at)
+			evs = append(evs, ev{at, "TTE internal", "ditandatangani " + who})
+		}
+	}
+	var out []map[string]any
+	for _, e := range evs {
+		out = append(out, map[string]any{"At": e.at, "Kind": e.kind, "Text": e.text})
+	}
+	return out
 }
 
 func (a *App) deedSaveVersion(w http.ResponseWriter, r *http.Request) {
@@ -1046,6 +1157,41 @@ func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.update", Entity: "office", EntityID: "self"})
 	http.Redirect(w, r, "/office?flash=Profil+kantor+disimpan", http.StatusSeeOther)
+}
+
+// licensePage shows the standalone install license status (non-enforcing).
+func (a *App) licensePage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageOffice) {
+		a.forbidden(w, r)
+		return
+	}
+	var key sql.NullString
+	var exp sql.NullString
+	_ = a.db.QueryRow(`SELECT license_key, DATE_FORMAT(license_expires,'%Y-%m-%d') FROM offices WHERE id=?`, a.officeOf(r)).Scan(&key, &exp)
+	status := "Belum ada lisensi — mode evaluasi internal."
+	if key.Valid && key.String != "" {
+		status = "Lisensi tercatat."
+	}
+	a.render(w, r, "license", "Lisensi Instalasi", map[string]string{
+		"Key": key.String, "Expires": exp.String, "Status": status,
+	})
+}
+
+// licenseSave records the license (informational only — never locks the office out).
+func (a *App) licenseSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageOffice) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	key := strings.TrimSpace(r.FormValue("key"))
+	exp := strings.TrimSpace(r.FormValue("expires"))
+	if _, err := a.db.Exec(`UPDATE offices SET license_key=?, license_expires=NULLIF(?,'') WHERE id=?`, key, exp, a.officeOf(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.license", Entity: "office", EntityID: "self"})
+	http.Redirect(w, r, "/office/license?flash=Lisensi+dicatat", http.StatusSeeOther)
 }
 
 // ---- tasks ----

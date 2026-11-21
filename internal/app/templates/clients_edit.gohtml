@@ -1,0 +1,56 @@
+{{define "client_edit"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients">Daftar Klien</a></li><li class="breadcrumb-item"><a href="/clients/{{.Data.C.ID}}">{{.Data.C.FullName}}</a></li><li class="breadcrumb-item active">Edit</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Edit Profil Klien</h3></div>
+<form method="post" action="/clients/{{.Data.C.ID}}"><div class="card-body row">{{template "csrf" .}}
+{{if .Data.Error}}<div class="col-12"><div class="alert alert-danger">{{.Data.Error}}</div></div>{{end}}
+<div class="col-md-8 mb-2"><label class="form-label">Nama</label><input class="form-control" name="full_name" value="{{.Data.C.FullName}}" required/></div>
+<div class="col-md-4 mb-2"><label class="form-label">No. registrasi</label><input class="form-control" name="reg_number" value="{{.Data.C.RegNumber}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Telepon</label><input class="form-control" name="phone" value="{{.Data.C.Phone}}" required/></div>
+<div class="col-md-4 mb-2"><label class="form-label">WA</label><input class="form-control" name="wa_number" value="{{.Data.C.WANumber}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Telp lain</label><input class="form-control" name="alt_phone" value="{{.Data.C.AltPhone}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{.Data.C.Email}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">NPWP</label><input class="form-control" name="npwp" value="{{.Data.C.NPWP}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Tgl lahir</label><input class="form-control" type="date" name="birth_date" value="{{.Data.C.BirthDate}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Tempat lahir</label><input class="form-control" name="birth_place" value="{{.Data.C.BirthPlace}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Gender</label><select class="form-select" name="gender"><option value="">—</option><option value="L" {{if eq .Data.C.Gender "L"}}selected{{end}}>Laki-laki</option><option value="P" {{if eq .Data.C.Gender "P"}}selected{{end}}>Perempuan</option></select></div>
+<div class="col-md-3 mb-2"><label class="form-label">Kewarganegaraan</label><input class="form-control" name="nationality" value="{{.Data.C.Nationality}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Status kawin</label><input class="form-control" name="marital_status" value="{{.Data.C.Marital}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Pekerjaan</label><input class="form-control" name="occupation" value="{{.Data.C.Occupation}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Pendidikan</label><input class="form-control" name="education" value="{{.Data.C.Education}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Paspor</label><input class="form-control" name="passport_no" value="{{.Data.C.Passport}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Status</label><select class="form-select" name="status"><option {{if eq .Data.C.Status "ACTIVE"}}selected{{end}}>ACTIVE</option><option {{if eq .Data.C.Status "INACTIVE"}}selected{{end}}>INACTIVE</option><option {{if eq .Data.C.Status "ARCHIVED"}}selected{{end}}>ARCHIVED</option></select></div>
+<div class="col-6 mb-2"><label class="form-label">Alamat KTP</label><textarea class="form-control" name="id_address" rows="2">{{.Data.C.IDAddress}}</textarea></div>
+<div class="col-6 mb-2"><label class="form-label">Domisili</label><textarea class="form-control" name="domicile_address" rows="2">{{.Data.C.Domicile}}</textarea></div>
+<div class="col-md-3 mb-2"><label class="form-label">Provinsi</label><input class="form-control" name="province" value="{{.Data.C.Province}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Kota</label><input class="form-control" name="city" value="{{.Data.C.City}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Kecamatan</label><input class="form-control" name="district" value="{{.Data.C.District}}"/></div>
+<div class="col-md-3 mb-2"><label class="form-label">Kel/Desa + kode pos</label><div class="d-flex gap-1"><input class="form-control" name="village" value="{{.Data.C.Village}}"/><input class="form-control" name="postal_code" value="{{.Data.C.Postal}}" style="max-width:90px"/></div></div>
+<div class="col-12 mb-2"><label class="form-label">Alamat korespondensi</label><input class="form-control" name="correspondence_address" value="{{.Data.C.Correspondence}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Klien sejak</label><input class="form-control" type="date" name="first_client_date" value="{{.Data.C.FirstClientDate}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">Sumber</label><input class="form-control" name="source" value="{{.Data.C.Source}}"/></div>
+<div class="col-md-4 mb-2"><label class="form-label">PIC (ID user)</label><input class="form-control" type="number" name="pic_user_id" value="{{if .Data.C.PIC}}{{.Data.C.PIC}}{{end}}"/></div>
+<div class="col-md-6 mb-2"><label class="form-label">Label (koma)</label><input class="form-control" name="labels" value="{{.Data.C.Labels}}"/></div>
+<div class="col-12 mb-2"><label class="form-label">Catatan internal (rahasia kantor, tak tampil di portal)</label><textarea class="form-control" name="internal_notes" rows="2">{{.Data.C.InternalNotes}}</textarea></div>
+<div class="col-12 text-end"><a class="btn btn-ghost-secondary" href="/clients/{{.Data.C.ID}}">Batal</a> <button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+{{template "page_close" .}}{{end}}
+
+{{define "client_merge"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients">Daftar Klien</a></li><li class="breadcrumb-item active">Gabung Duplikat</li></ol></nav>
+<div class="alert alert-warning">Pratinjau penggabungan. <strong>Tidak ada yang dihapus otomatis.</strong> Data pemenang dipertahankan; data ganda pindah ke pemenang lalu diarsipkan. Tercatat di audit.</div>
+<div class="card"><div class="card-header"><h3 class="card-title">Yang akan digabung ke <a href="/clients/{{.Data.MP.WinnerID}}">{{.Data.Winner}}</a></h3></div>
+<div class="card-body"><dl class="row">
+<dt class="col-4">Dari</dt><dd class="col-8"><a href="/clients/{{.Data.MP.LoserID}}">{{.Data.Loser}}</a> (#{{.Data.MP.LoserID}})</dd>
+<dt class="col-4">Permohonan pindah</dt><dd class="col-8">{{.Data.MP.Requests}}</dd>
+<dt class="col-4">Berkas pindah</dt><dd class="col-8">{{.Data.MP.Files}}</dd>
+<dt class="col-4">Identitas pindah</dt><dd class="col-8">{{.Data.MP.Identities}}</dd>
+<dt class="col-4">Janji pindah</dt><dd class="col-8">{{.Data.MP.Appointments}}</dd>
+<dt class="col-4">Catatan pindah</dt><dd class="col-8">{{.Data.MP.Notes}}</dd>
+<dt class="col-4">Invoice pindah</dt><dd class="col-8">{{.Data.MP.Invoices}}</dd>
+</dl>
+<form method="post" action="/clients/merge"><div class="d-flex gap-2">{{template "csrf" .}}
+<input type="hidden" name="winner_id" value="{{.Data.MP.WinnerID}}"/><input type="hidden" name="loser_id" value="{{.Data.MP.LoserID}}"/>
+<a class="btn btn-ghost-secondary" href="/clients/{{.Data.MP.LoserID}}">Batal</a>
+<button class="btn btn-danger" type="submit" onclick="return confirm('Gabungkan #{{.Data.MP.LoserID}} ke #{{.Data.MP.WinnerID}}? Tidak dapat dibatalkan otomatis.')">Gabungkan Sekarang</button>
+</div></form></div></div>
+{{template "page_close" .}}{{end}}

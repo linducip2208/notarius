@@ -208,6 +208,8 @@ func (a *App) runReminders() (appt, overdue, tasks, sla int) {
 		if a.web != nil {
 			a.web.PublishDue(oid)
 		}
+		// Retensi: ingatkan berkas yang mendekati kedaluwarsa (tanpa hapus otomatis).
+		sla += a.notifyExpiring(oid)
 	}
 	return appt, overdue, tasks, sla
 }
@@ -429,9 +431,18 @@ func (a *App) Router() http.Handler {
 		p.Get("/clients/export", a.clientExport)
 		p.Post("/clients", a.clientCreate)
 		p.Get("/clients/new", a.clientNew)
+		p.Post("/clients/new", a.clientNewSubmit)
+		p.Post("/clients/bulk", a.clientBulk)
+		p.Post("/clients/merge/preview", a.mergePreview)
+		p.Post("/clients/merge", a.mergeDo)
 		p.Get("/clients/{id}", a.clientDetail)
+		p.Get("/clients/{id}/edit", a.clientEditForm)
+		p.Post("/clients/{id}", a.clientUpdate)
 		p.Post("/clients/{id}/identities", a.identityAdd)
+		p.Post("/clients/{id}/notes", a.noteAdd)
 		p.Post("/identities/{id}/verify", a.identityVerify)
+		p.Post("/identities/{id}/status", a.identityStatus)
+		p.Post("/identities/{id}/flag", a.identityFlag)
 		p.Post("/clients/{id}/reps", a.repAdd)
 		p.Post("/clients/{id}/files", a.fileUpload)
 		p.Get("/files/{id}", a.fileDownload)
@@ -441,7 +452,9 @@ func (a *App) Router() http.Handler {
 		p.Get("/requests/{id}", a.requestDetail)
 		p.Post("/requests/{id}/move", a.requestMove)
 		p.Post("/requests/{id}/corp", a.corpSave)
+		p.Post("/requests/{id}/corp/legal", a.corpLegalSave)
 		p.Post("/requests/{id}/shareholders", a.shareholderAdd)
+		p.Post("/requests/{id}/shareholders/{sid}/link", a.shareholderLink)
 		p.Post("/requests/{id}/officers", a.officerAdd)
 		p.Post("/requests/{id}/bo", a.boAdd)
 		p.Get("/requests/{id}/wizard", a.corpWizard)
@@ -536,14 +549,18 @@ func (a *App) Router() http.Handler {
 		p.Get("/documents", a.documents)
 		p.Get("/dms", a.dmsDashboard)
 		p.Get("/dms/library", a.dmsLibrary)
+		p.Get("/dms/library/export", a.dmsLibraryExport)
 		p.Get("/documents/{id}", a.dmsDetail)
 		p.Post("/documents/{id}/meta", a.dmsSaveMeta)
 		p.Post("/documents/{id}/verify", a.dmsVerify)
 		p.Get("/documents/{id}/preview", a.dmsPreview)
+		p.Get("/documents/{id}/previewwm", a.dmsPreviewWM)
 		p.Post("/documents/{id}/version", a.dmsNewVersion)
 		p.Get("/documents/{id}/version/{v}", a.dmsDownloadVersion)
+		p.Get("/documents/{id}/compare", a.dmsCompare)
 		p.Post("/documents/{id}/restore/{v}", a.dmsRestoreVersion)
 		p.Post("/documents/{id}/workflow", a.dmsMove)
+		p.Post("/documents/{id}/approve", a.dmsApproveStep)
 		p.Post("/documents/{id}/scan", a.dmsScan)
 		p.Post("/documents/{id}/link", a.dmsLink)
 		p.Post("/documents/{id}/favorite", a.dmsFavorite)
@@ -551,6 +568,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/documents/{id}/archive", a.dmsArchiveMove)
 		p.Post("/documents/{id}/hold", a.dmsHold)
 		p.Post("/documents/{id}/disposition", a.dmsDisposition)
+		p.Post("/documents/{id}/fields", a.dmsFieldsSave)
 		p.Get("/dms/ocr", a.dmsOCRQueue)
 		p.Post("/dms/ocr/run", a.dmsOCRRun)
 		p.Get("/dms/search", a.dmsSearch)
@@ -560,6 +578,13 @@ func (a *App) Router() http.Handler {
 		p.Post("/dms/holds/{hid}/release", a.dmsReleaseHold)
 		p.Get("/dms/duplicates", a.dmsDuplicates)
 		p.Post("/dms/duplicates/merge", a.dmsMerge)
+		p.Get("/dms/search/adv", a.dmsSearchAdvanced)
+		p.Post("/dms/bulk", a.dmsBulk)
+		p.Get("/dms/fields", a.dmsFields)
+		p.Post("/dms/fields", a.dmsFieldSave)
+		p.Get("/dms/chain", a.dmsChain)
+		p.Post("/dms/chain", a.dmsChainSave)
+		p.Get("/dms/categories", a.dmsCategories)
 		p.Get("/dms/categories", a.dmsCategories)
 		p.Post("/dms/categories", a.dmsCategoryCreate)
 		p.Get("/dms/checklists", a.dmsChecklists)
@@ -570,6 +595,9 @@ func (a *App) Router() http.Handler {
 		p.Get("/audit", a.auditPage)
 		p.Get("/office", a.officePage)
 		p.Post("/office", a.officeSave)
+		p.Get("/office/export", a.officeExport)
+		p.Get("/office/license", a.licensePage)
+		p.Post("/office/license", a.licenseSave)
 		p.Get("/tasks", a.tasksPage)
 		p.Post("/tasks", a.taskCreate)
 		p.Post("/tasks/{id}/done", a.taskDone)
@@ -1109,18 +1137,22 @@ func (a *App) clientList(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	q := r.URL.Query().Get("q")
-	kind := r.URL.Query().Get("kind")
-	sort := r.URL.Query().Get("sort")
-	page := config.MustInt(r.URL.Query().Get("page"), 1)
+	q := r.URL.Query()
+	page := config.MustInt(q.Get("page"), 1)
 	if page < 1 {
 		page = 1
 	}
-	perPage := config.MustInt(r.URL.Query().Get("per_page"), 20)
-	if perPage != 10 && perPage != 20 && perPage != 50 {
+	perPage := config.MustInt(q.Get("per_page"), 20)
+	if perPage != 10 && perPage != 20 && perPage != 50 && perPage != 100 {
 		perPage = 20
 	}
-	list, total, _ := a.clients.ListFiltered(a.officeOf(r), q, kind, perPage, (page-1)*perPage, sort)
+	f := clients.ListFilter{
+		Q: q.Get("q"), Kind: q.Get("kind"), Status: q.Get("status"), Service: q.Get("service"),
+		Province: q.Get("province"), City: q.Get("city"),
+		From: q.Get("from"), To: q.Get("to"), Docs: q.Get("docs"), Sort: q.Get("sort"),
+		Limit: perPage, Offset: (page - 1) * perPage,
+	}
+	list, total, _ := a.clients.ListAdvanced(a.officeOf(r), f)
 	pages := (total + perPage - 1) / perPage
 	if pages < 1 {
 		pages = 1
@@ -1135,32 +1167,68 @@ func (a *App) clientList(w http.ResponseWriter, r *http.Request) {
 	if next > pages {
 		next = pages
 	}
-	qs := "q=" + q + "&kind=" + kind + "&sort=" + sort + "&per_page=" + strconv.Itoa(perPage)
+	var qs strings.Builder
+	for _, k := range []string{"q", "kind", "status", "service", "province", "city", "from", "to", "docs", "sort"} {
+		qs.WriteString(k + "=" + q.Get(k) + "&")
+	}
+	qs.WriteString("per_page=" + strconv.Itoa(perPage))
+	stats, _ := a.clients.Stats(a.officeOf(r))
+	svcs, _ := a.reqs.Services()
+	var provinces []string
+	if rows, err := a.db.Query(`SELECT DISTINCT province FROM clients WHERE office_id=? AND province<>'' ORDER BY province`, a.officeOf(r)); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var p string
+			_ = rows.Scan(&p)
+			provinces = append(provinces, p)
+		}
+	}
 	if r.Header.Get("HX-Request") == "true" {
 		_ = a.tmpl.ExecuteTemplate(w, "client_rows", list)
 		return
 	}
 	a.render(w, r, "clients", "Daftar Klien", map[string]any{
-		"List": list, "Q": q, "Kind": kind, "Sort": sort, "PerPage": perPage,
-		"Page": page, "Pages": pages, "Total": total, "Prev": prev, "Next": next, "QS": qs,
+		"List": list, "Q": f.Q, "Kind": f.Kind, "Status": f.Status, "Service": f.Service,
+		"Province": f.Province, "City": f.City, "From": f.From, "To": f.To, "Docs": f.Docs,
+		"Sort": f.Sort, "PerPage": perPage, "Page": page, "Pages": pages, "Total": total,
+		"Prev": prev, "Next": next, "QS": qs.String(), "Stats": stats, "Services": svcs,
+		"Provinces": provinces,
 	})
 }
 
 // clientExport downloads the filtered client list as CSV (permission-gated).
+// NIK is NEVER exported in full — only masked last-4 (UU PDP).
 func (a *App) clientExport(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
 		a.forbidden(w, r)
 		return
 	}
-	list, _, _ := a.clients.ListFiltered(a.officeOf(r), r.URL.Query().Get("q"), r.URL.Query().Get("kind"), 200, 0, r.URL.Query().Get("sort"))
+	q := r.URL.Query()
+	f := clients.ListFilter{Q: q.Get("q"), Kind: q.Get("kind"), Status: q.Get("status"),
+		Service: q.Get("service"), Province: q.Get("province"), City: q.Get("city"),
+		From: q.Get("from"), To: q.Get("to"), Docs: q.Get("docs"), Sort: q.Get("sort"),
+		Limit: 5000}
+	list, _, _ := a.clients.ListAdvanced(a.officeOf(r), f)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"klien.csv\"")
 	w.Write([]byte("\xef\xbb\xbf"))
-	fmt.Fprintln(w, "ID,Nama,Jenis,Telepon,Email,NPWP,Dibuat")
+	fmt.Fprintln(w, "ID,Registrasi,Nama,Jenis,Status,Telepon,Email,NPWP,NIK(4 digit),Domisili,Dibuat")
 	for _, c := range list {
-		fmt.Fprintf(w, "%d,\"%s\",%s,%s,%s,%s,%s\n", c.ID,
-			strings.ReplaceAll(c.FullName, `"`, `""`), c.Kind, c.Phone, c.Email, c.NPWP, c.CreatedAt)
+		full, _ := a.clients.GetFull(a.officeOf(r), c.ID)
+		last4 := ""
+		if ids, _ := a.clients.Identities(c.ID); len(ids) > 0 {
+			last4 = ids[0].NIKLast4
+		}
+		masked := "••••"
+		if last4 != "" {
+			masked = "••••" + last4
+		}
+		fmt.Fprintf(w, "%d,\"%s\",\"%s\",%s,%s,%s,%s,%s,%s,\"%s\",%s\n", c.ID,
+			strings.ReplaceAll(full.RegNumber, `"`, `""`),
+			strings.ReplaceAll(c.FullName, `"`, `""`), c.Kind, full.Status, c.Phone, c.Email,
+			c.NPWP, masked, strings.ReplaceAll(full.Domicile, `"`, `""`), c.CreatedAt)
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "client.export", Entity: "client", EntityID: "csv"})
 }
 
 func (a *App) clientNew(w http.ResponseWriter, r *http.Request) {
@@ -1168,7 +1236,55 @@ func (a *App) clientNew(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	a.render(w, r, "client_new", "Klien Baru", nil)
+	step := r.URL.Query().Get("step")
+	if step == "" {
+		step = "1"
+	}
+	a.render(w, r, "client_wizard", "Klien Baru", map[string]any{"Step": step, "F": map[string]string{}})
+}
+
+// clientNewSubmit advances the 3-step wizard, carrying values as hidden fields.
+// Nothing is saved until the final POST to /clients (atomic, validated twice).
+func (a *App) clientNewSubmit(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	f := map[string]string{}
+	for _, k := range []string{"kind", "full_name", "phone", "email", "nik", "reg_number",
+		"birth_place", "birth_date", "gender", "nationality", "marital_status", "occupation",
+		"education", "passport_no", "npwp", "id_address", "domicile_address", "province", "city",
+		"district", "village", "postal_code", "alt_phone", "wa_number", "correspondence_address",
+		"first_client_date", "source"} {
+		f[k] = strings.TrimSpace(r.FormValue(k))
+	}
+	step := r.FormValue("step")
+	if step == "" {
+		step = "1"
+	}
+	next := "2"
+	if step == "2" {
+		next = "3"
+	}
+	var dups []clients.DuplicateCandidate
+	if step == "1" {
+		if f["full_name"] == "" || f["phone"] == "" {
+			a.render(w, r, "client_wizard", "Klien Baru", map[string]any{"Step": "1", "F": f, "Error": "nama dan telepon wajib diisi"})
+			return
+		}
+		// Non-blocking duplicate warning (review before final save).
+		dups, _ = a.clients.FindDuplicatesEx(a.officeOf(r), 0, f["full_name"], f["phone"], f["email"], f["npwp"], last4of(f["nik"]), f["birth_date"])
+	}
+	a.render(w, r, "client_wizard", "Klien Baru", map[string]any{"Step": next, "F": f, "Dups": dups})
+}
+
+func last4of(nik string) string {
+	nik = strings.TrimSpace(nik)
+	if len(nik) >= 4 {
+		return nik[len(nik)-4:]
+	}
+	return ""
 }
 
 func (a *App) clientCreate(w http.ResponseWriter, r *http.Request) {
@@ -1187,12 +1303,52 @@ func (a *App) clientCreate(w http.ResponseWriter, r *http.Request) {
 		NPWP:     r.FormValue("npwp"),
 	})
 	if err != nil {
-		a.render(w, r, "client_new", "Klien Baru", map[string]string{"Error": err.Error()})
+		a.render(w, r, "client_wizard", "Klien Baru", map[string]any{"Step": "1", "F": formMap(r), "Error": err.Error()})
 		return
 	}
+	// Enrich with wizard fields (step 2-3) in one update.
 	uid := a.uid(r)
+	pic, _ := strconv.ParseInt(r.FormValue("pic_user_id"), 10, 64)
+	_ = a.clients.UpdateFull(a.officeOf(r), clients.ClientFull{
+		Client: clients.Client{ID: id, OfficeID: a.officeOf(r), Kind: r.FormValue("kind"),
+			FullName: r.FormValue("full_name"), Email: r.FormValue("email"), Phone: r.FormValue("phone"),
+			Address: r.FormValue("address"), NPWP: r.FormValue("npwp")},
+		RegNumber: autoReg(id, r.FormValue("reg_number")), BirthPlace: r.FormValue("birth_place"),
+		BirthDate: r.FormValue("birth_date"), Gender: r.FormValue("gender"),
+		Nationality: def(r.FormValue("nationality"), "Indonesia"), Marital: r.FormValue("marital_status"),
+		Occupation: r.FormValue("occupation"), Education: r.FormValue("education"),
+		Passport: r.FormValue("passport_no"), IDAddress: r.FormValue("id_address"),
+		Domicile: r.FormValue("domicile_address"), Province: r.FormValue("province"),
+		City: r.FormValue("city"), District: r.FormValue("district"), Village: r.FormValue("village"),
+		Postal: r.FormValue("postal_code"), AltPhone: r.FormValue("alt_phone"),
+		WANumber: r.FormValue("wa_number"), Correspondence: r.FormValue("correspondence_address"),
+		FirstClientDate: r.FormValue("first_client_date"), Source: r.FormValue("source"),
+		PIC: pic, Status: "ACTIVE",
+	})
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "client.create", Entity: "client", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/clients/"+strconv.FormatInt(id, 10)+"?flash=Klien+berhasil+dibuat", http.StatusSeeOther)
+}
+
+func formMap(r *http.Request) map[string]string {
+	out := map[string]string{}
+	for _, k := range []string{"kind", "full_name", "phone", "email", "npwp", "address"} {
+		out[k] = r.FormValue(k)
+	}
+	return out
+}
+
+func autoReg(id int64, v string) string {
+	if strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v)
+	}
+	return fmt.Sprintf("KLI-%06d", id)
+}
+
+func def(v, fb string) string {
+	if strings.TrimSpace(v) == "" {
+		return fb
+	}
+	return v
 }
 
 func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
@@ -1201,7 +1357,7 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	c, err := a.clients.Get(a.officeOf(r), id)
+	c, err := a.clients.GetFull(a.officeOf(r), id)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -1217,11 +1373,19 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	dups, _ := a.clients.FindDuplicates(a.officeOf(r), c.FullName, c.Phone)
+	dups, _ := a.clients.FindDuplicatesEx(a.officeOf(r), id, c.FullName, c.Phone, c.Email, c.NPWP, "", c.BirthDate)
 	ids, _ := a.clients.Identities(c.ID)
+	verHist := map[int64][]map[string]any{}
+	for _, it := range ids {
+		if h, _ := a.clients.VerificationHistory(it.ID); len(h) > 0 {
+			verHist[it.ID] = h
+		}
+	}
 	reps, _ := a.clients.Reps(c.ID)
 	docs, _ := a.uploads.List(a.officeOf(r), "client", c.ID)
-	// Riwayat layanan + akta + audit klien ini.
+	notes, _ := a.clients.Notes(c.ID, 20)
+	timeline, _ := a.clients.Timeline(c.ID, 30)
+	// Riwayat layanan + akta + keuangan.
 	type svcRow struct {
 		ID, Title, Service, Status string
 	}
@@ -1247,10 +1411,19 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 			trail = append(trail, x)
 		}
 	}
+	// Ringkasan keuangan dari modul finance yang sama (tanpa duplikasi hitung).
+	var fin struct {
+		Invoices, Paid, Outstanding, Overdue int64
+	}
+	_ = a.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(paid),0), COALESCE(SUM(total-paid),0)
+		FROM invoices WHERE client_id=? AND office_id=? AND status IN ('ISSUED','PARTIAL')`, id, a.officeOf(r)).Scan(&fin.Invoices, &fin.Paid, &fin.Outstanding)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM invoices WHERE client_id=? AND office_id=? AND status IN ('ISSUED','PARTIAL') AND due_date IS NOT NULL AND due_date < CURDATE()`, id, a.officeOf(r)).Scan(&fin.Overdue)
 	a.render(w, r, "client_detail", "Detail Klien", map[string]any{
-		"Client": c, "Duplicates": dups, "Identities": ids, "Reps": reps, "Files": docs,
-		"Services": svcs, "Trail": trail,
+		"Client": c, "Duplicates": dups, "Identities": ids, "VerHist": verHist, "Reps": reps, "Files": docs,
+		"Services": svcs, "Trail": trail, "Notes": notes, "Timeline": timeline,
+		"Fin": map[string]int64{"Invoices": fin.Invoices, "Paid": fin.Paid, "Outstanding": fin.Outstanding, "Overdue": fin.Overdue},
 		"CanVerify": rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity),
+		"CanEdit":   rbac.Has(mw.RoleOf(r), rbac.PermEditClient),
 	})
 }
 

@@ -11,14 +11,18 @@ import (
 // Identity is one identity document row. NIK plaintext is NEVER stored;
 // nik_cipher holds AES-256-GCM ciphertext, nik_last4 supports lookup.
 type Identity struct {
-	ID         int64
-	ClientID   int64
-	IDType     string
-	NIKLast4   string
-	FullName   string
-	Verified   bool
-	VerifiedBy *int64
-	CreatedAt  time.Time
+	ID           int64
+	ClientID     int64
+	IDType       string
+	NIKLast4     string
+	FullName     string
+	Verified     bool
+	VerifiedBy   *int64
+	Status       string
+	VerifiedNote string
+	DocExpiry    string
+	Inconsistent bool
+	CreatedAt    time.Time
 }
 
 // AddIdentity stores an identity; NIK is encrypted when a field key is configured.
@@ -61,7 +65,8 @@ func (s *Store) AddIdentity(clientID int64, idType, nik, fullName string) (int64
 
 // Identities lists a client's identity documents (no NIK plaintext leaves the DB).
 func (s *Store) Identities(clientID int64) ([]Identity, error) {
-	rows, err := s.db.Query(`SELECT id, client_id, id_type, nik_last4, full_name, verified, verified_by, created_at
+	rows, err := s.db.Query(`SELECT id, client_id, id_type, nik_last4, full_name, verified, verified_by,
+		COALESCE(status,'UNCHECKED'), COALESCE(verified_note,''), COALESCE(DATE_FORMAT(doc_expiry,'%d %b %Y'),''), inconsistent_flag, created_at
 		FROM identities WHERE client_id=? ORDER BY id`, clientID)
 	if err != nil {
 		return nil, err
@@ -71,13 +76,40 @@ func (s *Store) Identities(clientID int64) ([]Identity, error) {
 	for rows.Next() {
 		var it Identity
 		var last4 sql.NullString
-		if err := rows.Scan(&it.ID, &it.ClientID, &it.IDType, &last4, &it.FullName, &it.Verified, &it.VerifiedBy, &it.CreatedAt); err != nil {
+		var inc int
+		if err := rows.Scan(&it.ID, &it.ClientID, &it.IDType, &last4, &it.FullName, &it.Verified, &it.VerifiedBy,
+			&it.Status, &it.VerifiedNote, &it.DocExpiry, &inc, &it.CreatedAt); err != nil {
 			return nil, err
 		}
 		if last4.Valid {
 			it.NIKLast4 = last4.String
 		}
+		it.Inconsistent = inc == 1
 		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// VerificationHistory lists human verification transitions for one identity.
+func (s *Store) VerificationHistory(identityID int64) ([]map[string]any, error) {
+	rows, err := s.db.Query(`SELECT COALESCE(u.name,'sistem'), from_status, to_status, note, created_at
+		FROM identity_verifications v LEFT JOIN users u ON u.id=v.actor_id
+		WHERE v.identity_id=? ORDER BY v.id`, identityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]any
+	for rows.Next() {
+		var m = map[string]any{}
+		var actor, from, to, note, at string
+		var f sql.NullString
+		_ = rows.Scan(&actor, &f, &to, &note, &at)
+		if f.Valid {
+			from = f.String
+		}
+		m["Actor"], m["From"], m["To"], m["Note"], m["At"] = actor, from, to, note, at
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }

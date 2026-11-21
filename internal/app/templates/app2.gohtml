@@ -78,6 +78,8 @@ window.insertClause=insertClause;
 {{if .Data.CanSign}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Tanda Tangan Elektronik Internal</h3></div>
 <div class="card-body"><p class="text-secondary small">Hash SHA-256 atas isi + identitas + segel tercatat permanen. Bukan PSrE.</p>
 <form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-dark" type="submit" data-confirm="Tandatangani isi saat ini? Hash tercatat permanen.">Tandatangani</button></form></div></div>{{end}}
+{{if .Data.Timeline}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Linimasa Akta</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Timeline}}<div class="list-group-item"><span class="badge bg-azure-lt me-2">{{.Kind}}</span>{{.Text}}<span class="text-secondary small ms-2">{{.At}}</span></div>{{end}}</div></div>{{end}}
 </div>
 <div class="col-lg-5"><div class="card"><div class="card-header"><h3 class="card-title">Riwayat Versi</h3></div>
 <div class="card-body">{{range .Data.Versions}}<div class="mb-3 pb-2 border-bottom"><strong>v{{.No}}</strong> <span class="text-secondary">{{.CreatedAt}} · {{.Hash}}</span><div class="small">{{.Note}}</div><div class="d-flex gap-2 mt-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{$.Data.Deed.ID}}?compare={{.No}}">Bandingkan</a></div><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{plaintext .Content}}</pre></div>{{else}}<p class="text-secondary">Belum ada revisi tersimpan.</p>{{end}}</div></div>
@@ -106,7 +108,7 @@ window.insertClause=insertClause;
 {{template "page_close" .}}{{end}}
 
 {{define "office"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card"><div class="card-header"><h3 class="card-title">Profil Kantor</h3><div class="ms-auto"><span class="badge bg-azure-lt">Paket {{.Data.Plan}}</span></div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Profil Kantor</h3><div class="ms-auto d-flex gap-2"><span class="badge bg-azure-lt">Paket {{.Data.Plan}}</span><a class="btn btn-sm btn-outline-primary" href="/office/license">Lisensi</a><a class="btn btn-sm btn-outline-primary" href="/office/export">Ekspor ZIP</a></div></div>
 <form method="post" action="/office"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-6 mb-2"><label class="form-label">Nama kantor</label><input class="form-control" name="name" value="{{.Data.Name}}" required/></div>
 <div class="col-md-6 mb-2"><label class="form-label">Nama notaris</label><input class="form-control" name="notary" value="{{.Data.Notary}}" required/></div>
@@ -115,6 +117,17 @@ window.insertClause=insertClause;
 <div class="col-md-4 mb-2"><label class="form-label">Email</label><input class="form-control" name="email" value="{{.Data.Email}}"/></div>
 <div class="col-12 mb-2"><label class="form-label">Alamat</label><textarea class="form-control" name="address" rows="2">{{.Data.Address}}</textarea></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
+</div></form></div>
+{{template "page_close" .}}{{end}}
+
+{{define "license"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/office">Kantor</a></li><li class="breadcrumb-item active">Lisensi</li></ol></nav>
+<div class="card"><div class="card-header"><h3 class="card-title">Lisensi Instalasi (satu kantor)</h3></div>
+<form method="post" action="/office/license"><div class="card-body">{{template "csrf" .}}
+<p class="text-secondary">Instalasi mandiri per kantor — kunci ini informasional, tidak pernah mengunci Anda keluar. Status: <strong>{{.Data.Status}}</strong></p>
+<div class="mb-2"><label class="form-label">Kunci lisensi</label><input class="form-control" name="key" value="{{.Data.Key}}" placeholder="cth. SAKTI-2026-XXXX"/></div>
+<div class="mb-2"><label class="form-label">Berlaku s/d</label><input class="form-control" type="date" name="expires" value="{{.Data.Expires}}"/></div>
+<div class="text-end"><button class="btn btn-primary" type="submit">Catat</button></div>
 </div></form></div>
 {{template "page_close" .}}{{end}}
 

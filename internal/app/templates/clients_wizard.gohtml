@@ -1,0 +1,61 @@
+{{define "client_wizard"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients">Daftar Klien</a></li><li class="breadcrumb-item active">Klien Baru (langkah {{.Data.Step}} dari 3)</li></ol></nav>
+<div class="card mb-3"><div class="card-body">
+<div class="steps d-flex gap-2 mb-3">
+<span class="badge {{if eq .Data.Step "1"}}bg-blue{{else}}bg-azure-lt{{end}}">1 · Identitas</span>
+<span class="badge {{if eq .Data.Step "2"}}bg-blue{{else}}bg-azure-lt{{end}}">2 · Kontak & Alamat</span>
+<span class="badge {{if eq .Data.Step "3"}}bg-blue{{else}}bg-azure-lt{{end}}">3 · Konfirmasi</span>
+</div>
+{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}
+{{if eq .Data.Step "1"}}
+<form method="post" action="/clients/new?step=1"><div class="row">{{template "csrf" .}}
+{{if .Data.Dups}}<div class="col-12"><div class="alert alert-warning"><strong>Kemungkinan duplikat:</strong>{{range .Data.Dups}} <a href="/clients/{{.ID}}">{{.FullName}}</a> ({{.Reason}}) ·{{end}} lanjutkan hanya bila benar-benar klien berbeda.</div></div>{{end}}
+<div class="col-md-4 mb-3"><label class="form-label">Jenis</label><select class="form-select" name="kind"><option value="individual">Perorangan</option><option value="corporate">Badan usaha</option></select></div>
+<div class="col-md-8 mb-3"><label class="form-label">Nama lengkap / badan usaha</label><input class="form-control" name="full_name" value="{{index .Data.F "full_name"}}" required/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Telepon (wajib, untuk deteksi duplikat)</label><input class="form-control" name="phone" value="{{index .Data.F "phone"}}" required/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{index .Data.F "email"}}"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">NIK (opsional, terenkripsi)</label><input class="form-control" name="nik" value="{{index .Data.F "nik"}}"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">No. registrasi (kosong = otomatis)</label><input class="form-control" name="reg_number" value="{{index .Data.F "reg_number"}}"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Lanjut →</button></div>
+</div></form>
+{{else if eq .Data.Step "2"}}
+<form method="post" action="/clients/new?step=2"><div class="row">{{template "csrf" .}}
+{{range $k, $v := .Data.F}}<input type="hidden" name="{{$k}}" value="{{$v}}"/>{{end}}
+<div class="col-md-4 mb-3"><label class="form-label">Tempat lahir</label><input class="form-control" name="birth_place"/></div>
+<div class="col-md-4 mb-3"><label class="form-label">Tanggal lahir</label><input class="form-control" type="date" name="birth_date"/></div>
+<div class="col-md-4 mb-3"><label class="form-label">Jenis kelamin</label><select class="form-select" name="gender"><option value="">—</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+<div class="col-md-4 mb-3"><label class="form-label">Kewarganegaraan</label><input class="form-control" name="nationality" value="Indonesia"/></div>
+<div class="col-md-4 mb-3"><label class="form-label">Status kawin</label><input class="form-control" name="marital_status"/></div>
+<div class="col-md-4 mb-3"><label class="form-label">Pekerjaan</label><input class="form-control" name="occupation"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Pendidikan</label><input class="form-control" name="education"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Paspor</label><input class="form-control" name="passport_no"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">NPWP</label><input class="form-control" name="npwp"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Telp alternatif</label><input class="form-control" name="alt_phone"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">WhatsApp</label><input class="form-control" name="wa_number"/></div>
+<div class="col-12 mb-3"><label class="form-label">Alamat sesuai identitas</label><textarea class="form-control" name="id_address" rows="2"></textarea></div>
+<div class="col-12 mb-3"><label class="form-label">Alamat domisili</label><textarea class="form-control" name="domicile_address" rows="2"></textarea></div>
+<div class="col-md-3 mb-3"><label class="form-label">Provinsi</label><input class="form-control" name="province"/></div>
+<div class="col-md-3 mb-3"><label class="form-label">Kota/Kab</label><input class="form-control" name="city"/></div>
+<div class="col-md-3 mb-3"><label class="form-label">Kecamatan</label><input class="form-control" name="district"/></div>
+<div class="col-md-3 mb-3"><label class="form-label">Kelurahan</label><input class="form-control" name="village"/></div>
+<div class="col-md-3 mb-3"><label class="form-label">Kode pos</label><input class="form-control" name="postal_code"/></div>
+<div class="col-md-9 mb-3"><label class="form-label">Alamat korespondensi</label><input class="form-control" name="correspondence_address"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Klien sejak</label><input class="form-control" type="date" name="first_client_date"/></div>
+<div class="col-md-6 mb-3"><label class="form-label">Sumber</label><input class="form-control" name="source" placeholder="cth. referensi, website"/></div>
+<div class="col-12 text-end"><a class="btn btn-ghost-secondary" href="/clients/new?step=1">← Kembali</a> <button class="btn btn-primary" type="submit">Lanjut →</button></div>
+</div></form>
+{{else}}
+<form method="post" action="/clients">{{template "csrf" .}}
+{{range $k, $v := .Data.F}}<input type="hidden" name="{{$k}}" value="{{$v}}"/>{{end}}
+<div class="card-body"><dl class="row">
+<dt class="col-4">Nama</dt><dd class="col-8">{{index .Data.F "full_name"}} ({{index .Data.F "kind"}})</dd>
+<dt class="col-4">Kontak</dt><dd class="col-8">{{index .Data.F "phone"}} · {{index .Data.F "email"}}</dd>
+<dt class="col-4">Wilayah</dt><dd class="col-8">{{index .Data.F "city"}}, {{index .Data.F "province"}}</dd>
+<dt class="col-4">NPWP/NIK</dt><dd class="col-8">{{index .Data.F "npwp"}}</dd>
+</dl>
+<p class="text-secondary small">Periksa kembali — data disimpan sekali dan tercatat di audit. NIK penuh tidak pernah tampil di mana pun.</p></div>
+<div class="card-footer text-end"><a class="btn btn-ghost-secondary" href="/clients/new?step=1">← Ulangi</a> <button class="btn btn-success" type="submit" onclick="return confirm('Simpan klien ini?')">Simpan Klien</button></div>
+</form>
+{{end}}
+</div></div>
+{{template "page_close" .}}{{end}}
