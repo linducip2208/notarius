@@ -55,7 +55,7 @@ def workflow(prompt, seed, prefix):
         "9": {"class_type": "VAEDecode",
               "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
         "10": {"class_type": "SaveImage",
-               "inputs": {"images": ["9", 0], "filename_prefix": "NOTARIUS_" + prefix}},
+               "inputs": {"images": ["9", 0], "filename_prefix": prefix}},
     }
 
 
