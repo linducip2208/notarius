@@ -15,6 +15,7 @@
 <div class="container-fluid">
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
 <h1 class="navbar-brand navbar-brand-autodark mt-2"><img src="/assets/brand/saktinotaris-logo-b.png" alt="SaktiNotaris" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/> <span class="text-white">SaktiNotaris</span></h1>
+{{if .Acting}}<div class="px-3"><div class="alert alert-warning py-2 mb-2 small">Mode lintas-kantor AKTIF ({{.OfficeName}}). <form method="post" action="/offices/act" class="d-inline">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning" type="submit">Keluar mode</button></form></div></div>{{end}}
 <div class="collapse navbar-collapse" id="sidebar-menu">
 <form method="get" action="/search" class="px-3 mb-2"><input class="form-control" name="q" placeholder="Cari klien/akta…"/></form>
 <ul class="navbar-nav pt-lg-3" id="mainnav">
@@ -55,6 +56,7 @@
 <li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Pengaturan</span></li>
 {{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">🏢 Kantor</a></li>{{end}}
 <li class="nav-item"><a class="nav-link" href="/settings">⚙ Pengaturan</a></li>
+{{if eq .Role "super_admin"}}<li class="nav-item"><a class="nav-link" href="/offices">🏢 Multi-Kantor</a></li>{{end}}
 {{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">🔑 Role & Permission</a></li>{{end}}
 </ul>
 <div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>

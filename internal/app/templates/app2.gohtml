@@ -24,8 +24,9 @@
 <dt class="col-4">Versi</dt><dd class="col-8">{{.Data.Deed.Version}} · terkunci={{.Data.Deed.Locked}}</dd>
 </dl>
 <pre class="p-3 bg-light border rounded" style="white-space:pre-wrap">{{.Data.Body}}</pre>
+{{if .Data.Seal}}<div class="alert alert-success mt-2 mb-0 small">Segel verifikasi: <code>{{.Data.Seal}}</code> · cek di <a href="/verify?code={{.Data.Seal}}">/verify</a><br/><span class="text-secondary">TTE internal (hash tersertifikasi sistem, bukan PSrE). Berlaku sebagai segel integritas naskah + identitas penandatangan tercatat.</span></div>{{end}}
 <div class="d-flex gap-2 mt-3">
-{{if .Data.CanApprove}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/review">{{template "csrf" .}}<button class="btn btn-outline-primary" type="submit">Kirim Review</button></form>
+{{if and .Data.CanApprove (ne .Data.Deed.Status "APPROVED")}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/review">{{template "csrf" .}}<button class="btn btn-outline-primary" type="submit">Kirim Review</button></form>
 <form method="post" action="/deeds/{{.Data.Deed.ID}}/approve" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="number" placeholder="No. akta" required/><button class="btn btn-success" type="submit" onclick="return confirm('Sahkan akta? Repertorium otomatis.')">Sahkan</button></form>{{end}}
 <a class="btn btn-ghost-primary" href="/deeds/{{.Data.Deed.ID}}/pdf">PDF</a>
 <a class="btn btn-ghost-primary" href="/deeds/{{.Data.Deed.ID}}/docx">DOCX</a>
@@ -48,6 +49,7 @@
 <tr><td class="text-secondary">Dibuat</td><td>{{.Data.Props.Created}} oleh {{.Data.Props.Creator}}</td></tr>
 <tr><td class="text-secondary">Disahkan</td><td>{{.Data.Props.ApprovedBy}} {{.Data.Props.ApprovedAt}}</td></tr>
 <tr><td class="text-secondary">Hash isi</td><td><code>{{.Data.Props.Hash}}</code></td></tr>
+<tr><td class="text-secondary">TTE internal</td><td>{{range .Data.Sigs}}<div class="small mb-1">✍️ {{.Signer}} · <code>{{.Hash}}</code><br/><span class="text-secondary">{{.At}} {{.Note}}</span></div>{{else}}<span class="text-secondary">Belum ditandatangani.</span>{{end}}{{if and .Data.CanApprove (eq .Data.Deed.Status "APPROVED")}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1 mt-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-sm btn-dark" type="submit" onclick="return confirm('Tandatangani isi saat ini? Hash tercatat permanen.')">Tandatangani</button></form>{{end}}</td></tr>
 </tbody></table></div></div>
 </div>
 <div class="col-lg-5"><div class="card"><div class="card-header"><h3 class="card-title">Riwayat Versi</h3></div>
@@ -77,7 +79,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "office"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card"><div class="card-header"><h3 class="card-title">Profil Kantor</h3></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Profil Kantor</h3><div class="ms-auto"><span class="badge bg-azure-lt">Paket {{.Data.Plan}}</span></div></div>
 <form method="post" action="/office"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-6 mb-2"><label class="form-label">Nama kantor</label><input class="form-control" name="name" value="{{.Data.Name}}" required/></div>
 <div class="col-md-6 mb-2"><label class="form-label">Nama notaris</label><input class="form-control" name="notary" value="{{.Data.Notary}}" required/></div>
@@ -144,4 +146,15 @@
 <div class="card"><div class="card-header"><h3 class="card-title">Pengguna per Peran</h3><div class="ms-auto"><a class="btn btn-sm btn-primary" href="/settings">Kelola Pengguna</a></div></div>
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Nama</th><th>Email</th><th>Peran</th></tr></thead>
 <tbody>{{range .Data.Users}}<tr><td>{{.Name}}</td><td>{{.Email}}</td><td><span class="badge bg-azure-lt">{{.Role}}</span></td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada pengguna.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "offices"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Multi-Kantor</li></ol></nav>
+<div class="alert alert-info">Bertindak lintas-kantor membutuhkan paket <strong>ENTERPRISE</strong> pada kantor tujuan. Aksi tercatat di audit.</div>
+<div class="card"><div class="card-header"><h3 class="card-title">Kantor & Paket</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Paket</th><th>Klien</th><th>Antrean</th><th>Piutang</th><th></th></tr></thead>
+<tbody>{{range .Data.Offices}}<tr><td>{{.ID}}</td><td>{{.Name}} {{if .Acting}}<span class="badge bg-yellow-lt">AKTIF</span>{{end}}</td><td><span class="badge bg-azure-lt">{{.Plan}}</span></td><td>{{.Clients}}</td><td>{{.Pending}}</td><td>Rp {{.Outstanding}}</td>
+<td><div class="d-flex gap-1"><form method="post" action="/offices/act">{{template "csrf" $}}<input type="hidden" name="office_id" value="{{.ID}}"/><button class="btn btn-sm btn-outline-primary" type="submit" {{if not (eq .Plan "ENTERPRISE")}}disabled title="Butuh paket ENTERPRISE"{{end}}>Bertindak</button></form><form method="post" action="/offices/{{.ID}}/plan" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="plan"><option>LITE</option><option>PRO</option><option>ENTERPRISE</option></select><button class="btn btn-sm btn-ghost-secondary" type="submit">Set</button></form></div></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-3">Belum ada kantor.</td></tr>{{end}}</tbody></table></div></div>
+<form method="post" action="/offices/act" class="mt-2">{{template "csrf" .}}<button class="btn btn-ghost-secondary" type="submit">Kembali ke kantor sendiri</button></form>
 {{template "page_close" .}}{{end}}

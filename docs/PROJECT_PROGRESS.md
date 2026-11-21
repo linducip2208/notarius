@@ -7,7 +7,9 @@ Selesai:
 - DMS enterprise: migrasi 011 (16 tabel + kolom), store, 25 rute, 13 template, auto-enqueue OCR + auto-relasi, FTS+fallback, share expiring publik, arsip+QR label cetak, retensi+hold blokir-hancur, duplikat SHA-256, checklist template+auto+progres+notif.
 - Fase 1 jualan: kuitansi QR HMAC + /verify publik + tolak palsu (6/6), portal bayar + bukti (8/8), pengingat anti-spam.
 - Fase 2: diff LCS+test, checklist cerdas, label QR arsip (7/7).
-- Test: integrasi 20/20, unit hijau (rename-AV), E2E 10+14+7, screenshot Chromium 20+ halaman.
+- Fase 3: TTE internal (approve→segel HMAC→/verify akta→sign hash-64, 13/13), multi-kantor ENTERPRISE + acting HMAC-audit, tier LITE/PRO/ENTERPRISE + gate 402 jujur, harga konsultasi tanpa angka palsu.
+- E2E hardening: confirm() JS auto-dismiss Playwright menutupi submit gagal → semua skrip wajib dialog-accept + asersi flash-URL/DB (bukan teks statis); tangkap duplikat nomor akta via UNIQUE nyata.
+- Test: integrasi 20/20, unit hijau (rename-AV), E2E 10+14+7+13, screenshot Chromium 20+ halaman.
 - Scorecard bukti 88-97 (rata-rata ±94).
 
 Blokir eksternal: tinjauan notaris, TLS produksi, uji restore VPS, pen-test, lab perangkat fisik.

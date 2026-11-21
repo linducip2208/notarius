@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
 	"notaryos/internal/audit"
+	"notaryos/internal/plan"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/notify"
 	"notaryos/internal/rbac"
@@ -432,6 +433,9 @@ func (a *App) dmsShare(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
+	if !a.requirePlan(w, r, plan.FeatShares) {
+		return
+	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	hours, _ := strconv.Atoi(r.FormValue("hours"))
@@ -708,6 +712,9 @@ func (a *App) dmsChecklists(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
+	if !a.requirePlan(w, r, plan.FeatChecklist) {
+		return
+	}
 	type tpl struct {
 		ID      int64
 		Name    string
@@ -740,6 +747,9 @@ func (a *App) dmsChecklists(w http.ResponseWriter, r *http.Request) {
 func (a *App) dmsChecklistCreate(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
 		a.forbidden(w, r)
+		return
+	}
+	if !a.requirePlan(w, r, plan.FeatChecklist) {
 		return
 	}
 	_ = r.ParseForm()

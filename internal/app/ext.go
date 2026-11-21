@@ -1,7 +1,9 @@
 package app
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -573,8 +575,86 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number")})
-	http.Redirect(w, r, "/deeds?flash=Akta+disetujui+dan+masuk+repertorium", http.StatusSeeOther)
+	seal, _ := verifyCode("DEED", id)
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number") + " segel:" + seal})
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Akta+disahkan+segel:"+seal, http.StatusSeeOther)
+}
+
+// deedSign records an internal electronic signature (hash tersertifikasi sistem,
+// BUKAN tanda tangan PSrE/BSrE). Only notary, only APPROVED deeds, one per signer
+// per content hash — replay of the same hash is rejected honestly.
+func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) {
+		http.Error(w, "hanya notaris yang dapat menandatangani akta", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	office := a.officeOf(r)
+	var status, body, number string
+	if err := a.db.QueryRow(`SELECT status, content, number FROM deed_drafts WHERE id=? AND office_id=?`, id, office).
+		Scan(&status, &body, &number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if status != "APPROVED" {
+		http.Error(w, "akta harus disahkan (APPROVED) sebelum ditandatangani", http.StatusBadRequest)
+		return
+	}
+	uid := a.uid(r)
+	var signerID int64
+	var signerName string
+	if uid != nil {
+		signerID = *uid
+		_ = a.db.QueryRow(`SELECT name FROM users WHERE id=?`, signerID).Scan(&signerName)
+	}
+	seal, _ := verifyCode("DEED", id)
+	hash := sha256Of(fmt.Sprintf("%s|%s|%d|%s|%s", body, number, signerID, signerName, seal))
+	var dup int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_signatures WHERE deed_id=? AND content_hash=?`, id, hash).Scan(&dup)
+	if dup > 0 {
+		http.Error(w, "isi yang sama sudah ditandatangani — ubah revisi dulu bila perlu tanda baru", http.StatusConflict)
+		return
+	}
+	if _, err := a.db.Exec(`INSERT INTO deed_signatures(office_id, deed_id, signer_user_id, signer_name, content_hash, seal_code, note)
+		VALUES(?,?,?,?,?,?,?)`, office, id, signerID, signerName, hash, seal, r.FormValue("note")); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.sign", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: "hash:" + hash[:16] + " segel:" + seal})
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Tanda+tangan+internal+tercatat", http.StatusSeeOther)
+}
+
+func sha256Of(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+func deedSeal(deedID int64) string {
+	s, _ := verifyCode("DEED", deedID)
+	return s
+}
+
+type deedSig struct {
+	Signer, Hash, Seal, At, Note string
+}
+
+func deedSigs(db *sql.DB, deedID int64) []deedSig {
+	var out []deedSig
+	if db == nil {
+		return out
+	}
+	rs, err := db.Query(`SELECT signer_name, content_hash, seal_code, created_at, note FROM deed_signatures WHERE deed_id=? ORDER BY id`, deedID)
+	if err != nil {
+		return out
+	}
+	defer rs.Close()
+	for rs.Next() {
+		var s deedSig
+		_ = rs.Scan(&s.Signer, &s.Hash, &s.Seal, &s.At, &s.Note)
+		out = append(out, s)
+	}
+	return out
 }
 
 // canViewDeed allows staff with client view (office-scoped), or a portal
@@ -845,6 +925,7 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
+		"Seal": deedSeal(id), "Sigs": deedSigs(a.db, id),
 	})
 }
 
@@ -910,11 +991,11 @@ func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
 // ---- office profile ----
 
 func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
-	var name, notary, sk, addr, phone, email string
-	_ = a.db.QueryRow(`SELECT o.name, o.notary_name, o.sk_number, o.address, o.phone, o.email
-		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email)
+	var name, notary, sk, addr, phone, email, plan string
+	_ = a.db.QueryRow(`SELECT o.name, o.notary_name, o.sk_number, o.address, o.phone, o.email, o.plan
+		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email, &plan)
 	a.render(w, r, "office", "Profil Kantor", map[string]string{
-		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email,
+		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email, "Plan": plan,
 	})
 }
 

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -19,6 +21,7 @@ import (
 	"notaryos/internal/clients"
 	"notaryos/internal/config"
 	"notaryos/internal/corp"
+	"notaryos/internal/cryptoxx"
 	"notaryos/internal/deeds"
 	"notaryos/internal/dms"
 	"notaryos/internal/doctpl"
@@ -28,6 +31,7 @@ import (
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/notify"
 	"notaryos/internal/ocr"
+	"notaryos/internal/plan"
 	"notaryos/internal/rbac"
 	"notaryos/internal/remind"
 	"notaryos/internal/requests"
@@ -78,6 +82,7 @@ type Page struct {
 	Role       string
 	UserName   string
 	OfficeName string
+	Acting     bool
 	WIBDate    string
 	Pending    int
 	Unread     int
@@ -189,10 +194,72 @@ func (a *App) officeOf(r *http.Request) int64 {
 	}
 	var office sql.NullInt64
 	_ = a.db.QueryRow(`SELECT office_id FROM users WHERE id=?`, *id).Scan(&office)
-	if office.Valid {
-		return office.Int64
+	if !office.Valid {
+		return 0
 	}
-	return 0
+	// Acting lintas-kantor: hanya super_admin + cookie bertanda HMAC + target ENTERPRISE.
+	if mw.RoleOf(r) == rbac.RoleSuperAdmin {
+		if c, err := r.Cookie(a.cfg.SessionName + "_act"); err == nil {
+			if oid, ok := a.verifyActing(c.Value); ok {
+				var pl string
+				_ = a.db.QueryRow(`SELECT plan FROM offices WHERE id=?`, oid).Scan(&pl)
+				if pl == "ENTERPRISE" {
+					return oid
+				}
+			}
+		}
+	}
+	return office.Int64
+}
+
+// actingCookieName is the signed cross-office scope cookie (super_admin only).
+func (a *App) actingCookieName() string { return a.cfg.SessionName + "_act" }
+
+func (a *App) signActing(officeID int64) string {
+	key, err := cryptoxx.Key()
+	if err != nil {
+		return ""
+	}
+	mac := hmac.New(sha256.New, key)
+	fmt.Fprintf(mac, "act:%d", officeID)
+	return fmt.Sprintf("%d:%x", officeID, mac.Sum(nil))
+}
+
+func (a *App) verifyActing(token string) (int64, bool) {
+	parts := strings.SplitN(token, ":", 2)
+	if len(parts) != 2 {
+		return 0, false
+	}
+	oid, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || oid <= 0 {
+		return 0, false
+	}
+	if a.signActing(oid) != token {
+		return 0, false
+	}
+	return oid, true
+}
+
+// officeTier returns the office tier (fail-closed ke LITE bila tak terbaca).
+func (a *App) officeTier(officeID int64) string {
+	var p string
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT plan FROM offices WHERE id=?`, officeID).Scan(&p)
+	}
+	if p == "" {
+		return "LITE"
+	}
+	return p
+}
+
+// requirePlan blocks below-tier features with an honest upgrade notice.
+func (a *App) requirePlan(w http.ResponseWriter, r *http.Request, feature string) bool {
+	if plan.Allowed(a.officeTier(a.officeOf(r)), feature) {
+		return true
+	}
+	need := map[string]string{plan.FeatPortalPay: "PRO", plan.FeatShares: "PRO", plan.FeatChecklist: "PRO", plan.FeatActing: "ENTERPRISE"}[feature]
+	http.Error(w, "Fitur ini membutuhkan paket "+need+" atau lebih tinggi. Hubungi administrator.", http.StatusPaymentRequired)
+	return false
 }
 
 func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title string, data any) {
@@ -212,7 +279,18 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 	}
 	flash := r.URL.Query().Get("flash")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data}); err != nil {
+	acting := false
+	actName := ""
+	if c, err := r.Cookie(a.actingCookieName()); err == nil && mw.RoleOf(r) == rbac.RoleSuperAdmin {
+		if oid, ok := a.verifyActing(c.Value); ok {
+			acting = true
+			_ = a.db.QueryRow(`SELECT name FROM offices WHERE id=?`, oid).Scan(&actName)
+		}
+	}
+	if acting && actName != "" {
+		officeName = actName + " (bertindak)"
+	}
+	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data}); err != nil {
 		a.log.Error("render", "page", name, "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
@@ -296,6 +374,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/deeds/{id}/version", a.deedSaveVersion)
 		p.Post("/deeds/{id}/approve", a.deedApprove)
 		p.Post("/deeds/{id}/review", a.deedToReview)
+		p.Post("/deeds/{id}/sign", a.deedSign)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
 		p.Get("/deeds/{id}/docx", a.deedDOCX)
 		p.Get("/wills", a.willsPage)
@@ -325,6 +404,9 @@ func (a *App) Router() http.Handler {
 		p.Post("/users", a.userCreate)
 		p.Post("/users/{id}/link", a.userLink)
 		p.Get("/roles", a.rolesPage)
+		p.Get("/offices", a.officesPage)
+		p.Post("/offices/act", a.officeAct)
+		p.Post("/offices/{id}/plan", a.officePlanSave)
 		p.Get("/mfa", a.mfaSetup)
 		p.Post("/mfa", a.mfaEnable)
 		p.Get("/portal", a.portal)
@@ -1077,8 +1159,11 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := a.uid(r)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "request.create", Entity: "service_request", EntityID: strconv.FormatInt(id, 10)})
-	// Checklist cerdas: salin item template layanan sebagai MISSING otomatis.
-	_ = a.dms.AutoChecklist(a.officeOf(r), id, serviceID)
+	// Checklist cerdas (paket PRO+): salin item template layanan sebagai MISSING otomatis.
+	// LITE dilewati diam-diam — fitur memang di luar paketnya.
+	if plan.Allowed(a.officeTier(a.officeOf(r)), plan.FeatChecklist) {
+		_ = a.dms.AutoChecklist(a.officeOf(r), id, serviceID)
+	}
 	http.Redirect(w, r, "/requests?flash=Permohonan+dibuat", http.StatusSeeOther)
 }
 

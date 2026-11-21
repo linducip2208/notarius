@@ -22,7 +22,7 @@
 <form method="get" action="/verify"><div class="mb-3"><label class="form-label">Kode verifikasi (cth. INV-12-AB34CD56)</label><input class="form-control" name="code" value="{{.Data.Code}}" required/></div>
 <button class="btn btn-primary w-100" type="submit">Periksa</button></form>
 {{if .Data.Error}}<div class="alert alert-danger mt-3">{{.Data.Error}}</div>{{end}}
-{{if .Data.Found}}<div class="alert alert-success mt-3"><strong>TERVERIFIKASI ✓</strong><br/>Nomor: {{.Data.Number}}<br/>Kantor: {{.Data.Office}}<br/>Total: Rp {{.Data.Total}} · Dibayar: Rp {{.Data.Paid}}<br/>Status: <span class="badge bg-green-lt">{{.Data.Status}}</span></div>{{end}}
+{{if .Data.Found}}<div class="alert alert-success mt-3"><strong>TERVERIFIKASI ✓</strong><br/>Jenis: {{.Data.Kind}}<br/>Nomor: {{.Data.Number}}<br/>Kantor: {{.Data.Office}}{{if eq .Data.Kind "Kuitansi"}}<br/>Total: Rp {{.Data.Total}} · Dibayar: Rp {{.Data.Paid}}{{end}}{{if eq .Data.Kind "Akta"}}<br/>Tanda tangan internal: {{.Data.Sigs}} tercatat{{end}}<br/>Status: <span class="badge bg-green-lt">{{.Data.Status}}</span></div>{{end}}
 <p class="text-secondary small mt-3 mb-0">Hanya dokumen dengan kode HMAC yang cocok yang dinyatakan asli. Bukan pengganti minuta/final notaris.</p>
 </div></div>
 <p class="text-center mt-3"><a href="/">← Beranda</a></p>

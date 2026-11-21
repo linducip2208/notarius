@@ -33,6 +33,8 @@ def run():
     with sync_playwright() as p:
         b = p.chromium.launch()
         pg = b.new_page()
+        # tombol verifikasi/restore/disposisi memakai confirm() JS — terima agar submit jalan
+        pg.on("dialog", lambda d: d.accept())
         pg.goto(BASE + "/login")
         pg.fill('input[name="email"]', "admin@contoh.id")
         pg.fill('input[name="password"]', "Admin123!")
@@ -67,12 +69,12 @@ def run():
         pg.select_option('form[action$="/verify"] select', "VERIFIED")
         pg.locator('form[action$="/verify"] button').click()
         pg.wait_for_load_state("networkidle")
-        step("verifikasi manusia", "terverifikasi" in pg.content().lower() or "VERIFIED" in pg.content())
+        step("verifikasi manusia", "Verifikasi+dicatat" in pg.url, pg.url)
         # workflow (auto-move saat unggah: RECEIVED->CLASSIFICATION; lanjutkan)
         pg.select_option('form[action$="/workflow"] select', "ADMIN_REVIEW")
         pg.locator('form[action$="/workflow"] button').click()
         pg.wait_for_load_state("networkidle")
-        step("workflow CLASSIFICATION->ADMIN_REVIEW", "ADMIN_REVIEW" in pg.content())
+        step("workflow CLASSIFICATION->ADMIN_REVIEW", "Workflow+berpindah+ke+ADMIN_REVIEW" in pg.url, pg.url)
         # share terbatas
         pg.fill('form[action$="/share"] input[name="hours"]', "1")
         pg.fill('form[action$="/share"] input[name="max"]', "3")

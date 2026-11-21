@@ -14,6 +14,7 @@ import (
 	"notaryos/internal/audit"
 	"notaryos/internal/cryptoxx"
 	mw "notaryos/internal/middleware"
+	"notaryos/internal/plan"
 	"notaryos/internal/rbac"
 	"notaryos/internal/verify"
 )
@@ -101,22 +102,46 @@ func (a *App) verifyPage(w http.ResponseWriter, r *http.Request) {
 	if code != "" {
 		key, err := cryptoxx.Key()
 		if err == nil {
-			if kind, id, err := verify.Parse(key, code); err == nil && kind == "INV" {
-				var number, status, office string
-				var stotal, spaid sql.NullString
-				if err := a.db.QueryRow(`SELECT i.number, i.status, i.total, i.paid, o.name
-					FROM invoices i JOIN offices o ON o.id=i.office_id WHERE i.id=?`, id).
-					Scan(&number, &status, &stotal, &spaid, &office); err == nil {
-					data["Found"] = true
-					data["Number"] = number
-					data["Status"] = status
-					data["Total"] = decWhole(stotal.String)
-					data["Paid"] = decWhole(spaid.String)
-					data["Office"] = office
-				} else {
-					data["Error"] = "dokumen tidak ditemukan"
+			if kind, id, err := verify.Parse(key, code); err == nil {
+				switch kind {
+				case "INV":
+					var number, status, office string
+					var stotal, spaid sql.NullString
+					if err := a.db.QueryRow(`SELECT i.number, i.status, i.total, i.paid, o.name
+						FROM invoices i JOIN offices o ON o.id=i.office_id WHERE i.id=?`, id).
+						Scan(&number, &status, &stotal, &spaid, &office); err == nil {
+						data["Found"] = true
+						data["Kind"] = "Kuitansi"
+						data["Number"] = number
+						data["Status"] = status
+						data["Total"] = decWhole(stotal.String)
+						data["Paid"] = decWhole(spaid.String)
+						data["Office"] = office
+					} else {
+						data["Error"] = "dokumen tidak ditemukan"
+					}
+				case "DEED":
+					var number, title, status, office string
+					if err := a.db.QueryRow(`SELECT d.number, d.title, d.status, o.name
+						FROM deed_drafts d JOIN offices o ON o.id=d.office_id WHERE d.id=?`, id).
+						Scan(&number, &title, &status, &office); err == nil {
+						data["Found"] = true
+						data["Kind"] = "Akta"
+						data["Number"] = number + " — " + title
+						data["Status"] = status
+						data["Total"] = int64(0)
+						data["Paid"] = int64(0)
+						data["Office"] = office
+						var nsig int
+						_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_signatures WHERE deed_id=?`, id).Scan(&nsig)
+						data["Sigs"] = nsig
+					} else {
+						data["Error"] = "dokumen tidak ditemukan"
+					}
+				default:
+					data["Error"] = "jenis dokumen tidak dikenal"
 				}
-			} else if err != nil {
+			} else {
 				data["Error"] = err.Error()
 			}
 		} else {
@@ -206,6 +231,9 @@ func (a *App) portalPayConfirm(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
+	if !a.requirePlan(w, r, plan.FeatPortalPay) {
+		return
+	}
 	uid := a.uid(r)
 	var clientID int64
 	if uid != nil {
@@ -247,4 +275,91 @@ func (a *App) remindersRun(w http.ResponseWriter, r *http.Request) {
 	appt, overdue, tasks := a.runReminders()
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "reminders.run", Entity: "system", EntityID: "manual", Detail: fmt.Sprintf("janji=%d telat=%d tugas=%d", appt, overdue, tasks)})
 	http.Redirect(w, r, "/tasks?flash=Pengingat+dibangkitkan", http.StatusSeeOther)
+}
+
+// ---- multi-office (ENTERPRISE): consolidated view + acting ----
+
+func (a *App) officesPage(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != rbac.RoleSuperAdmin {
+		a.forbidden(w, r)
+		return
+	}
+	type row struct {
+		ID            int64
+		Name, Plan    string
+		Clients       int
+		Pending       int
+		Outstanding   int64
+		Acting        bool
+	}
+	var out []row
+	rs, _ := a.db.Query(`SELECT id, name, plan FROM offices ORDER BY id`)
+	if rs != nil {
+		defer rs.Close()
+		for rs.Next() {
+			var o row
+			_ = rs.Scan(&o.ID, &o.Name, &o.Plan)
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE office_id=?`, o.ID).Scan(&o.Clients)
+			pending, _, _, _ := a.reqs.Counts(o.ID)
+			o.Pending = pending
+			o.Outstanding, _ = a.fin.Outstanding(o.ID)
+			if c, err := r.Cookie(a.actingCookieName()); err == nil {
+				if oid, ok := a.verifyActing(c.Value); ok && oid == o.ID {
+					o.Acting = true
+				}
+			}
+			out = append(out, o)
+		}
+	}
+	a.render(w, r, "offices", "Multi-Kantor", map[string]any{"Offices": out})
+}
+
+func (a *App) officeAct(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != rbac.RoleSuperAdmin {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	if v := r.FormValue("office_id"); v == "" {
+		http.SetCookie(w, &http.Cookie{Name: a.actingCookieName(), Path: "/", MaxAge: -1})
+		http.Redirect(w, r, "/offices?flash=Kembali+ke+kantor+sendiri", http.StatusSeeOther)
+		return
+	} else {
+		oid, _ := strconv.ParseInt(v, 10, 64)
+		var pl string
+		_ = a.db.QueryRow(`SELECT plan FROM offices WHERE id=?`, oid).Scan(&pl)
+		if !plan.Allowed(pl, plan.FeatActing) {
+			http.Error(w, "Kantor tujuan membutuhkan paket ENTERPRISE untuk dikelola lintas-kantor.", http.StatusPaymentRequired)
+			return
+		}
+		tok := a.signActing(oid)
+		if tok == "" {
+			http.Error(w, "kunci penandatanganan belum dikonfigurasi", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: a.actingCookieName(), Value: tok, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: a.cfg.TLSCookie, MaxAge: 8 * 3600})
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.act", Entity: "office", EntityID: strconv.FormatInt(oid, 10)})
+		http.Redirect(w, r, "/app?flash=Bertindak+untuk+kantor+%23"+strconv.FormatInt(oid, 10), http.StatusSeeOther)
+	}
+}
+
+func (a *App) officePlanSave(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != rbac.RoleSuperAdmin {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	oid, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	switch p := r.FormValue("plan"); p {
+	case "LITE", "PRO", "ENTERPRISE":
+		if _, err := a.db.Exec(`UPDATE offices SET plan=? WHERE id=?`, p, oid); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.plan", Entity: "office", EntityID: strconv.FormatInt(oid, 10), Detail: p})
+	default:
+		http.Error(w, "paket tidak dikenal", http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/offices?flash=Paket+diperbarui", http.StatusSeeOther)
 }
