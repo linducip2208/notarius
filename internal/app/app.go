@@ -217,6 +217,8 @@ func (a *App) Router() http.Handler {
 	r.Get("/llms.txt", a.llmsTxt)
 	r.Get("/layanan", a.layananIndex)
 	r.Get("/layanan/{code}", a.layananDetail)
+	r.Get("/docs", a.docsIndex)
+	r.Get("/docs/{step}", a.docsStep)
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
 	r.Get("/login", a.loginForm)
 	r.With(limiter.Limit).Post("/login", a.login)
@@ -433,6 +435,10 @@ func (a *App) sitemapXML(w http.ResponseWriter, r *http.Request) {
 	for _, s := range []string{"#fitur", "#solusi", "#harga", "#faq"} {
 		urls = append(urls, url{base + "/" + s, "monthly", "0.5"})
 	}
+	urls = append(urls, url{base + "/docs", "monthly", "0.9"})
+	for _, st := range docSteps() {
+		urls = append(urls, url{base + "/docs/" + st.Slug, "monthly", "0.7"})
+	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`))
 	for _, u := range urls {
@@ -462,6 +468,7 @@ func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 
 ## Halaman
 - / (landing) · /layanan (indeks) · /layanan/{kode} (detail per layanan, syarat + alur)
+- /docs (tutorial) · /docs/{langkah} (ktp-masuk, ocr-proses, review-verifikasi, dokumen-sah)
 - Aplikasi butuh akun: /login (demo: admin@contoh.id — sandi demo di halaman login).
 `))
 }
@@ -530,6 +537,86 @@ func (a *App) layananDetail(w http.ResponseWriter, r *http.Request) {
 		"Code": code, "Name": name, "Category": category, "Price": price, "Reqs": reqs,
 	}); err != nil {
 		a.log.Error("render", "page", "layanan_detail", "err", err)
+		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+	}
+}
+
+// ---- tutorial publik: KTP masuk -> dokumen legalitas sah ----
+
+type docStep struct {
+	Slug, Title, Img, Alt, Intro string
+	Points                       []string
+	Honest                       string
+	CTA, CTAURL                  string
+}
+
+func docSteps() []docStep {
+	return []docStep{
+		{"ktp-masuk", "1. KTP & Dokumen Masuk", "notarius-doc-ktp.jpg", "Memfoto KTP di atas meja notaris",
+			"Unggah foto/scan KTP, KK, NPWP, atau dokumen pendukung dari halaman detail klien.",
+			[]string{"Buka /clients → pilih klien → tab Dokumen → Unggah", "Format JPG/PNG/WebP/PDF, maksimal 100MB, tersimpan privat", "Setiap berkas tercatat hash SHA-256 + status OCR"},
+			"Foto buram = OCR gagal. Pastikan KTP terang, fokus, dan tidak terpotong.",
+			"Mulai dari klien", "/clients"},
+		{"ocr-proses", "2. OCR Memproses", "notarius-doc-ocr.jpg", "Pemindai OCR membaca dokumen",
+			"Tesseract lokal membaca teks (Indonesia/Inggris), hasilnya disimpan beserta provenance.",
+			[]string{"Klik Jalankan OCR pada berkas → status PENDING → DONE/FAILED", "Hasil mentah tersimpan di riwayat AI (provider, versi engine, waktu)", "Tidak ada data yang otomatis dianggap benar pada tahap ini"},
+			"OCR salah baca adalah normal (stempel, tulisan tangan). Tahap berikut wajib verifikasi manusia.",
+			"Lihat Document Center", "/documents"},
+		{"review-verifikasi", "3. Review & Verifikasi Manusia", "notarius-doc-review.jpg", "Staf memverifikasi hasil OCR",
+			"Staf membandingkan teks hasil OCR dengan dokumen asli, lalu mengesahkan identitas.",
+			[]string{"Buka berkas → cocokkan NIK/nama dengan fisik dokumen", "Klik Verifikasi — tercatat siapa & kapan (verified_by/at)", "Hanya identitas terverifikasi yang dipakai ke akta"},
+			"Verifikasi tidak boleh diwakilkan ke OCR. Akun verifier tercatat di audit log.",
+			"Verifikasi identitas", "/clients"},
+		{"dokumen-sah", "4. Menjadi Dokumen Legalitas yang Sah", "notarius-doc-legal.jpg", "Akta ditandatangani dengan segel",
+			"Data terverifikasi masuk draf akta → review → pengesahan notaris → dokumen sah + repertorium.",
+			[]string{"Buat draf dari template terapproved (data terisi dari identitas terverifikasi)", "Kirim review → notaris mengesahkan dengan nomor akta", "Final terkunci; repertorium otomatis; ekspor PDF/DOCX berwatermark"},
+			"Keabsahan berasal dari pengesahan notaris sesuai UUJN — bukan dari OCR/aplikasi.",
+			"Buat draf akta", "/deeds"},
+	}
+}
+
+// docsIndex renders the tutorial hub.
+func (a *App) docsIndex(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != "" {
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := a.tmpl.ExecuteTemplate(w, "docs_index", map[string]any{"Steps": docSteps()}); err != nil {
+		a.log.Error("render", "page", "docs_index", "err", err)
+		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+	}
+}
+
+// docsStep renders one tutorial step.
+func (a *App) docsStep(w http.ResponseWriter, r *http.Request) {
+	if mw.RoleOf(r) != "" {
+		http.Redirect(w, r, "/app", http.StatusSeeOther)
+		return
+	}
+	slug := chi.URLParam(r, "step")
+	steps := docSteps()
+	idx := -1
+	for i, s := range steps {
+		if s.Slug == slug {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		http.NotFound(w, r)
+		return
+	}
+	var prev, next *docStep
+	if idx > 0 {
+		prev = &steps[idx-1]
+	}
+	if idx < len(steps)-1 {
+		next = &steps[idx+1]
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := a.tmpl.ExecuteTemplate(w, "docs_step", map[string]any{"Step": steps[idx], "Prev": prev, "Next": next, "Idx": idx + 1, "Total": len(steps)}); err != nil {
+		a.log.Error("render", "page", "docs_step", "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
 }

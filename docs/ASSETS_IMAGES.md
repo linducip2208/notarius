@@ -17,6 +17,10 @@ frame tengah (_00007_) · seed tetap.
 | notarius-feat-laporan.jpg | monitor laporan di kantor navy | 36 | kartu Laporan + banner /reports |
 | notarius-feat-keamanan.jpg | gembok kuningan di dokumen berpita | 37 | kartu Keamanan + banner /settings |
 | notarius-feat-dokumen.jpg | boks arsip berlabel di rak | 38 | kartu Dokumen + banner /documents |
+| notarius-doc-ktp.jpg | kartu identitas + ponsel di meja | 45 | tutorial /docs/ktp-masuk |
+| notarius-doc-ocr.jpg | pemindai + berkas + sorot cahaya | 46 | tutorial /docs/ocr-proses |
+| notarius-doc-review.jpg | staf membandingkan berkas | 43 | tutorial /docs/review-verifikasi |
+| notarius-doc-legal.jpg | akta + segel lilin + timbangan | 44 | tutorial /docs/dokumen-sah |
 
 Lisensi: hasil generate lokal milik kantor. Regenerasi: samakan seed + jalankan skrip.
 Catatan: frame tablet portal mengandung teks semu (khas T2V 1.3B) — aman dipakai kecil;

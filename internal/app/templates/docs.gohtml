@@ -1,0 +1,70 @@
+{{define "docs_index"}}<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Tutorial: KTP Masuk → Dokumen Legalitas Sah | SaktiNotaris Docs</title>
+<meta name="description" content="Tutorial lengkap: unggah KTP & dokumen, OCR Tesseract, review verifikasi manusia, hingga menjadi dokumen legalitas yang sah di SaktiNotaris."/>
+<link rel="canonical" href="/docs"/>
+<meta property="og:title" content="Tutorial SaktiNotaris: KTP Masuk → Dokumen Sah"/>
+<meta property="og:image" content="/assets/docs/notarius-doc-legal.jpg"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Dari KTP masuk menjadi dokumen legalitas yang sah","step":[{{range $i, $s := .Steps}}{{if $i}},{{end}}{"@type":"HowToStep","name":"{{$s.Title}}","text":"{{$s.Intro}}"}}{{end}}]}</script>
+<link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
+</head>
+<body>
+<header class="navbar navbar-expand-md bg-white border-bottom sticky-top"><div class="container-xl">
+<h1 class="navbar-brand"><a href="/" class="text-decoration-none text-body"><span class="text-yellow fw-bold">S</span> SaktiNotaris <span class="text-secondary small">Docs</span></a></h1>
+<nav class="navbar-nav ms-auto flex-row gap-1 align-items-center" aria-label="Navigasi"><a class="nav-link" href="/">Beranda</a><a class="nav-link" href="/layanan">Layanan</a><a class="btn btn-warning ms-1" href="/login">Coba Aplikasi</a></nav>
+</div></header>
+<main class="container-xl py-5" style="max-width:900px">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item active">Tutorial</li></ol></nav>
+<h2 class="display-6 fw-bold">KTP Masuk → Dokumen Legalitas yang Sah</h2>
+<p class="text-secondary fs-3">Empat langkah nyata di dalam aplikasi — dengan gambar sesungguhnya dari tiap tahap. Prinsipnya: OCR membantu membaca, <strong>manusia yang mengesahkan</strong>.</p>
+{{range $i, $s := .Steps}}
+<div class="card mb-3"><div class="row g-0 align-items-center">
+<div class="col-md-4"><img class="w-100 h-100" style="object-fit:cover;min-height:180px" src="/assets/docs/{{$s.Img}}" alt="{{$s.Alt}}" loading="lazy"/></div>
+<div class="col-md-8"><div class="card-body"><h3>{{$s.Title}}</h3><p class="text-secondary">{{$s.Intro}}</p><a class="btn btn-outline-primary" href="/docs/{{$s.Slug}}">Baca langkah →</a></div></div>
+</div></div>
+{{end}}
+<div class="alert alert-warning"><strong>Catatan kejujuran:</strong> keabsahan dokumen berasal dari pengesahan notaris sesuai UUJN — bukan dari OCR maupun aplikasi ini.</div>
+</main>
+<footer class="py-4 border-top"><div class="container-xl text-secondary small d-flex justify-content-between"><span>© 2026 SaktiNotaris Docs</span><span><a href="/">Beranda</a> · <a href="/layanan">Layanan</a></span></div></footer>
+<script src="/assets/vendor/tabler.min.js"></script>
+</body>
+</html>{{end}}
+
+{{define "docs_step"}}<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{.Step.Title}} | Tutorial SaktiNotaris</title>
+<meta name="description" content="{{.Step.Title}}: {{.Step.Intro}}"/>
+<link rel="canonical" href="/docs/{{.Step.Slug}}"/>
+<meta property="og:title" content="{{.Step.Title}}"/>
+<meta property="og:image" content="/assets/docs/notarius-{{.Step.Img}}"/>
+<link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
+</head>
+<body>
+<header class="navbar navbar-expand-md bg-white border-bottom sticky-top"><div class="container-xl">
+<h1 class="navbar-brand"><a href="/docs" class="text-decoration-none text-body"><span class="text-yellow fw-bold">S</span> SaktiNotaris <span class="text-secondary small">Docs</span></a></h1>
+<nav class="navbar-nav ms-auto flex-row gap-1 align-items-center" aria-label="Navigasi"><a class="nav-link" href="/">Beranda</a><a class="btn btn-warning ms-1" href="/login">Coba Aplikasi</a></nav>
+</div></header>
+<main class="container-xl py-5" style="max-width:820px">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item"><a href="/docs">Tutorial ({{.Idx}}/{{.Total}})</a></li><li class="breadcrumb-item active">{{.Step.Title}}</li></ol></nav>
+<h2 class="display-6 fw-bold">{{.Step.Title}}</h2>
+<p class="text-secondary fs-3">{{.Step.Intro}}</p>
+<img class="img-fluid rounded shadow my-3" style="width:100%;max-height:420px;object-fit:cover" src="/assets/docs/{{.Step.Img}}" alt="{{.Step.Alt}}"/>
+<div class="card"><div class="card-header"><h3 class="card-title">Langkah di aplikasi</h3></div>
+<div class="list-group list-group-flush">{{range .Step.Points}}<div class="list-group-item">✅ {{.}}</div>{{end}}</div></div>
+<div class="alert alert-info mt-3"><strong>Perhatian:</strong> {{.Step.Honest}}</div>
+<div class="d-flex gap-2 mt-3">
+{{if .Prev}}<a class="btn btn-outline-primary" href="/docs/{{.Prev.Slug}}">← {{.Prev.Title}}</a>{{end}}
+<a class="btn btn-warning" href="{{.Step.CTAURL}}">{{.Step.CTA}}</a>
+{{if .Next}}<a class="btn btn-outline-primary ms-auto" href="/docs/{{.Next.Slug}}">{{.Next.Title}} →</a>{{end}}
+</div>
+</main>
+<footer class="py-4 border-top"><div class="container-xl text-secondary small d-flex justify-content-between"><span>© 2026 SaktiNotaris Docs</span><span><a href="/docs">Semua tutorial</a></span></div></footer>
+<script src="/assets/vendor/tabler.min.js"></script>
+</body>
+</html>{{end}}
