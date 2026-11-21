@@ -31,10 +31,11 @@
 {{define "portal_invoices"}}{{template "head" .}}{{template "page_open" .}}
 <div class="alert alert-info">Tagihan Anda. Untuk membayar: transfer sesuai nominal, lalu unggah bukti — staf memverifikasi dan status diperbarui.</div>
 <div class="card"><div class="card-header"><h3 class="card-title">Tagihan Saya</h3></div>
-<div class="table-responsive"><table class="table card-table"><thead><tr><th>Nomor</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Jatuh tempo</th><th>Status</th><th>Bukti</th></tr></thead>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Nomor</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Jatuh tempo</th><th>Status</th><th>Kuitansi</th><th>Bukti</th></tr></thead>
 <tbody>{{range .Data}}<tr><td>{{.Number}}</td><td>{{.Total}}</td><td>{{.Paid}}</td><td>{{.Outstanding}}</td><td>{{.Due}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
+<td><a class="btn btn-sm btn-ghost-primary" href="/portal/invoices/{{.ID}}/receipt">Kuitansi</a></td>
 <td>{{if ne .Status "PAID"}}<form method="post" action="/portal/pay" enctype="multipart/form-data" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" type="file" name="bukti" required/><button class="btn btn-sm btn-primary" type="submit">Kirim</button></form>{{else}}<span class="text-success">Lunas ✓</span>{{end}}</td></tr>
-{{else}}<tr><td colspan="7" class="text-center text-secondary py-3">Belum ada tagihan.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-3">Belum ada tagihan.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "portal_pay_ok"}}{{template "head" .}}{{template "page_open" .}}

@@ -1,5 +1,12 @@
 # CHANGELOG
-## [Hardening] — 2026-11-22 — lockout + token expiry (dibuktikan)
+## [Ops-Growth] — 2026-11-22 — semua ide fitur non-SaaS (dibuktikan E2E + integrasi)
+- CRM: skor kelengkapan profil, timeline 360 (tagihan/janji/berkas/verifikasi), spesimen TTD pembanding visual.
+- Keuangan: rekonsiliasi bank CSV + automatch eksplisit, anggaran vs realisasi, laba per layanan, invoice tertaut permohonan.
+- Operasi: inquiry→permohonan 1 klik, peringatan konsistensi korporat + org chart cetak, gate pra-pengesahan akta, paket ZIP akta, berkas tertaut akta, 3-way template, antrean legalisasi + estimasi, tindak lanjut gov, review + pembukaan wasiat bersaksi, tugas berulang + tautan konteks + refLink, retensi→tugas, backup mysqldump 1 klik, mode darurat baca-saja (READ_ONLY=1), kalender 14 hari, kartu notaris + banner kata sandi di dasbor, celah nomor repertorium + label QR, kuitansi portal + notifikasi berkas baru.
+- Pengingat: ultah, identitas kedaluwarsa, review wasiat tahunan, ringkasan pagi, SLA per layanan.
+- Keamanan: sesi catat IP/UA + notifikasi perangkat baru (login biasa + MFA).
+- Migrasi 019. Bukti: ops_growth.py nihil gagal + integrasi MySQL + regresi penuh.
+- Batasan jujur: H-1 WA aktif hanya bila gateway dikonfigurasi; OCR search sudah ada (dipakai ulang); kata sandi belum ada alur ganti mandiri (banner + admin reset).
 - Lockout: 5x gagal/15 mnt → kunci 15 mnt per email lintas IP; `login_attempts` aktif dipakai; sukses membersihkan riwayat; pesan generik; audit `login.locked`.
 - Cookie CSRF → `HttpOnly`; token pratinjau draf HMAC → kedaluwarsa 24 jam.
 - Bukti: curl 6x salah → kunci tampil; integrasi MySQL PASS; E2E growth/cms/matrix/fase1a-b/fase2-3/wizard/merge/interact/confirm SEMUA HIJAU.

@@ -5,8 +5,9 @@
 <span class="badge bg-azure-lt">{{.Data.Client.Kind}}</span> <span class="badge {{if eq .Data.Client.Status "ACTIVE"}}bg-green-lt{{else}}bg-yellow-lt{{end}}">{{.Data.Client.Status}}</span>
 {{if .Data.Client.RegNumber}}<span class="badge bg-blue-lt">{{.Data.Client.RegNumber}}</span>{{end}}
 <div><span class="text-secondary small">{{.Data.Client.Phone}}{{if .Data.Client.WANumber}} · WA {{.Data.Client.WANumber}}{{end}} · {{.Data.Client.Email}}</span></div></div></div>
-<div class="d-flex gap-2 flex-wrap">{{if .Data.CanEdit}}<a class="btn btn-outline-primary" href="/clients/{{.Data.Client.ID}}/edit">Edit Profil</a>{{end}}<a class="btn btn-outline-primary" href="/requests?client={{.Data.Client.ID}}">+ Permohonan</a><button class="btn btn-primary" type="button" onclick="document.querySelector('a[href=\'#tab-doc\']').click();document.getElementById('tab-doc').scrollIntoView()">Unggah Berkas</button></div>
+<div class="d-flex gap-2 flex-wrap">{{if .Data.CanEdit}}<a class="btn btn-outline-primary" href="/clients/{{.Data.Client.ID}}/edit">Edit Profil</a>{{end}}<a class="btn btn-outline-primary" href="/requests?client={{.Data.Client.ID}}">+ Permohonan</a><a class="btn btn-outline-primary" href="/clients/{{.Data.Client.ID}}/specimens">Spesimen TTD</a><button class="btn btn-primary" type="button" onclick="document.querySelector('a[href=\'#tab-doc\']').click();document.getElementById('tab-doc').scrollIntoView()">Unggah Berkas</button></div>
 </div></div></div>
+{{if .Data.Missing}}<div class="alert alert-info">Kelengkapan profil {{.Data.Complete}}% — kurang: {{range .Data.Missing}}{{.Label}} ({{.Weight}}) · {{end}}<a href="/clients/{{.Data.Client.ID}}/edit">Lengkapi →</a></div>{{end}}
 <div class="row g-2 mb-3">
 <div class="col-sm-6 col-lg"><div class="card"><div class="card-body"><div class="subheader">Pekerjaan</div><div class="h1 mb-0">{{len .Data.Services}}</div><div class="small text-secondary">tercatat</div></div></div></div>
 <div class="col-sm-6 col-lg"><div class="card"><div class="card-body"><div class="subheader">Dokumen</div><div class="h1 mb-0">{{len .Data.Files}}</div><div class="small text-secondary">berkas privat</div></div></div></div>

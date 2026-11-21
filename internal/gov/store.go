@@ -77,7 +77,7 @@ func (s *Store) ToggleCheckScoped(officeID, id int64, index int) error {
 
 // List returns submissions for the office.
 func (s *Store) List(officeID int64) ([]Submission, error) {
-	rows, err := s.db.Query(`SELECT id, channel, reference, status, checklist, receipt_no, notes, updated_at
+	rows, err := s.db.Query(`SELECT id, channel, reference, status, checklist, receipt_no, notes, updated_at, follow_up
 		FROM gov_submissions WHERE office_id=? ORDER BY id DESC LIMIT 200`, officeID)
 	if err != nil {
 		return nil, err
@@ -87,8 +87,8 @@ func (s *Store) List(officeID int64) ([]Submission, error) {
 	for rows.Next() {
 		var x Submission
 		var ch, st, cl sql.NullString
-		var rcpt, notes sql.NullString
-		if err := rows.Scan(&x.ID, &ch, &x.Reference, &st, &cl, &rcpt, &notes, &x.UpdatedAt); err != nil {
+		var rcpt, notes, fu sql.NullString
+		if err := rows.Scan(&x.ID, &ch, &x.Reference, &st, &cl, &rcpt, &notes, &x.UpdatedAt, &fu); err != nil {
 			return nil, err
 		}
 		if ch.Valid {
@@ -106,6 +106,7 @@ func (s *Store) List(officeID int64) ([]Submission, error) {
 		if notes.Valid {
 			x.Notes = notes.String
 		}
+		x.FollowUp = fu.String
 		out = append(out, x)
 	}
 	return out, rows.Err()

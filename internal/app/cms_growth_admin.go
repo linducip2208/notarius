@@ -51,7 +51,20 @@ func (a *App) cmsInquiries(w http.ResponseWriter, r *http.Request) {
 	}
 	var nb int
 	_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_inquiries WHERE office_id=? AND status='BARU'`, a.officeOf(r)).Scan(&nb)
-	a.render(w, r, "cms_inquiries", "Konsultasi Masuk", map[string]any{"Rows": out, "St": st, "NewCount": nb})
+	type svc struct {
+		ID   int64
+		Name string
+	}
+	var svcs []svc
+	if srows, err := a.db.Query(`SELECT id, name FROM services WHERE is_active=1 ORDER BY name`); err == nil && srows != nil {
+		defer srows.Close()
+		for srows.Next() {
+			var x svc
+			_ = srows.Scan(&x.ID, &x.Name)
+			svcs = append(svcs, x)
+		}
+	}
+	a.render(w, r, "cms_inquiries", "Konsultasi Masuk", map[string]any{"Rows": out, "St": st, "NewCount": nb, "Svcs": svcs})
 }
 
 func (a *App) cmsInquiryStatus(w http.ResponseWriter, r *http.Request) {

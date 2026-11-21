@@ -8,14 +8,14 @@
 <div class="col-md-1 mb-2"><input class="form-control" name="fee" placeholder="Biaya" value="0"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
 </div></form></div>
-<div class="card"><div class="card-header"><h3 class="card-title">Buku Register</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jenis</th><th>No. Register</th><th>Dokumen</th><th>Biaya</th><th>Status</th><th>Serah</th></tr></thead>
-<tbody>{{range .Data.Rows}}<tr><td>{{.Kind}}</td><td>{{.Reg}}</td><td>{{.Title}}</td><td>{{.Fee}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td><td><form method="post" action="/legalisasi/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option value="COMPLETED">COMPLETED</option><option value="HANDED_OVER">HANDED_OVER</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada register.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Buku Register (antrean: REGISTERED terlama dipanggil dulu)</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Antre</th><th>Jenis</th><th>No. Register</th><th>Dokumen</th><th>Biaya</th><th>Status</th><th>Estimasi ambil</th><th>Serah</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr>{{if eq .Status "REGISTERED"}}<td><span class="badge bg-yellow-lt">#{{.Queue}}</span></td>{{else}}<td class="text-secondary">—</td>{{end}}<td>{{.Kind}}</td><td>{{.Reg}}</td><td>{{.Title}}</td><td>{{.Fee}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td><td class="text-secondary small">{{if eq .Status "REGISTERED"}}±2 hari kerja{{else}}—{{end}}</td><td><form method="post" action="/legalisasi/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option value="COMPLETED">COMPLETED</option><option value="HANDED_OVER">HANDED_OVER</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada register.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "gov"}}{{template "head" .}}{{template "page_open" .}}
-<div class="alert alert-info">Alur <strong>asistensi</strong>: data disiapkan di SaktiNotaris, pengisian dilakukan manual oleh staf berwenang di portal resmi, lalu bukti diarsipkan di sini. Tidak ada endpoint pemerintah yang diinventarisasi.</div>
+<div class="alert alert-info">Alur <strong>asistensi</strong>: data disiapkan di SaktiNotaris, pengisian dilakukan manual oleh staf berwenang di portal resmi, lalu bukti diarsipkan di sini. Tidak ada endpoint pemerintah yang diinventarisasi. Lihat <a href="/tariffs">daftar biaya resmi (PNBP/materai)</a>.</div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Pengajuan Baru</h3></div>
 <form method="post" action="/gov"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="channel"><option value="AHU">AHU</option><option value="OSS">OSS</option></select></div>
@@ -23,14 +23,15 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Pengajuan AHU / OSS</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Kanal</th><th>Referensi</th><th>Status</th><th>Bukti</th><th>Checklist</th><th>Ubah</th></tr></thead>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Kanal</th><th>Referensi</th><th>Status</th><th>Bukti</th><th>Tindak Lanjut</th><th>Checklist</th><th>Ubah</th></tr></thead>
 <tbody>{{range .Data.Subs}}{{$sid := .ID}}<tr><td>{{$sid}}</td><td>{{.Channel}}</td><td>{{.Reference}}<div class="small text-secondary">{{range $i, $c := .Checklist}}{{if $c.Done}}✓{{else}}○{{end}} {{$c.Label}}<form method="post" action="/gov/{{$sid}}/check" class="d-inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"/><input type="hidden" name="index" value="{{$i}}"/><button class="btn btn-sm btn-ghost-primary py-0" type="submit">toggle</button></form><br/>{{end}}</div></td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td>{{.ReceiptNo}}</td>
+<td><form method="post" action="/gov/{{$sid}}/followup" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" type="date" name="follow_up" value="{{.FollowUp}}"/><button class="btn btn-sm btn-ghost-primary" type="submit" title="Tanggal tindak lanjut resi manual">OK</button></form></td>
 <td><span class="text-secondary small">{{len .Checklist}} item</span></td>
 <td><form method="post" action="/gov/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}
 <select class="form-select form-select-sm" name="to"><option value="READY">READY</option><option value="SUBMITTED">SUBMITTED</option><option value="ACCEPTED">ACCEPTED</option><option value="REJECTED">REJECTED</option></select>
 <input class="form-control form-control-sm" name="receipt_no" placeholder="No. bukti"/>
 <button class="btn btn-sm btn-primary" type="submit">OK</button></form></td></tr>
-{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada pengajuan.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada pengajuan.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "finance"}}{{template "head" .}}{{template "page_open" .}}
@@ -40,8 +41,9 @@
 <div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Piutang berjalan</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
 <div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Penerimaan {{.Data.Month}}</div><div class="h1">Rp {{.Data.Revenue}}</div></div></div></div>
 </div>
+<p><a class="btn btn-ghost-primary" href="/finance/bank">Rekonsiliasi Bank →</a></p>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Invoice Baru</h3></div>
-<form method="post" action="/invoices">{{template "csrf" .}}<div class="card-body">
+<form method="post" action="/invoices">{{template "csrf" .}}<input type="hidden" name="request_id" value="{{.Data.ReqID}}"/><div class="card-body">
 <div class="row"><div class="col-md-4 mb-2"><input class="form-control" name="number" placeholder="Nomor invoice" required/></div>
 <div class="col-md-4 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
 <div class="col-md-4 mb-2"><input class="form-control" type="date" name="due_date"/></div></div>
@@ -94,6 +96,13 @@
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Piutang</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
 </div>
 <p class="text-secondary mt-3">Seluruh angka dihitung dari query database — tanpa data fabrikasi.</p>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Anggaran vs Realisasi ({{.Data.Month}})</h3><div class="ms-auto"><form method="post" action="/budgets" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="category" placeholder="Kategori" style="max-width:130px"/><input class="form-control form-control-sm" name="month" placeholder="YYYY-MM" style="max-width:100px"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal" style="max-width:110px"/><button class="btn btn-sm btn-outline-primary" type="submit">Simpan</button></form></div></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Kategori</th><th class="text-end">Anggaran</th><th class="text-end">Realisasi</th><th class="text-end">Sisa</th></tr></thead>
+<tbody>{{range .Data.Budgets}}<tr><td>{{.Category}}</td><td class="text-end">{{.Budget}}</td><td class="text-end">{{.Spent}}</td><td class="text-end">{{sub .Budget .Spent}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada anggaran bulan ini. Tambahkan lewat form di atas.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Pendapatan per Layanan</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Layanan</th><th class="text-end">Invoice</th><th class="text-end">Total</th></tr></thead>
+<tbody>{{range .Data.Profits}}<tr><td>{{.Service}}</td><td class="text-end">{{.Count}}</td><td class="text-end">{{.Total}}</td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada data.</td></tr>{{end}}</tbody></table></div>
+<p class="text-secondary small mx-3">Hanya invoice yang tertaut permohonan yang terpetakan ke layanan — tautkan invoice baru lewat halaman permohonan.</p></div>
 {{template "page_close" .}}{{end}}
 
 {{define "settings"}}{{template "head" .}}{{template "page_open" .}}
@@ -125,9 +134,12 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Daftar</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Register Wasiat</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Klien</th><th>No. Register</th><th>Status</th><th>Serah-terima</th></tr></thead>
-<tbody>{{range .Data.Wills}}<tr><td>{{.ID}}</td><td>{{.ClientID}}</td><td>{{.RegisterNo}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td><td><form method="post" action="/wills/{{.ID}}/handover" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="handed_to" placeholder="Diserahkan ke" style="width:120px"/><button class="btn btn-sm btn-outline-primary" type="submit">Serahkan</button></form></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Klien</th><th>No. Register</th><th>Status</th><th>Review</th><th>Pembukaan</th><th>Serah-terima</th></tr></thead>
+<tbody>{{range .Data.Wills}}<tr><td>{{.ID}}</td><td>{{.ClientID}}</td><td>{{.RegisterNo}}</td><td><span class="badge bg-yellow-lt">{{.Status}}</span></td>
+<td>{{if .ReviewDate}}<span class="text-secondary small">{{.ReviewDate}}</span>{{else}}<form method="post" action="/wills/{{.ID}}/review">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-primary" type="submit" title="Catat review tahunan hari ini">Review</button></form>{{end}}</td>
+<td>{{if .OpenedAt}}<span class="badge bg-green-lt">dibuka</span> <span class="text-secondary small">{{.Witness}} · {{.OpenedAt}}</span>{{else}}<form method="post" action="/wills/{{.ID}}/open" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="witness" placeholder="Saksi pembuka" style="width:110px" required/><input class="form-control form-control-sm" name="note" placeholder="Berita acara" style="width:110px"/><button class="btn btn-sm btn-outline-warning" type="submit" onclick="return confirm('Catat pembukaan bersaksi?')">Buka</button></form>{{end}}</td>
+<td><form method="post" action="/wills/{{.ID}}/handover" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="handed_to" placeholder="Diserahkan ke" style="width:100px"/><button class="btn btn-sm btn-outline-primary" type="submit">Serahkan</button></form></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "portal"}}{{template "head" .}}{{template "page_open" .}}

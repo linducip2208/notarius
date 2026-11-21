@@ -1,0 +1,39 @@
+{{define "specimens"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients/{{.Data.ClientID}}">Klien</a></li><li class="breadcrumb-item active">Spesimen</li></ol></nav>
+<p class="text-secondary">Spesimen tanda tangan/cap untuk pembanding visual saat verifikasi dokumen. Unggah dari contoh bertinta basah yang disaksikan.</p>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Spesimen Baru (gambar)</h3></div>
+<form method="post" action="/clients/{{.Data.ClientID}}/specimens" enctype="multipart/form-data"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><select class="form-select" name="kind"><option>TTD</option><option>CAP</option><option>STEMPEL</option><option>LAIN</option></select></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="file" name="file" accept="image/*" required/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="note" placeholder="Catatan (tgl pengambilan)"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Unggah</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Daftar Spesimen</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Jenis</th><th>Pratinjau</th><th>Catatan</th><th>Diambil</th><th>Banding</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td><span class="badge bg-azure-lt">{{.Kind}}</span></td>
+<td><a href="/documents/{{.File}}" target="_blank">berkas #{{.File}}</a></td><td>{{.Note}}</td><td class="text-secondary small">{{.At}}</td>
+<td>{{if $.Data.Compare}}<a class="btn btn-sm btn-outline-primary" href="/clients/{{$.Data.ClientID}}/specimens?compare={{.File}}">Banding</a>{{end}}</td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada spesimen.</td></tr>{{end}}</tbody></table></div>
+{{if .Data.Compare}}<div class="card-body border-top"><h4>Banding berdampingan</h4>
+<div class="row"><div class="col-md-6"><strong>Spesimen</strong><br/><a class="btn btn-sm btn-ghost-primary" href="/documents/{{.Data.Compare}}" target="_blank">Buka berkas acuan #{{.Data.Compare}}</a></div>
+<div class="col-md-6"><strong>Dokumen acuan #{{.Data.Compare}}</strong><p class="text-secondary small">Buka keduanya berdampingan (dua tab) dan bandingkan goresan secara visual. Tidak ada skor otomatis — keputusan manusia.</p></div></div></div>{{end}}
+</div>
+{{template "page_close" .}}{{end}}
+
+{{define "bank"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/finance">Keuangan</a></li><li class="breadcrumb-item active">Rekonsiliasi Bank</li></ol></nav>
+<p class="text-secondary">Impor mutasi CSV bank → cocokkan otomatis dengan invoice (nominal sama persis ±0 dalam 30 hari). Cocok & selisih <strong>ditampilkan eksplisit</strong>, tidak pernah dipaksa.</p>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Impor Mutasi (CSV: tanggal,uraian,nominal)</h3></div>
+<form method="post" action="/finance/bank/upload" enctype="multipart/form-data"><div class="card-body d-flex gap-2">{{template "csrf" .}}
+<input class="form-control" type="file" name="file" accept=".csv" required/>
+<button class="btn btn-primary" type="submit">Impor</button>
+</div></form>
+<div class="card-body border-top"><form method="post" action="/finance/bank/match">{{template "csrf" .}}<button class="btn btn-outline-primary" type="submit" onclick="return confirm('Cocokkan otomatis semua mutasi belum cocok?')">Cocok Otomatis Semua</button>
+<span class="text-secondary small ms-2">Kriteria: nominal sama persis, invoice belum lunas, dalam rentang 30 hari sebelum – 7 hari sesudah mutasi.</span></form></div></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Mutasi</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Tanggal</th><th>Uraian</th><th class="text-end">Nominal</th><th>Status</th><th>Taut Manual</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.Date}}</td><td>{{.Desc}}</td><td class="text-end">{{.Amount}}</td>
+<td>{{if .Matched}}<a href="/finance"><span class="badge bg-green-lt">cocok #{{.Matched}}</span></a>{{else}}<span class="badge bg-yellow-lt">belum cocok</span>{{end}}</td>
+<td><form method="post" action="/finance/bank/manual" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="mutation_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="invoice_id" placeholder="ID invoice" style="max-width:100px"/><button class="btn btn-sm btn-ghost-primary" type="submit">Taut</button></form></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada mutasi. Impor CSV dari e-banking.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}

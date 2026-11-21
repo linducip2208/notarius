@@ -146,10 +146,17 @@ func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	return tx.Commit()
 }
 
-// List returns deeds newest first.
-func (s *Store) List(officeID int64) ([]Deed, error) {
-	rows, err := s.db.Query(`SELECT id, office_id, request_id, number, title, kind, status, version, locked
-		FROM deed_drafts WHERE office_id=? ORDER BY id DESC LIMIT 200`, officeID)
+// List returns deeds newest first (optional status filter).
+func (s *Store) List(officeID int64, status ...string) ([]Deed, error) {
+	q := `SELECT id, office_id, request_id, number, title, kind, status, version, locked
+		FROM deed_drafts WHERE office_id=?`
+	args := []any{officeID}
+	if len(status) > 0 && status[0] != "" {
+		q += ` AND status=?`
+		args = append(args, status[0])
+	}
+	q += ` ORDER BY id DESC LIMIT 200`
+	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

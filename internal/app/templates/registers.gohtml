@@ -46,9 +46,10 @@
 <input class="form-control" style="max-width:260px" type="search" name="q" placeholder="Cari nomor / uraian…" value="{{.Data.Q}}"/>
 <button class="btn btn-primary" type="submit">Filter</button>
 </div></form>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Para pihak</th></tr></thead>
-<tbody>{{range .Data.Rows}}<tr><td>{{.No}}</td><td>{{.Date}}</td><td>{{.Desc}}</td><td>{{.Parties}}</td></tr>
-{{else}}<tr><td colspan="4" class="text-center text-secondary py-4">Belum ada entri repertorium. Nomor terisi otomatis saat akta disahkan.</td></tr>{{end}}</tbody></table></div></div>
+{{if .Data.Gaps}}<div class="alert alert-warning">Nomor lompat terdeteksi: {{range .Data.Gaps}}<span class="badge bg-yellow-lt me-1">{{.}}</span>{{end}}<span class="text-secondary small">— selidiki sebelum tutup tahun buku.</span></div>{{end}}
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Para pihak</th><th class="no-print">Label</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.No}}</td><td>{{.Date}}</td><td>{{.Desc}}</td><td>{{.Parties}}</td><td class="no-print"><a class="btn btn-sm btn-ghost-primary" href="/qr?d=Repertorium+{{.No}}+{{.Date}}" target="_blank" title="Label QR untuk map fisik">QR</a></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada entri repertorium. Nomor terisi otomatis saat akta disahkan.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "protocols"}}{{template "head" .}}{{template "page_open" .}}

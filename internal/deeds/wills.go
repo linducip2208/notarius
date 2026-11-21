@@ -12,6 +12,10 @@ type Will struct {
 	DeedID     *int64
 	RegisterNo string
 	Status     string
+	ReviewDate string
+	OpenedBy   int64
+	Witness    string
+	OpenedAt   string
 }
 
 type WillStore struct{ db *sql.DB }
@@ -33,7 +37,8 @@ func (s *WillStore) Register(officeID, clientID int64, deedID *int64, registerNo
 
 // List returns wills for the office (caller must be authorized).
 func (s *WillStore) List(officeID int64) ([]Will, error) {
-	rows, err := s.db.Query(`SELECT id, client_id, deed_id, register_no, status FROM wills WHERE office_id=? ORDER BY id DESC`, officeID)
+	rows, err := s.db.Query(`SELECT id, client_id, deed_id, register_no, status, review_date,
+		COALESCE(opened_by,0), COALESCE(opened_witness,''), COALESCE(opened_at,'') FROM wills WHERE office_id=? ORDER BY id DESC`, officeID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +46,14 @@ func (s *WillStore) List(officeID int64) ([]Will, error) {
 	var out []Will
 	for rows.Next() {
 		var w Will
-		var reg sql.NullString
-		if err := rows.Scan(&w.ID, &w.ClientID, &w.DeedID, &reg, &w.Status); err != nil {
+		var reg, rev sql.NullString
+		if err := rows.Scan(&w.ID, &w.ClientID, &w.DeedID, &reg, &w.Status, &rev, &w.OpenedBy, &w.Witness, &w.OpenedAt); err != nil {
 			return nil, err
 		}
 		if reg.Valid {
 			w.RegisterNo = reg.String
 		}
+		w.ReviewDate = rev.String
 		out = append(out, w)
 	}
 	return out, rows.Err()

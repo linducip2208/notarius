@@ -129,10 +129,11 @@ func RunOnce(db *sql.DB, officeID int64, send Sender) (appt, overdue, tasks, sla
 			tasks++
 		}
 	}
-	// SLA eskalasi: permohonan macet >3 hari tanpa pergerakan.
-	srows, _ := db.Query(`SELECT id, title, status, assignee_id, DATEDIFF(UTC_TIMESTAMP(), updated_at)
-		FROM service_requests WHERE office_id=? AND status IN ('SUBMITTED','IN_REVIEW','NEEDS_DOCS')
-		AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)`, officeID)
+	// SLA eskalasi: permohonan macet melewati sla_days layanannya (default 3 hari).
+	srows, _ := db.Query(`SELECT r.id, r.title, r.status, r.assignee_id, DATEDIFF(UTC_TIMESTAMP(), r.updated_at),
+		COALESCE(s.sla_days, 3) FROM service_requests r LEFT JOIN services s ON s.id=r.service_id
+		WHERE r.office_id=? AND r.status IN ('SUBMITTED','IN_REVIEW','NEED_DOCS')
+		AND r.updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL COALESCE(s.sla_days,3) DAY)`, officeID)
 	if srows != nil {
 		defer srows.Close()
 		for srows.Next() {

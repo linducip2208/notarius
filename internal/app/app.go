@@ -121,6 +121,27 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"safeHTML":  func(s string) template.HTML { return template.HTML(safehtml.Sanitize(s)) },
 		"cmsHTML":   func(s string) template.HTML { return template.HTML(cms.SanitizeHTML(s)) },
 		"plaintext": func(s string) string { return safehtml.ToText(s) },
+		"sub": func(a, b int64) int64 { return a - b },
+		// refLink renders a safe deep-link for task context references.
+		"refLink": func(typ string, id int64) template.HTML {
+			if id <= 0 {
+				return ""
+			}
+			var href, label string
+			switch typ {
+			case "deed":
+				href, label = "/deeds/"+strconv.FormatInt(id, 10), "akta"
+			case "request":
+				href, label = "/requests/"+strconv.FormatInt(id, 10), "permohonan"
+			case "client":
+				href, label = "/clients/"+strconv.FormatInt(id, 10), "klien"
+			case "file":
+				href, label = "/documents/"+strconv.FormatInt(id, 10), "berkas"
+			default:
+				return ""
+			}
+			return template.HTML(`<a href="` + href + `">` + label + ` #` + strconv.FormatInt(id, 10) + `</a>`)
+		},
 	}).ParseFS(tmplFS, "templates/*.gohtml")
 	if err != nil {
 		return nil, err
@@ -204,6 +225,13 @@ func (a *App) runReminders() (appt, overdue, tasks, sla int) {
 		_ = rows.Scan(&oid)
 		pa, po, pt, ps, _ := remind.RunOnce(a.db, oid, deliver.FromEnv())
 		appt, overdue, tasks, sla = appt+pa, overdue+po, tasks+pt, sla+ps
+		// Orang & dokumen: ultah, identitas kedaluwarsa, review wasiat tahunan (tercatat terpisah).
+		pb, pe, pw, _ := remind.RunPeople(a.db, oid, deliver.FromEnv())
+		if n := pb + pe + pw; n > 0 {
+			a.audit.Record(audit.Entry{Action: "reminders.people", Entity: "office", EntityID: strconv.FormatInt(oid, 10), Detail: fmt.Sprintf("ultah=%d id-exp=%d wasiat=%d", pb, pe, pw)})
+		}
+		// Ringkasan pagi per staf.
+		_, _ = remind.Digest(a.db, oid, deliver.FromEnv())
 		// CMS: terbitkan halaman/artikel terjadwal yang jatuh tempo.
 		if a.web != nil {
 			a.web.PublishDue(oid)
@@ -387,6 +415,7 @@ func (a *App) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(mw.SecurityHeaders)
 	r.Use(mw.LoadSession(a.sessions, a.cfg.SessionName))
+	r.Use(a.readOnly)
 	limiter := mw.NewRateLimiter(10, time.Minute)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
@@ -457,6 +486,8 @@ func (a *App) Router() http.Handler {
 		p.Post("/identities/{id}/flag", a.identityFlag)
 		p.Post("/clients/{id}/reps", a.repAdd)
 		p.Post("/clients/{id}/files", a.fileUpload)
+		p.Get("/clients/{id}/specimens", a.specimens)
+		p.Post("/clients/{id}/specimens", a.specimenUpload)
 		p.Get("/files/{id}", a.fileDownload)
 		p.Post("/files/{id}/ocr", a.fileOCR)
 		p.Get("/requests", a.requestList)
@@ -482,9 +513,13 @@ func (a *App) Router() http.Handler {
 		p.Post("/deeds/{id}/sign", a.deedSign)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
 		p.Get("/deeds/{id}/docx", a.deedDOCX)
+		p.Post("/deeds/{id}/attach", a.deedAttach)
+		p.Get("/deeds/{id}/package", a.deedPackage)
 		p.Get("/wills", a.willsPage)
 		p.Post("/wills", a.willCreate)
 		p.Post("/wills/{id}/handover", a.willHandover)
+		p.Post("/wills/{id}/review", a.willReview)
+		p.Post("/wills/{id}/open", a.willOpen)
 		p.Get("/repertorium", a.repertorium)
 		p.Get("/repertorium/export", a.repertoriumExport)
 		p.Get("/protocols", a.protocols)
@@ -496,9 +531,15 @@ func (a *App) Router() http.Handler {
 		p.Post("/gov", a.govCreate)
 		p.Post("/gov/{id}/advance", a.govAdvance)
 		p.Post("/gov/{id}/check", a.govCheck)
+		p.Post("/gov/{id}/followup", a.govFollowup)
 		p.Get("/finance", a.financePage)
 		p.Post("/invoices", a.invoiceCreate)
 		p.Post("/payments", a.paymentCreate)
+		p.Get("/finance/bank", a.bankPage)
+		p.Post("/finance/bank/upload", a.bankUpload)
+		p.Post("/finance/bank/match", a.bankMatch)
+		p.Post("/finance/bank/manual", a.bankManual)
+		p.Post("/budgets", a.budgetSave)
 		p.Get("/templates", a.templatesPage)
 		p.Post("/templates", a.templateSave)
 		p.Get("/templates/{id}", a.templateEdit)
@@ -609,6 +650,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/dms/archive", a.dmsArchive)
 		p.Post("/dms/archive/locations", a.dmsArchiveLoc)
 		p.Get("/dms/retention", a.dmsRetention)
+		p.Post("/dms/retention/task", a.retentionTask)
 		p.Post("/dms/holds/{hid}/release", a.dmsReleaseHold)
 		p.Get("/dms/duplicates", a.dmsDuplicates)
 		p.Post("/dms/duplicates/merge", a.dmsMerge)
@@ -632,6 +674,9 @@ func (a *App) Router() http.Handler {
 		p.Get("/office/export", a.officeExport)
 		p.Get("/office/license", a.licensePage)
 		p.Post("/office/license", a.licenseSave)
+		p.Post("/office/backup", a.backupNow)
+		p.Get("/portal/invoices/{id}/receipt", a.portalReceipt)
+		p.Post("/cms/inquiries/{id}/convert", a.inquiryToRequest)
 		p.Get("/tasks", a.tasksPage)
 		p.Post("/tasks", a.taskCreate)
 		p.Post("/tasks/{id}/done", a.taskDone)
@@ -705,6 +750,16 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "gagal membuat sesi", http.StatusInternalServerError)
 		return
+	}
+	// Catat IP/UA sesi; beri tahu bila login dari IP yang belum pernah dipakai akun ini.
+	lip := clientIPOf(r)
+	_, _ = a.db.Exec(`UPDATE sessions SET ip=?, user_agent=? WHERE token=?`, lip, r.UserAgent(), sess.Token)
+	var seen int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=? AND ip=? AND token<>?`, u.ID, lip, sess.Token).Scan(&seen)
+	var ever int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=?`, u.ID).Scan(&ever)
+	if seen == 0 && ever > 1 {
+		_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, u.ID, "Login dari IP baru", "Akun Anda login dari "+lip+". Abaikan bila itu Anda.")
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
@@ -1120,6 +1175,20 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			notifs = notifs[:5]
 		}
 	}
+	// Kata sandi kedaluwarsa (>180 hari): banner pengingat.
+	pwStale := false
+	if id := a.uid(r); id != nil {
+		var days int
+		_ = a.db.QueryRow(`SELECT COALESCE(DATEDIFF(NOW(), password_changed_at), 9999) FROM users WHERE id=?`, *id).Scan(&days)
+		pwStale = days > 180
+	}
+	// Kartu notaris: menunggu persetujuan, siap TTE, macet SLA.
+	var toApprove, readySign, stuck int
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status IN ('REVIEW','REVISION')`, office).Scan(&toApprove)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status='APPROVED'`, office).Scan(&readySign)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM service_requests r LEFT JOIN services s ON s.id=r.service_id WHERE r.office_id=? AND r.status IN ('SUBMITTED','IN_REVIEW','NEED_DOCS') AND r.updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL COALESCE(s.sla_days,3) DAY)`, office).Scan(&stuck)
+	}
 	a.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed,
 		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
@@ -1128,6 +1197,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"ReqDots": mkDots(reqSeries), "DeedDots": mkDots(deedSeries),
 		"Clients": totalClients, "MonthDeeds": monthDeeds, "Range": r.URL.Query().Get("range"),
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
+		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
 	})
 }
 
@@ -1431,6 +1501,7 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 	docs, _ := a.uploads.List(a.officeOf(r), "client", c.ID)
 	notes, _ := a.clients.Notes(c.ID, 20)
 	timeline, _ := a.clients.Timeline(c.ID, 30)
+	completeness, missing, _ := a.clients.Completeness(a.officeOf(r), c.ID)
 	// Riwayat layanan + akta + keuangan.
 	type svcRow struct {
 		ID, Title, Service, Status string
@@ -1470,6 +1541,7 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 		"Fin": map[string]int64{"Invoices": fin.Invoices, "Paid": fin.Paid, "Outstanding": fin.Outstanding, "Overdue": fin.Overdue},
 		"CanVerify": rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity),
 		"CanEdit":   rbac.Has(mw.RoleOf(r), rbac.PermEditClient),
+		"Complete": completeness, "Missing": missing,
 	})
 }
 
@@ -1537,9 +1609,9 @@ func (a *App) deedList(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	list, _ := a.deeds.List(a.officeOf(r))
+	list, _ := a.deeds.List(a.officeOf(r), r.URL.Query().Get("status"))
 	tpls, _ := a.tpl.List(a.officeOf(r))
-	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls})
+	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls, "St": r.URL.Query().Get("status")})
 }
 
 func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
@@ -1612,8 +1684,38 @@ func (a *App) repertorium(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.render(w, r, "repertorium", "Repertorium", map[string]any{
-		"Rows": rows, "Year": year, "Month": month, "Q": search,
+		"Rows": rows, "Year": year, "Month": month, "Q": search, "Gaps": a.repertoriumGaps(a.officeOf(r), year),
 	})
+}
+
+// repertoriumGaps finds missing entry_no in a year (numbering discipline, honest gaps).
+func (a *App) repertoriumGaps(officeID int64, year string) []int64 {
+	q := `SELECT entry_no FROM repertorium WHERE office_id=?`
+	args := []any{officeID}
+	if year != "" {
+		q += ` AND YEAR(entry_date)=?`
+		args = append(args, year)
+	}
+	q += ` ORDER BY entry_no`
+	rows, err := a.db.Query(q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var gaps []int64
+	var prev int64
+	first := true
+	for rows.Next() {
+		var n int64
+		_ = rows.Scan(&n)
+		if !first && n > prev+1 {
+			for m := prev + 1; m < n && len(gaps) < 50; m++ {
+				gaps = append(gaps, m)
+			}
+		}
+		prev, first = n, false
+	}
+	return gaps
 }
 
 // repertoriumExport downloads the filtered register as CSV (server-side numbering).
@@ -1694,18 +1796,26 @@ func (a *App) legalisasi(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		ID                       int64
 		Kind, Reg, Title, Status string
+		Created                  string
+		Queue                    int
 		Fee                      float64
 	}
 	var rows []row
 	if a.db != nil {
-		rs, err := a.db.Query(`SELECT id, kind, register_no, doc_title, fee, status FROM legalizations WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
+		rs, err := a.db.Query(`SELECT id, kind, register_no, doc_title, fee, status, DATE_FORMAT(created_at,'%d %b %Y') FROM legalizations WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
 		if err == nil {
 			defer rs.Close()
 			for rs.Next() {
 				var x row
-				var sfee string
-				_ = rs.Scan(&x.ID, &x.Kind, &x.Reg, &x.Title, &sfee, &x.Status)
+				var sfee, created string
+				_ = rs.Scan(&x.ID, &x.Kind, &x.Reg, &x.Title, &sfee, &x.Status, &created)
 				fmt.Sscanf(sfee, "%f", &x.Fee)
+				x.Created = created
+				if x.Status == "REGISTERED" {
+					var q int
+					_ = a.db.QueryRow(`SELECT COUNT(*) FROM legalizations WHERE office_id=? AND status='REGISTERED' AND id<=?`, a.officeOf(r), x.ID).Scan(&q)
+					x.Queue = q
+				}
 				rows = append(rows, x)
 			}
 		}
@@ -1751,8 +1861,9 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 	month := time.Now().Format("2006-01")
 	rev, _ := a.fin.Revenue(a.officeOf(r), month)
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
+	reqID, _ := strconv.ParseInt(r.URL.Query().Get("req"), 10, 64)
 	a.render(w, r, "finance", "Keuangan", map[string]any{
-		"Invoices": invs, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl,
+		"Invoices": invs, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID,
 	})
 }
 
@@ -1763,6 +1874,16 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	// Taut opsional ke permohonan (divalidasi satu kantor + klien sama).
+	var reqID *int64
+	if v := strings.TrimSpace(r.FormValue("request_id")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			var rcid, roid int64
+			if err := a.db.QueryRow(`SELECT client_id, office_id FROM service_requests WHERE id=?`, n).Scan(&rcid, &roid); err == nil && rcid == clientID && roid == a.officeOf(r) {
+				reqID = &n
+			}
+		}
+	}
 	descs := r.Form["desc[]"]
 	qtys := r.Form["qty[]"]
 	prices := r.Form["price[]"]
@@ -1775,7 +1896,7 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 		p, _ := parseIDR(prices[i])
 		lines = append(lines, finance.Line{Description: descs[i], Qty: q, UnitPrice: int64(p)})
 	}
-	_, err := a.fin.CreateInvoice(a.officeOf(r), clientID, nil, r.FormValue("number"), lines, 1100, r.FormValue("due_date"))
+	_, err := a.fin.CreateInvoice(a.officeOf(r), clientID, reqID, r.FormValue("number"), lines, 1100, r.FormValue("due_date"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1824,8 +1945,49 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 		pending, active, completed, _ = a.reqs.Counts(a.officeOf(r))
 		out, _ = a.fin.Outstanding(a.officeOf(r))
 	}
+	// Anggaran vs realisasi bulan berjalan per kategori.
+	type brow struct {
+		Category         string
+		Budget, Spent    int64
+	}
+	var budgets []brow
+	month := time.Now().Format("2006-01-01")
+	brows, _ := a.db.Query(`SELECT b.category, b.amount, COALESCE((SELECT SUM(e.amount) FROM expenses e
+		WHERE e.office_id=b.office_id AND e.category=b.category AND DATE_FORMAT(e.spent_at,'%Y-%m-01')=b.month),0)
+		FROM budgets b WHERE b.office_id=? AND b.month=? ORDER BY b.category`, a.officeOf(r), month)
+	if brows != nil {
+		defer brows.Close()
+		for brows.Next() {
+			var x brow
+			var bamt, samt string
+			_ = brows.Scan(&x.Category, &bamt, &samt)
+			x.Budget = decWhole(bamt)
+			x.Spent = decWhole(samt)
+			budgets = append(budgets, x)
+		}
+	}
+	// Laba per layanan: hanya invoice yang tertaut permohonan (jujur; sisanya "tanpa tautan").
+	type prow struct {
+		Service       string
+		Count, Total int64
+	}
+	var profits []prow
+	prows, _ := a.db.Query(`SELECT COALESCE(s.name,'(tanpa tautan layanan)'), COUNT(i.id), COALESCE(SUM(i.total),0)
+		FROM invoices i LEFT JOIN service_requests r ON r.id=i.request_id LEFT JOIN services s ON s.id=r.service_id
+		WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY 1 ORDER BY 3 DESC`, a.officeOf(r))
+	if prows != nil {
+		defer prows.Close()
+		for prows.Next() {
+			var x prow
+			var tot string
+			_ = prows.Scan(&x.Service, &x.Count, &tot)
+			x.Total = decWhole(tot)
+			profits = append(profits, x)
+		}
+	}
 	a.render(w, r, "reports", "Laporan", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed, "Outstanding": out,
+		"Budgets": budgets, "Profits": profits, "Month": time.Now().Format("2006-01"),
 	})
 }
 

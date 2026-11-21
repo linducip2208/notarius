@@ -71,8 +71,8 @@ func (s *Store) Create(officeID *int64, role, name, email, phone, password strin
 	if err := s.db.QueryRow(`SELECT id FROM roles WHERE name=?`, role).Scan(&roleID); err != nil {
 		return 0, errors.New("role tidak dikenal: " + role)
 	}
-	res, err := s.db.Exec(`INSERT INTO users(office_id, role_id, name, email, phone, password_hash)
-		VALUES(?,?,?,?,?,?)`, officeID, roleID, name, email, phone, h)
+	res, err := s.db.Exec(`INSERT INTO users(office_id, role_id, name, email, phone, password_hash, password_changed_at)
+		VALUES(?,?,?,?,?,?,NOW())`, officeID, roleID, name, email, phone, h)
 	if err != nil {
 		return 0, err
 	}

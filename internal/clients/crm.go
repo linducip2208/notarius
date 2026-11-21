@@ -361,16 +361,19 @@ type TimelineEvent struct {
 	At, Kind, Text string
 }
 
-// Timeline unions requests, notes, payments, appointments newest first.
+// Timeline unions requests, invoices, notes, payments, appointments, files, identity checks newest first.
 func (s *Store) Timeline(clientID int64, limit int) ([]TimelineEvent, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 	rows, err := s.db.Query(`(SELECT created_at AS at, 'permohonan' AS kind, CONCAT('#',id,' ',title,' [',status,']') AS text FROM service_requests WHERE client_id=?)
 		UNION ALL (SELECT COALESCE(occurred_at, created_at), LOWER(kind), CONCAT(title,' — ',COALESCE(body,'')) FROM client_notes WHERE client_id=?)
+		UNION ALL (SELECT i.created_at, 'tagihan', CONCAT(i.number,' Rp ',FORMAT((SELECT COALESCE(SUM(line_total),0) FROM invoice_lines WHERE invoice_id=i.id),0),' [',i.status,']') FROM invoices i WHERE i.client_id=?)
 		UNION ALL (SELECT p.paid_at, 'pembayaran', CONCAT('Rp ', FORMAT(p.amount,0)) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.client_id=? AND p.paid_at IS NOT NULL)
 		UNION ALL (SELECT scheduled_at, 'janji', purpose FROM appointments WHERE client_id=? AND scheduled_at IS NOT NULL)
-		ORDER BY at DESC LIMIT ?`, clientID, clientID, clientID, clientID, limit)
+		UNION ALL (SELECT created_at, 'berkas', COALESCE(display_name,original_name) FROM files WHERE owner_type='client' AND owner_id=?)
+		UNION ALL (SELECT COALESCE(verified_at, created_at), 'verifikasi identitas', CONCAT(id_type,' ',verified_note) FROM identities WHERE client_id=?)
+		ORDER BY at DESC LIMIT ?`, clientID, clientID, clientID, clientID, clientID, clientID, clientID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -510,4 +513,51 @@ func (s *Store) MergeClients(officeID, winnerID, loserID int64, actor *int64) er
 		return err
 	}
 	return tx.Commit()
+}
+
+// CompletenessItem is one missing-profile item with its weight.
+type CompletenessItem struct {
+	Label  string
+	Weight int
+}
+
+// Completeness scores the profile 0-100 and lists what's missing (drives staff follow-up).
+func (s *Store) Completeness(officeID, clientID int64) (int, []CompletenessItem, error) {
+	c, err := s.GetFull(officeID, clientID)
+	if err != nil {
+		return 0, nil, err
+	}
+	type check struct {
+		label string
+		weight int
+		ok     bool
+	}
+	checks := []check{
+		{"nama lengkap", 10, c.FullName != ""},
+		{"kontak HP valid", 10, len(c.Phone) >= 9},
+		{"email", 5, c.Email != ""},
+		{"alamat", 10, c.Address != ""},
+		{"tempat/tanggal lahir", 10, c.BirthPlace != "" && c.BirthDate != ""},
+		{"identitas terverifikasi", 25, false}, // diisi di bawah
+		{"NPWP", 10, c.NPWP != ""},
+		{"alamat domisili", 10, c.Domicile != ""},
+		{"pekerjaan", 10, c.Occupation != ""},
+	}
+	var verified int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM identities WHERE client_id=? AND verified=1`, clientID).Scan(&verified)
+	checks[5].ok = verified > 0
+	score, total := 0, 0
+	var missing []CompletenessItem
+	for _, ch := range checks {
+		total += ch.weight
+		if ch.ok {
+			score += ch.weight
+		} else {
+			missing = append(missing, CompletenessItem{Label: ch.label, Weight: ch.weight})
+		}
+	}
+	if total == 0 {
+		return 0, missing, nil
+	}
+	return score * 100 / total, missing, nil
 }

@@ -194,7 +194,7 @@
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Berkas</th><th>Alasan</th><th>Sejak</th><th></th></tr></thead>
 <tbody>{{range .Data.Holds}}<tr><td>{{.ID}}</td><td><a href="/documents/{{.FileID}}">{{.Name}}</a></td><td>{{.Reason}}</td><td>{{.At}}</td><td><form method="post" action="/dms/holds/{{.ID}}/release">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit">Lepas</button></form></td></tr>
 {{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Tidak ada hold aktif.</td></tr>{{end}}</tbody></table></div></div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kedaluwarsa ≤30 Hari</h3></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kedaluwarsa ≤30 Hari</h3><div class="ms-auto"><form method="post" action="/dms/retention/task">{{template "csrf" .}}<button class="btn btn-sm btn-outline-primary" type="submit" title="Buat tugas tindak lanjut untuk berkas kedaluwarsa">+ Tugas Tindak Lanjut</button></form></div></div>
 <div class="list-group list-group-flush">{{range .Data.Expiring}}<a class="list-group-item" href="/documents/{{.ID}}">{{.Name}} <span class="text-secondary">· {{.Expiry}}</span></a>{{else}}<div class="list-group-item text-secondary">Tidak ada yang mendesak.</div>{{end}}</div></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Kebijakan Retensi</h3></div>
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Entitas</th><th>Tahun</th><th>Catatan</th></tr></thead>

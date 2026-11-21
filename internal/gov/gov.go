@@ -39,6 +39,7 @@ type Submission struct {
 	ReceiptNo   string
 	ReceiptFile string
 	Notes       string
+	FollowUp    string
 	UpdatedAt   time.Time
 }
 

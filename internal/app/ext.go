@@ -65,6 +65,14 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "gagal membuat sesi", http.StatusInternalServerError)
 		return
 	}
+	lip := clientIPOf(r)
+	_, _ = a.db.Exec(`UPDATE sessions SET ip=?, user_agent=? WHERE token=?`, lip, r.UserAgent(), sess.Token)
+	var seen, ever int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=? AND ip=? AND token<>?`, p.userID, lip, sess.Token).Scan(&seen)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=?`, p.userID).Scan(&ever)
+	if seen == 0 && ever > 1 {
+		_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, p.userID, "Login dari IP baru", "Akun Anda login dari "+lip+". Abaikan bila itu Anda.")
+	}
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1})
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
 		Expires: sess.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
@@ -192,6 +200,16 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.upload", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
 	// DMS: auto-relasi ke klien + antre OCR (best-effort, tak menghambat respons).
 	_ = a.dms.AutoLink(a.officeOf(r), id, "client", clientID, a.uid(r))
+	// Portal: beri tahu akun klien yang tertaut bahwa ada berkas baru.
+	if urows, err := a.db.Query(`SELECT user_id FROM user_client_links WHERE client_id=?`, clientID); err == nil {
+		defer urows.Close()
+		for urows.Next() {
+			var linkUID int64
+			_ = urows.Scan(&linkUID)
+			_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, linkUID, "Berkas baru", "Kantor mengunggah berkas baru ke arsip Anda.")
+		}
+	}
+	_ = a.dms.AutoLink(a.officeOf(r), id, "client", clientID, a.uid(r))
 	if _, err := a.dms.EnqueueOCR(a.officeOf(r), id); err == nil {
 		_ = a.dms.Move(a.officeOf(r), id, "CLASSIFICATION", a.uid(r), "otomatis saat unggah")
 	}
@@ -252,6 +270,14 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 
 // ---- request detail + corporate ----
 
+// firstWord returns the first whitespace-separated token (for fuzzy name compare).
+func firstWord(s string) string {
+	if i := strings.IndexAny(s, " \t"); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
 func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	d, err := a.reqs.Get(a.officeOf(r), id)
@@ -260,6 +286,32 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	co, shs, offs, _ := a.corp.GetByRequest(id)
+	// Peringatan konsistensi korporat (peringatan, bukan blokir).
+	var corpWarn []string
+	if co.ID != 0 {
+		var totalShares int
+		var pctSum float64
+		for _, s := range shs {
+			totalShares += s.Shares
+			if co.Issued > 0 {
+				pctSum += float64(s.Shares) / co.Issued * 100
+			}
+			var cname string
+			_ = a.db.QueryRow(`SELECT c.full_name FROM clients c JOIN shareholders sh ON sh.client_id=c.id WHERE sh.id=?`, s.ID).Scan(&cname)
+			if cname != "" && !strings.Contains(strings.ToLower(s.Name), strings.ToLower(firstWord(cname))) && !strings.Contains(strings.ToLower(cname), strings.ToLower(firstWord(s.Name))) {
+				corpWarn = append(corpWarn, "nama pemegang saham \""+s.Name+"\" tidak mirip klien tertaut ("+cname+") — periksa salah ketik")
+			}
+		}
+		if len(shs) > 0 && co.Issued > 0 && (pctSum < 99.5 || pctSum > 100.5) {
+			corpWarn = append(corpWarn, fmt.Sprintf("total %d lembar tidak sama dengan modal ditempatkan %.0f — selisih harus dijelaskan", totalShares, co.Issued))
+		}
+		if co.Paid > co.Issued {
+			corpWarn = append(corpWarn, "modal disetor melebihi ditempatkan — tidak wajar")
+		}
+		if co.Issued > co.Authorized {
+			corpWarn = append(corpWarn, "modal ditempatkan melebihi modal dasar — tidak wajar")
+		}
+	}
 	var bos []corp.BeneficialOwner
 	var legal corp.Legal
 	if co.ID != 0 {
@@ -280,7 +332,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		pct = done * 100 / total
 	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
-		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
+		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 	})
 }
@@ -471,7 +523,31 @@ func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {	if !rbac.Has(mw.Ro
 func (a *App) appointments(w http.ResponseWriter, r *http.Request) {
 	list, _ := a.reqs.Appointments(a.officeOf(r))
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
-	a.render(w, r, "appointments", "Janji Temu", map[string]any{"List": list, "Clients": cl})
+	names := map[int64]string{}
+	for _, c := range cl {
+		names[c.ID] = c.FullName
+	}
+	// Agenda 14 hari ke depan dikelompokkan per tanggal (kalender mingguan sederhana).
+	type item struct {
+		Time, Client, Purpose, Status string
+	}
+	var week []map[string]any
+	seen := map[string]int{}
+	for _, ap := range list {
+		day := ap.At.Format("2006-01-02")
+		i, ok := seen[day]
+		if !ok {
+			week = append(week, map[string]any{"Day": day, "Items": []item{}})
+			i = len(week) - 1
+			seen[day] = i
+			if len(week) >= 14 {
+				break
+			}
+		}
+		items := week[i]["Items"].([]item)
+		week[i]["Items"] = append(items, item{Time: ap.At.Format("15:04"), Client: names[ap.ClientID], Purpose: ap.Purpose, Status: ap.Status})
+	}
+	a.render(w, r, "appointments", "Janji Temu", map[string]any{"List": list, "Clients": cl, "Week": week})
 }
 
 func (a *App) appointmentCreate(w http.ResponseWriter, r *http.Request) {
@@ -673,6 +749,21 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	var approver int64
 	if uid != nil {
 		approver = *uid
+	}
+	// Gerbang pra-pengesahan: nomor + isi wajib ada; tampilkan jujur bila belum.
+	var number, body, st string
+	_ = a.db.QueryRow(`SELECT COALESCE(number,''), COALESCE(content,''), status FROM deed_drafts WHERE id=?`, id).Scan(&number, &body, &st)
+	if strings.TrimSpace(r.FormValue("number")) == "" && strings.TrimSpace(number) == "" {
+		http.Error(w, "nomor akta wajib diisi sebelum pengesahan", http.StatusBadRequest)
+		return
+	}
+	if len(strings.TrimSpace(safehtml.ToText(body))) < 50 {
+		http.Error(w, "isi akta terlalu pendek/belum ada — lengkapi draf dulu", http.StatusBadRequest)
+		return
+	}
+	if st == "APPROVED" {
+		http.Error(w, "akta sudah disahkan — gunakan revisi tercatat untuk perubahan", http.StatusConflict)
+		return
 	}
 	if err := a.deeds.Approve(id, r.FormValue("number"), approver); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1024,14 +1115,38 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 			diffAdd, diffDel = diff.Stats(diffOps)
 		}
 	}
+	// 3-way: template sebagai kolom ketiga (isi mentah bervariabel — pembanding struktur).
+	var tplBody string
+	var tplID sql.NullInt64
+	_ = a.db.QueryRow(`SELECT template_id FROM deed_drafts WHERE id=?`, id).Scan(&tplID)
+	if tplID.Valid {
+		_ = a.db.QueryRow(`SELECT body FROM doc_templates WHERE id=?`, tplID.Int64).Scan(&tplBody)
+	}
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
+		"TplBody": safehtml.ToText(tplBody),
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
 		"Timeline":   a.deedTimeline(id),
+		"Attached":   a.deedFiles(a.officeOf(r), id),
+		"CanEdit":    rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
 	})
+}
+
+// deedFiles lists DMS files linked to a deed (lampiran dua arah).
+func (a *App) deedFiles(officeID, deedID int64) []map[string]any {
+	fids, _ := a.dms.ByRelated(officeID, "deed", deedID)
+	var out []map[string]any
+	for _, fid := range fids {
+		var name string
+		_ = a.db.QueryRow(`SELECT COALESCE(display_name,original_name) FROM files WHERE id=? AND office_id=?`, fid, officeID).Scan(&name)
+		if name != "" {
+			out = append(out, map[string]any{"ID": fid, "Name": name})
+		}
+	}
+	return out
 }
 
 // deedTimeline unions versions, approval, and TTE signatures chronologically.
@@ -1201,10 +1316,12 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	rows, _ := a.db.Query(`SELECT id, title, due_date, status FROM tasks WHERE office_id=? ORDER BY status, due_date LIMIT 200`, a.officeOf(r))
+	rows, _ := a.db.Query(`SELECT id, title, due_date, status, recurrence, ref_type, COALESCE(ref_id,0) FROM tasks WHERE office_id=? ORDER BY status, due_date LIMIT 200`, a.officeOf(r))
 	type task struct {
-		ID                 int64
-		Title, Due, Status string
+		ID                   int64
+		Title, Due, Status   string
+		Rec, RefType         string
+		RefID                int64
 	}
 	var out []task
 	if rows != nil {
@@ -1212,7 +1329,7 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var t task
 			var due sql.NullString
-			_ = rows.Scan(&t.ID, &t.Title, &due, &t.Status)
+			_ = rows.Scan(&t.ID, &t.Title, &due, &t.Status, &t.Rec, &t.RefType, &t.RefID)
 			if due.Valid {
 				t.Due = due.String
 			}
@@ -1232,8 +1349,28 @@ func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("due") != "" {
 		due = r.FormValue("due")
 	}
-	_, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,?,?)`,
-		a.officeOf(r), r.FormValue("title"), due, a.uid(r))
+	rec := strings.ToUpper(strings.TrimSpace(r.FormValue("recurrence")))
+	switch rec {
+	case "DAILY", "WEEKLY", "MONTHLY":
+	default:
+		rec = "NONE"
+	}
+	refType := strings.ToLower(strings.TrimSpace(r.FormValue("ref_type")))
+	switch refType {
+	case "deed", "request", "client", "file":
+	default:
+		refType = ""
+	}
+	var refID any
+	if refType != "" {
+		if n, err := strconv.ParseInt(r.FormValue("ref_id"), 10, 64); err == nil && n > 0 {
+			refID = n
+		} else {
+			refType = ""
+		}
+	}
+	_, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by, recurrence, ref_type, ref_id) VALUES(?,?,?,?,?,?,?)`,
+		a.officeOf(r), r.FormValue("title"), due, a.uid(r), rec, nullStrOpt(refType), refID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1244,7 +1381,34 @@ func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
 func (a *App) taskDone(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var title, rec, due string
+	var refType sql.NullString
+	var refID sql.NullInt64
+	_ = a.db.QueryRow(`SELECT title, recurrence, DATE_FORMAT(due_date,'%Y-%m-%d'), ref_type, ref_id FROM tasks WHERE id=? AND office_id=?`,
+		id, a.officeOf(r)).Scan(&title, &rec, &due, &refType, &refID)
 	_, _ = a.db.Exec(`UPDATE tasks SET status='DONE' WHERE id=? AND office_id=?`, id, a.officeOf(r))
+	// Tugas berulang: jadwalkan periode berikut dari tenggat lama (atau hari ini bila kosong).
+	if rec == "DAILY" || rec == "WEEKLY" || rec == "MONTHLY" {
+		base := time.Now()
+		if t, err := time.Parse("2006-01-02", due); err == nil {
+			base = t
+		}
+		switch rec {
+		case "DAILY":
+			base = base.AddDate(0, 0, 1)
+		case "WEEKLY":
+			base = base.AddDate(0, 0, 7)
+		case "MONTHLY":
+			base = base.AddDate(0, 1, 0)
+		}
+		var rt, ri any
+		if refType.Valid && refType.String != "" {
+			rt, ri = refType.String, refID.Int64
+		}
+		_, _ = a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by, recurrence, ref_type, ref_id) VALUES(?,?,?,?,?,?,?)`,
+			a.officeOf(r), title, base.Format("2006-01-02"), a.uid(r), rec, rt, ri)
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "task.recur", Entity: "task", EntityID: strconv.FormatInt(id, 10), Detail: rec})
+	}
 	http.Redirect(w, r, "/tasks?flash=Tugas+selesai", http.StatusSeeOther)
 }
 

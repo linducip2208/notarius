@@ -8,7 +8,8 @@
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama / Kontak</th><th>Layanan</th><th>Pesan</th><th>Status</th><th>Masuk</th><th></th></tr></thead>
 <tbody>{{range .Data.Rows}}<tr><td>{{.ID}}</td><td><strong>{{.Name}}</strong><br/><span class="text-secondary">{{.Contact}}</span></td><td>{{.Service}}</td><td style="max-width:280px">{{.Msg}}</td>
 <td><span class="badge {{if eq .St "BARU"}}bg-yellow-lt{{else if eq .St "SELESAI"}}bg-green-lt{{else}}bg-azure-lt{{end}}">{{.St}}</span></td><td class="text-secondary small">{{.At}}</td>
-<td><form method="post" action="/cms/inquiries/{{.ID}}/status" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option>BARU</option><option>DIPROSES</option><option>SELESAI</option><option>SPAM</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
+<td><div class="d-flex gap-1 flex-wrap"><form method="post" action="/cms/inquiries/{{.ID}}/status">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option>BARU</option><option>DIPROSES</option><option>SELESAI</option><option>SPAM</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form>
+<form method="post" action="/cms/inquiries/{{.ID}}/convert">{{template "csrf" $}}<select class="form-select form-select-sm" name="service_id">{{range $.Data.Svcs}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select><button class="btn btn-sm btn-success" type="submit" title="Buat klien + permohonan dari inquiry ini" onclick="return confirm('Buat permohonan dari inquiry ini?')">→ Permohonan</button></form></div></td></tr>
 {{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada konsultasi masuk. Bagikan tautan <code>/konsultasi</code> di website.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 

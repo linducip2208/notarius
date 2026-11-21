@@ -34,7 +34,9 @@
 <form method="post" action="/requests/{{.Data.Req.ID}}/move" class="d-flex gap-1">{{template "csrf" .}}
 <select class="form-select" name="to"><option value="SUBMITTED">SUBMITTED</option><option value="IN_REVIEW">IN_REVIEW</option><option value="NEED_DOCS">NEED_DOCS</option><option value="APPROVED">APPROVED</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="CANCELLED">CANCELLED</option></select>
 <input class="form-control" name="note" placeholder="Catatan perubahan"/>
-<button class="btn btn-primary" type="submit">Ubah Status</button></form></div></div>
+<button class="btn btn-primary" type="submit">Ubah Status</button></form>
+<div class="card-body border-top"><a class="btn btn-sm btn-outline-primary" href="/finance?req={{.Data.Req.ID}}">+ Buat Invoice Permohonan Ini</a></div></div>
+{{if .Data.CorpWarn}}<div class="alert alert-warning mt-3"><strong>Konsistensi korporat perlu perhatian:</strong><ul class="mb-0">{{range .Data.CorpWarn}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Data Korporat</h3><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/requests/{{.Data.Req.ID}}/wizard">Wizard Korporat →</a></div></div>
 <form method="post" action="/requests/{{.Data.Req.ID}}/corp"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-4 mb-2"><select class="form-select" name="entity_type"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Yayasan">Yayasan</option><option value="Koperasi">Koperasi</option><option value="Perkumpulan">Perkumpulan</option></select></div>
@@ -81,6 +83,12 @@
 <div class="col-2 mb-2"><input class="form-control" name="pct" placeholder="%" value="25"/></div>
 <div class="col-2 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="pep" value="1"/> PEP</label></div></div>
 <button class="btn btn-sm btn-primary w-100" type="submit">Catat BO</button></form></div></div>
+{{if .Data.Company.ID}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Struktur Kepemilikan (cetak)</h3><div class="ms-auto"><button class="btn btn-sm btn-ghost-primary" type="button" onclick="window.print()">Cetak</button></div></div>
+<div class="card-body"><strong>{{.Data.Company.Name}}</strong> ({{.Data.Company.EntityType}})
+<p class="mb-1 mt-2"><strong>Pemegang saham:</strong></p>
+<ul>{{range .Data.Shareholders}}<li>{{.Name}} — {{.Shares}} lembar</li>{{else}}<li class="text-secondary">Belum ada pemegang saham.</li>{{end}}</ul>
+<p class="mb-1"><strong>Pengurus:</strong></p>
+<ul>{{range .Data.Officers}}<li><span class="badge bg-azure-lt">{{.Role}}</span> {{.Name}}{{if .Title}} ({{.Title}}){{end}}</li>{{else}}<li class="text-secondary">Belum ada pengurus.</li>{{end}}</ul></div></div>{{end}}
 </div>
 <div class="col-md-5">
 <div class="card"><div class="card-header"><h3 class="card-title">Linimasa</h3></div>
@@ -103,6 +111,9 @@
 <div class="col-md-3 mb-2"><input class="form-control" name="purpose" placeholder="Keperluan" required/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
 </div></form></div>
+{{if .Data.Week}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kalender 14 Hari</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Tanggal</th><th>Agenda</th></tr></thead>
+<tbody>{{range .Data.Week}}<tr><td style="white-space:nowrap"><strong>{{.Day}}</strong></td><td>{{range .Items}}<span class="badge bg-azure-lt me-1">{{.Time}} · {{.Client}} — {{.Purpose}} ({{.Status}})</span>{{end}}</td></tr>{{end}}</tbody></table></div></div>{{end}}
 <div class="card"><div class="card-header"><h3 class="card-title">Janji Temu</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jadwal</th><th>Klien</th><th>Keperluan</th><th>Status</th><th>Ubah</th></tr></thead>
 <tbody>{{range .Data.List}}<tr><td>{{.At}}</td><td>{{.ClientID}}</td><td>{{.Purpose}}</td><td>{{.Status}}</td><td><form method="post" action="/appointments/{{.ID}}/status" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="to"><option value="DONE">DONE</option><option value="CANCELLED">CANCELLED</option><option value="NOSHOW">NOSHOW</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>

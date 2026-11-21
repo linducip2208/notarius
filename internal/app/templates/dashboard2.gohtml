@@ -1,7 +1,6 @@
 {{define "dashboard"}}{{template "head" .}}{{template "page_open" .}}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-<div><h2 class="page-title mb-0">Selamat datang kembali, {{.UserName}}</h2><p class="text-secondary mb-0">{{.OfficeName}} · {{.WIBDate}} · {{len .Data.Today}} janji hari ini, {{.Pending}} antrean menunggu</p></div>
-<div class="dropdown">
+<div><h2 class="page-title mb-0">Selamat datang kembali, {{.UserName}}</h2><p class="text-secondary mb-0">{{.OfficeName}} · {{.WIBDate}} · {{len .Data.Today}} janji hari ini, {{.Pending}} antrean menunggu</p></div><div class="dropdown">
 <button class="btn btn-primary" type="button" data-bs-toggle="dropdown">+ Aksi Cepat</button>
 <div class="dropdown-menu dropdown-menu-end">
 {{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Tambah Klien</a>{{end}}
@@ -12,6 +11,12 @@
 </div>
 </div>
 </div>
+{{if .Data.PwStale}}<div class="alert alert-warning" role="alert">Kata sandi Anda tidak diganti &gt;180 hari. Minta admin mereset demi keamanan akun.</div>{{end}}
+{{if or (eq .Role "notary") (eq .Role "substitute_notary") (eq .Role "super_admin") (eq .Role "office_admin")}}<div class="row row-deck row-cards mb-3">
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Menunggu Persetujuan</div><div class="h1 mb-0">{{.Data.ToApprove}}</div><a href="/deeds?status=REVIEW">Review akta →</a></div></div></div>
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Siap Tanda Tangan</div><div class="h1 mb-0">{{.Data.ReadySign}}</div><a href="/deeds?status=APPROVED">Akta disetujui →</a></div></div></div>
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Permohonan Macet (SLA)</div><div class="h1 mb-0">{{.Data.Stuck}}</div><a href="/requests">Lihat antrean →</a></div></div></div>
+</div>{{end}}
 <div class="row row-deck row-cards mb-3">
 <div class="col-sm-6 col-lg"><div class="card" title="Jumlah seluruh klien terdaftar di kantor ini"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-blue-lt">👥</span><div><div class="subheader">Total Klien</div><div class="h1 mb-0">{{.Data.Clients}}</div></div></div><div class="small text-secondary mt-1">Periode: keseluruhan</div><a href="/clients">Lihat klien</a></div></div></div>
 <div class="col-sm-6 col-lg"><div class="card" title="Permohonan berstatus SUBMITTED / IN_REVIEW / NEED_DOCS"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-yellow-lt">📝</span><div><div class="subheader">Permohonan Aktif</div><div class="h1 mb-0">{{.Pending}}</div></div></div><div class="small text-secondary mt-1">Periode: berjalan</div><a href="/requests?status=SUBMITTED">Lihat antrean</a></div></div></div>
