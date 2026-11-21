@@ -87,7 +87,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "tasks"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Tugas Baru</h3></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Tugas Baru</h3><div class="ms-auto"><form method="post" action="/reminders/run">{{template "csrf" .}}<button class="btn btn-sm btn-outline-primary" type="submit">Jalankan Pengingat</button></form></div></div>
 <form method="post" action="/tasks"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-7 mb-2"><input class="form-control" name="title" placeholder="Judul tugas" required/></div>
 <div class="col-md-3 mb-2"><input class="form-control" type="date" name="due"/></div>

@@ -16,7 +16,7 @@ Bobot: fungsional 30% · benar+workflow 20% · security/izin 20% · reliabilitas
 | AHU/OSS asistensi | 90 | checklist+bukti manual; tanpa API resmi (by design) |
 | File privat + unduh otorisasi + MIME sniff | 95 | E2E upload/download, IDOR test |
 | DMS (library/detail/preview/versi/workflow/share/arsip/retensi/duplikat/audit) | 94 | 11 halaman 200, E2E 10/10, integrasi 8/8; uji beban: backlog |
-| Keuangan | 96 | TestFinanceOverpay, multi-baris |
+| Keuangan | 97 | multi-baris + anti-overpay (test) + kuitansi QR HMAC + verifikasi publik + portal bayar (E2E 14/14) |
 | Portal klien terisolasi | 93 | server-side links; unduh akta portal: parsial |
 | Dashboard/laporan | 94 | real-query; grafik+donat+feed |
 | Deploy/backup/Docker | 88 | file lengkap; uji restore VPS: BELUM |

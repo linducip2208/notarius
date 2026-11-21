@@ -15,6 +15,7 @@ type Config struct {
 	SessionName    string
 	TLSCookie      bool
 	StorageDir     string
+	AppBaseURL     string
 	S3Endpoint     string
 	S3Bucket       string
 	AIBaseURL      string
@@ -54,6 +55,7 @@ func Load() Config {
 		SessionName:    getenv("SESSION_NAME", "notaryos_sess"),
 		TLSCookie:      getenv("COOKIE_SECURE", "false") == "true",
 		StorageDir:     getenv("STORAGE_DIR", "./storage"),
+		AppBaseURL:     strings.TrimSuffix(getenv("APP_BASE_URL", ""), "/"),
 		S3Endpoint:     os.Getenv("S3_ENDPOINT"),
 		S3Bucket:       os.Getenv("S3_BUCKET"),
 		AIBaseURL:      os.Getenv("AI_BASE_URL"),

@@ -29,6 +29,7 @@ import (
 	"notaryos/internal/notify"
 	"notaryos/internal/ocr"
 	"notaryos/internal/rbac"
+	"notaryos/internal/remind"
 	"notaryos/internal/requests"
 	"notaryos/internal/storage"
 	"notaryos/internal/users"
@@ -142,6 +143,14 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 				}
 			}()
 		}
+		// Pengingat operasional harian (janji H-1, invoice telat, tugas mendesak).
+		go func() {
+			t := time.NewTicker(24 * time.Hour)
+			defer t.Stop()
+			for range t.C {
+				a.runReminders()
+			}
+		}()
 	}
 	return a, nil
 }
@@ -152,6 +161,25 @@ func (a *App) uid(r *http.Request) *int64 {
 		return &id
 	}
 	return nil
+}
+
+// runReminders executes the daily reminder scan for every office.
+func (a *App) runReminders() (appt, overdue, tasks int) {
+	if a.db == nil {
+		return 0, 0, 0
+	}
+	rows, err := a.db.Query(`SELECT id FROM offices`)
+	if err != nil {
+		return 0, 0, 0
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var oid int64
+		_ = rows.Scan(&oid)
+		pa, po, pt, _ := remind.RunOnce(a.db, oid, remind.LogSender{})
+		appt, overdue, tasks = appt+pa, overdue+po, tasks+pt
+	}
+	return appt, overdue, tasks
 }
 
 func (a *App) officeOf(r *http.Request) int64 {
@@ -216,6 +244,8 @@ func (a *App) Router() http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
 	r.Get("/s/{token}", a.dmsSharedDownload)
+	r.Get("/verify", a.verifyPage)
+	r.Get("/qr/inv/{id}", a.invoiceQR)
 	r.Get("/", a.landing)
 	r.Get("/robots.txt", a.robotsTxt)
 	r.Get("/sitemap.xml", a.sitemapXML)
@@ -300,6 +330,10 @@ func (a *App) Router() http.Handler {
 		p.Get("/portal", a.portal)
 		p.Post("/notifications/read", a.notifRead)
 		p.Get("/metrics", a.metrics)
+		p.Get("/portal/invoices", a.portalInvoices)
+		p.Post("/portal/pay", a.portalPayConfirm)
+		p.Get("/invoices/{id}/receipt", a.receipt)
+		p.Post("/reminders/run", a.remindersRun)
 		p.Get("/documents", a.documents)
 		p.Get("/dms", a.dmsDashboard)
 		p.Get("/dms/library", a.dmsLibrary)
@@ -522,7 +556,9 @@ func (a *App) layananIndex(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var s svc
-				_ = rows.Scan(&s.Code, &s.Category, &s.Name, &s.Price)
+				var price string
+				_ = rows.Scan(&s.Code, &s.Category, &s.Name, &price)
+				fmt.Sscanf(price, "%f", &s.Price)
 				out = append(out, s)
 				if _, ok := groups[s.Category]; !ok {
 					order = append(order, s.Category)
@@ -543,11 +579,14 @@ func (a *App) layananDetail(w http.ResponseWriter, r *http.Request) {
 	code := strings.ToUpper(chi.URLParam(r, "code"))
 	var name, category string
 	var price float64
-	var reqRaw sql.NullString
-	err := a.db.QueryRow(`SELECT name, category, base_price, requirements FROM services WHERE code=? AND is_active=1`, code).Scan(&name, &category, &price, &reqRaw)
+	var sprice, reqRaw sql.NullString
+	err := a.db.QueryRow(`SELECT name, category, base_price, requirements FROM services WHERE code=? AND is_active=1`, code).Scan(&name, &category, &sprice, &reqRaw)
 	if err != nil {
 		http.NotFound(w, r)
 		return
+	}
+	if sprice.Valid {
+		fmt.Sscanf(sprice.String, "%f", &price)
 	}
 	var reqs []string
 	if reqRaw.Valid && reqRaw.String != "" {
@@ -1222,7 +1261,9 @@ func (a *App) legalisasi(w http.ResponseWriter, r *http.Request) {
 			defer rs.Close()
 			for rs.Next() {
 				var x row
-				_ = rs.Scan(&x.ID, &x.Kind, &x.Reg, &x.Title, &x.Fee, &x.Status)
+				var sfee string
+				_ = rs.Scan(&x.ID, &x.Kind, &x.Reg, &x.Title, &sfee, &x.Status)
+				fmt.Sscanf(sfee, "%f", &x.Fee)
 				rows = append(rows, x)
 			}
 		}

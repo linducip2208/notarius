@@ -3,6 +3,7 @@ package requests
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -67,9 +68,11 @@ func (s *Store) Services() ([]Service, error) {
 	var out []Service
 	for rows.Next() {
 		var sv Service
-		if err := rows.Scan(&sv.ID, &sv.Code, &sv.Category, &sv.Name, &sv.BasePrice); err != nil {
+		var price string
+		if err := rows.Scan(&sv.ID, &sv.Code, &sv.Category, &sv.Name, &price); err != nil {
 			return nil, err
 		}
+		fmt.Sscanf(price, "%f", &sv.BasePrice)
 		out = append(out, sv)
 	}
 	return out, rows.Err()

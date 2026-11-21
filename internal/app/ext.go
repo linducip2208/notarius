@@ -981,7 +981,9 @@ func (a *App) expensesPage(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var e exp
-			_ = rows.Scan(&e.ID, &e.Cat, &e.Desc, &e.Amount, &e.At)
+			var samt string
+			_ = rows.Scan(&e.ID, &e.Cat, &e.Desc, &samt, &e.At)
+			fmt.Sscanf(samt, "%f", &e.Amount)
 			out = append(out, e)
 		}
 	}
@@ -1027,7 +1029,9 @@ func (a *App) tariffsPage(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var t tariff
-			_ = rows.Scan(&t.ID, &t.Name, &t.Amount, &t.Active)
+			var samt string
+			_ = rows.Scan(&t.ID, &t.Name, &samt, &t.Active)
+			fmt.Sscanf(samt, "%f", &t.Amount)
 			out = append(out, t)
 		}
 	}

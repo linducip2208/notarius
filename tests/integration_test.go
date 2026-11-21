@@ -16,6 +16,7 @@ import (
 	"notaryos/internal/deeds"
 	"notaryos/internal/finance"
 	"notaryos/internal/gov"
+	"notaryos/internal/remind"
 	"notaryos/internal/requests"
 	"notaryos/internal/users"
 )
@@ -319,5 +320,45 @@ func TestProtocolLegalisasiAppointment(t *testing.T) {
 	}
 	if err := rs.SetAppointmentStatus(office, aid, "BOGUS"); err == nil {
 		t.Fatal("status liar harus gagal")
+	}
+}
+
+func TestRemindersRun(t *testing.T) {
+	clean(t)
+	office := seedOffice(t)
+	cs := clients.NewStore(db)
+	cid, _ := cs.Create(clients.Client{OfficeID: office, Kind: "individual", FullName: "Rina", Phone: "0866000066"})
+	// Janji besok + invoice telat + tugas mendesak.
+	rs := requests.NewStore(db)
+	at := time.Now().AddDate(0, 0, 1).Add(2 * time.Hour)
+	if _, err := rs.Schedule(office, cid, nil, at, "Konsultasi"); err != nil {
+		t.Fatal(err)
+	}
+	fs := finance.NewStore(db)
+	invid, err := fs.CreateInvoice(office, cid, nil, "INV-TELAT", []finance.Line{{Description: "Jasa", Qty: 1, UnitPrice: 100000}}, 0, time.Now().AddDate(0, 0, -5).Format("2006-01-02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = invid
+	if _, err := db.Exec(`INSERT INTO tasks(office_id, title, due_date) VALUES(?,?,CURDATE())`, office, "Siapkan berkas"); err != nil {
+		t.Fatal(err)
+	}
+	appt, overdue, tasks, err := remind.RunOnce(db, office, remind.LogSender{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if appt != 1 || overdue != 1 || tasks != 1 {
+		t.Fatalf("pengingat kurang: janji=%d telat=%d tugas=%d", appt, overdue, tasks)
+	}
+	// Anti-spam: jalan kedua tidak menambah baris dalam 24 jam.
+	var before int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM notifications`).Scan(&before)
+	if _, _, _, err := remind.RunOnce(db, office, remind.LogSender{}); err != nil {
+		t.Fatal(err)
+	}
+	var after int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM notifications`).Scan(&after)
+	if after != before {
+		t.Fatalf("duplikat pengingat: %d -> %d", before, after)
 	}
 }

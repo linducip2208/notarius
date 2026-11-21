@@ -3,6 +3,7 @@ package corp
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // Company, Shareholder, Officer mirror the corporate tables.
@@ -72,15 +73,19 @@ func (s *Store) UpsertCompany(c Company) (int64, error) {
 func (s *Store) GetByRequest(requestID int64) (Company, []Shareholder, []Officer, error) {
 	var c Company
 	var dom, addr sql.NullString
+	var sauth, siss, spaid string
 	err := s.db.QueryRow(`SELECT id, request_id, entity_type, name, domicile, address,
 		authorized_capital, issued_capital, paid_capital FROM companies WHERE request_id=?`, requestID).
-		Scan(&c.ID, &c.RequestID, &c.EntityType, &c.Name, &dom, &addr, &c.Authorized, &c.Issued, &c.Paid)
+		Scan(&c.ID, &c.RequestID, &c.EntityType, &c.Name, &dom, &addr, &sauth, &siss, &spaid)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Company{}, nil, nil, nil
 		}
 		return Company{}, nil, nil, err
 	}
+	fmt.Sscanf(sauth, "%f", &c.Authorized)
+	fmt.Sscanf(siss, "%f", &c.Issued)
+	fmt.Sscanf(spaid, "%f", &c.Paid)
 	if dom.Valid {
 		c.Domicile = dom.String
 	}
@@ -126,10 +131,12 @@ func (s *Store) list(q string, id int64) ([][]any, error) {
 		var id int64
 		var name string
 		var shares int64
-		var nom float64
-		if err := rows.Scan(&id, &name, &shares, &nom); err != nil {
+		var nomStr string
+		if err := rows.Scan(&id, &name, &shares, &nomStr); err != nil {
 			return nil, err
 		}
+		var nom float64
+		fmt.Sscanf(nomStr, "%f", &nom)
 		out = append(out, []any{id, name, shares, nom})
 	}
 	return out, rows.Err()
@@ -198,9 +205,11 @@ func (s *Store) BeneficialOwners(companyID int64) ([]BeneficialOwner, error) {
 		var b BeneficialOwner
 		var last4 sql.NullString
 		var pep int
-		if err := rows.Scan(&b.ID, &b.Name, &last4, &b.OwnershipPct, &pep); err != nil {
+		var pct string
+		if err := rows.Scan(&b.ID, &b.Name, &last4, &pct, &pep); err != nil {
 			return nil, err
 		}
+		fmt.Sscanf(pct, "%f", &b.OwnershipPct)
 		if last4.Valid {
 			b.NIKLast4 = last4.String
 		}
