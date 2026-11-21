@@ -2,6 +2,7 @@
 
 {{define "clients"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Daftar Klien</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Manajemen Klien</h3><p class="text-secondary mb-0">Perorangan & badan hukum, identitas terverifikasi, beneficial owner.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-klien.jpg" alt="Verifikasi klien" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title">Daftar Klien ({{.Data.Total}})</h3><div class="d-flex gap-2"><a class="btn btn-outline-primary" href="/clients/export?q={{.Data.Q}}&kind={{.Data.Kind}}&sort={{.Data.Sort}}">Ekspor CSV</a><a class="btn btn-primary" href="/clients/new">+ Tambah Klien</a></div></div>
 <form method="get" action="/clients"><div class="card-body border-bottom d-flex gap-2 flex-wrap">
 <input class="form-control" style="max-width:240px" type="search" name="q" placeholder="Cari nama / telepon / email…" value="{{.Data.Q}}"/>

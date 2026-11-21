@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -29,6 +30,7 @@ func getenv(key, def string) string {
 }
 
 func Load() Config {
+	loadDotEnv(".env") // dev convenience; real env vars always win (never committed: .gitignore)
 	port := getenv("PORT", "8080")
 	host := getenv("DB_HOST", "127.0.0.1")
 	dbport := getenv("DB_PORT", "3306")
@@ -66,4 +68,31 @@ func MustInt(s string, def int) int {
 		return def
 	}
 	return n
+}
+
+// loadDotEnv fills missing env vars from a KEY=VALUE file (stdlib, no dependency).
+// Existing environment always wins; missing file is silently ignored (prod uses real env).
+func loadDotEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if i := strings.IndexByte(line, '='); i > 0 {
+			k := strings.TrimSpace(line[:i])
+			v := strings.TrimSpace(line[i+1:])
+			if len(v) >= 2 && ((v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'')) {
+				v = v[1 : len(v)-1]
+			}
+			if k != "" && os.Getenv(k) == "" {
+				_ = os.Setenv(k, v)
+			}
+		}
+	}
 }

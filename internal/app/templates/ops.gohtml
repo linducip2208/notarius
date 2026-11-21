@@ -34,6 +34,8 @@
 {{template "page_close" .}}{{end}}
 
 {{define "finance"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Keuangan</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Keuangan Kantor</h3><p class="text-secondary mb-0">Invoice multi-baris, pembayaran anti-overpay, piutang terpantau.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-keuangan.jpg" alt="Keuangan kantor" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="row row-deck row-cards mb-3">
 <div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Piutang berjalan</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
 <div class="col-sm-6"><div class="card"><div class="card-body"><div class="subheader">Penerimaan {{.Data.Month}}</div><div class="h1">Rp {{.Data.Revenue}}</div></div></div></div>
@@ -83,6 +85,8 @@
 {{template "page_close" .}}{{end}}
 
 {{define "reports"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Laporan</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Laporan Operasional</h3><p class="text-secondary mb-0">Angka real-time dari database — tanpa fabrikasi.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-laporan.jpg" alt="Laporan bisnis" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="row row-deck row-cards">
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu</div><div class="h1">{{.Data.Pending}}</div></div></div></div>
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Aktif</div><div class="h1">{{.Data.Active}}</div></div></div></div>
@@ -93,6 +97,8 @@
 {{template "page_close" .}}{{end}}
 
 {{define "settings"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Pengaturan</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Pengaturan & Keamanan</h3><p class="text-secondary mb-0">Pengguna, peran, tautan portal klien, dan MFA TOTP.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-keamanan.jpg" alt="Keamanan akun" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Pengguna Kantor</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Aktif</th><th>Taut klien</th></tr></thead>
 <tbody>{{range .Data.Users}}<tr><td>{{.Name}}</td><td>{{.Email}}</td><td>{{.Role}}</td><td>{{.IsActive}}</td>
@@ -125,6 +131,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "portal"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Portal Klien</h3><p class="text-secondary mb-0">Setiap akun hanya melihat datanya sendiri — penegakan server-side.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-portal.jpg" alt="Portal klien" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="alert alert-info">Portal klien: setiap akun hanya dapat melihat dokumen dan permohonannya sendiri (penegakan di sisi server).</div>
 {{if .Data.Mine}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan Saya</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Status</th></tr></thead>

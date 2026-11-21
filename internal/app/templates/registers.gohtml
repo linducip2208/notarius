@@ -20,6 +20,7 @@
 
 {{define "deeds"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Akta</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Workflow Akta</h3><p class="text-secondary mb-0">Draf berversi dari template terapproved hingga pengesahan + repertorium.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-akta.jpg" alt="Pengesahan akta" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Draf Akta Baru (dari template terapproved)</h3></div>
 <form method="post" action="/deeds">{{template "csrf" .}}<div class="card-body row">
 <div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul akta" required/></div>
@@ -37,6 +38,7 @@
 
 {{define "repertorium"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Buku Repertorium</li></ol></nav>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Repertorium Digital</h3><p class="text-secondary mb-0">Nomor unik per kantor, terisi otomatis saat akta disahkan.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-repertorium.jpg" alt="Arsip repertorium" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h3 class="card-title">Buku Repertorium</h3><div class="d-flex gap-2 no-print"><a class="btn btn-outline-primary" href="/repertorium/export?year={{.Data.Year}}&month={{.Data.Month}}&q={{.Data.Q}}">Ekspor CSV</a><button class="btn btn-primary" type="button" onclick="window.print()">Cetak</button></div></div>
 <form method="get" action="/repertorium"><div class="card-body border-bottom d-flex gap-2 flex-wrap no-print">
 <input class="form-control" style="max-width:120px" name="year" placeholder="Tahun" value="{{.Data.Year}}"/>
