@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 <link rel="stylesheet" href="/assets/notarius/tokens.css"/>
 <style>:root{--wl-primary:{{.Brand.Primary}};--wl-secondary:{{.Brand.Secondary}};--wl-accent:{{.Brand.Accent}};--wl-header:{{.Brand.HeaderBG}};--wl-radius:{{.Brand.ButtonRadius}}}body{font-family:{{css .Brand.FontStack}}}.btn-primary{background:var(--wl-primary);border-color:var(--wl-primary)}.navbar-brand,.page-title{color:var(--wl-secondary)}.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
-<script src="/assets/vendor/htmx.min.js"></script>
+<script src="/assets/vendor/tabler.min.js"></script>
+<!-- htmx tidak dipakai (tidak ada atribut hx-* di template mana pun); sengaja tidak dimuat -->
 </head>{{end}}
 
 {{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:{{.Brand.SidebarBG}}" aria-label="Navigasi utama">
@@ -86,7 +87,7 @@
 <nav aria-label="breadcrumb" class="d-none d-lg-block"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/app">Beranda</a></li><li class="breadcrumb-item active">{{.Title}}</li></ol></nav>
 <form method="get" action="/search" class="flex-fill d-none d-md-block" role="search"><div class="input-icon"><span class="input-icon-addon" aria-hidden="true">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…" aria-label="Pencarian menu, klien, atau dokumen"/></div></form>
 <div class="dropdown">
-<button class="btn btn-primary" data-bs-toggle="dropdown">+ Buat</button>
+<button class="btn btn-primary" type="button" data-bs-toggle="dropdown">+ Buat</button>
 <div class="dropdown-menu dropdown-menu-end">
 {{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Klien Baru</a>{{end}}
 <a class="dropdown-item" href="/requests">🧾 Permohonan Baru</a>
@@ -124,6 +125,7 @@
 </div>
 </div>
 <script src="/assets/vendor/tabler.min.js"></script>
+<script src="/assets/notarius/ui.js"></script>
 <script>
 (function(){var p=location.pathname;document.querySelectorAll('#mainnav a.nav-link').forEach(function(a){var h=a.getAttribute('href');if(h&&h!=='#'&&(p===h||(h!=='/'&&p.indexOf(h)===0))){a.style.background='#c9a844';a.style.color='#101f3c';a.style.borderRadius='8px';a.style.fontWeight='700';}});})();
 </script>

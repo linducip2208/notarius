@@ -29,6 +29,8 @@
 | Beban baca | 20×10 konkuren | 50/50 tanpa 500 |
 | Beban tulis | `TestApproveConcurrent` | 8 goroutine → tepat 1 menang + 1 repertorium |
 | E2E bisnis | smoke login→permohonan→akta→invoice | HIJAU (log audit) |
+| UI sweep | `ui_audit.py` | load+console+forms+buttons+onclick+dropdown+tab+sidebar+overlay+mobile, 60+ rute |
+| UI interaksi | `interact.py` 11/11 + `confirm.py` 3/3 | dropdown/tab/sidebar/nav-mobile; confirm dismiss-vs-accept |
 | screenshot | `scripts/qa_shots/*.py` | 15+ halaman OK |
 | race detector | `go test -race` | BACKLOG (host Windows/AV) |
 | restore VPS | — | BACKLOG (B-09) |

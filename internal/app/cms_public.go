@@ -83,6 +83,19 @@ func (a *App) publicPageSlug(slug string) func(http.ResponseWriter, *http.Reques
 	return func(w http.ResponseWriter, r *http.Request) {
 		office := a.pubOffice()
 		data := a.pubBase(office, r)
+		if slug == "tentang-kami" {
+			// Profil kantor selalu tampil (data publik); halaman CMS opsional memperkaya.
+			if p, secs, err := a.web.PublicPage(office, slug); err == nil {
+				data["Page"] = p
+				data["Sections"] = secs
+				data["HasPage"] = true
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := a.tmpl.ExecuteTemplate(w, "pub_about", map[string]any{"Title": "Tentang Kami", "Data": data}); err != nil {
+				http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
+			}
+			return
+		}
 		p, secs, err := a.web.PublicPage(office, slug)
 		if err != nil {
 			a.notFound(w, r)

@@ -106,6 +106,13 @@ input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;bo
 </div></section>
 </main>{{template "pub_foot" .}}{{end}}
 
+{{define "pub_about"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>Tentang Kami</h1>
+{{if .Data.HasPage}}<div>{{cmsHTML .Data.Page.Content}}</div>{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}{{end}}
+<div class="card"><strong>{{.Data.Office.Name}}</strong><br/>{{.Data.Office.Addr}}<br/>{{.Data.Office.Phone}} · {{.Data.Office.Email}}<br/>{{.Data.Office.Site}}</div>
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}
+
 {{define "pub_services"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
 <section class="sec"><div class="wrap"><h1>Layanan Kami</h1><p class="meta">Ruang lingkup jabatan Notaris. Bukan layanan PPAT/advokat.</p>
 <div class="cards">{{range .Data.List}}<div class="card"><h3 style="margin-top:0"><a href="/layanan-kami/{{.Slug}}">{{.Name}}</a></h3><p class="meta">{{.Description}}</p></div>{{else}}<p class="meta">Belum ada info layanan.</p>{{end}}</div>
