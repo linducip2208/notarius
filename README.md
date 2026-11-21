@@ -1,4 +1,4 @@
-# NOTARYOS — Sistem Manajemen Kantor Notaris Indonesia
+# SaktiNotaris — Sistem Manajemen Kantor Notaris Indonesia
 Backend 100% Go · MySQL 8.x · UI Tabler + HTMX · Modular monolith.
 
 ## Syarat

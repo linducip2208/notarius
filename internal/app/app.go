@@ -329,7 +329,7 @@ func (a *App) loginForm(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/app", http.StatusSeeOther)
 		return
 	}
-	a.render(w, r, "login", "Masuk — NOTARYOS", nil)
+	a.render(w, r, "login", "Masuk — SaktiNotaris", nil)
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
@@ -340,7 +340,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	u, err := a.users.Authenticate(email, r.FormValue("password"))
 	if err != nil {
-		a.render(w, r, "login", "Masuk — NOTARYOS", map[string]string{"Error": err.Error(), "Email": email})
+		a.render(w, r, "login", "Masuk — SaktiNotaris", map[string]string{"Error": err.Error(), "Email": email})
 		return
 	}
 	// Step-up: accounts with TOTP enrolled must pass a second factor.
@@ -444,7 +444,7 @@ func (a *App) sitemapXML(w http.ResponseWriter, r *http.Request) {
 // llmsTxt exposes a crawler- and LLM-friendly summary (GEO: factual, no hype).
 func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	w.Write([]byte(`# NOTARIUS
+	w.Write([]byte(`# SaktiNotaris
 
 > Sistem manajemen kantor Notaris Indonesia (Go + MySQL + Tabler).
 > Catatan: informasi produk di bawah ini; bukan nasihat hukum.

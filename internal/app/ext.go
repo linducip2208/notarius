@@ -77,7 +77,7 @@ func (a *App) mfaSetup(w http.ResponseWriter, r *http.Request) {
 	var email string
 	_ = a.db.QueryRow(`SELECT email FROM users WHERE id=?`, *id).Scan(&email)
 	a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{
-		"Secret": secret, "URI": mfa.ProvisioningURI(secret, email, "NOTARYOS"),
+		"Secret": secret, "URI": mfa.ProvisioningURI(secret, email, "SaktiNotaris"),
 		"Enabled": a.users.MFAEnabled(*id),
 	})
 }

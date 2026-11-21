@@ -15,7 +15,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "gov"}}{{template "head" .}}{{template "page_open" .}}
-<div class="alert alert-info">Alur <strong>asistensi</strong>: data disiapkan di NOTARYOS, pengisian dilakukan manual oleh staf berwenang di portal resmi, lalu bukti diarsipkan di sini. Tidak ada endpoint pemerintah yang diinventarisasi.</div>
+<div class="alert alert-info">Alur <strong>asistensi</strong>: data disiapkan di SaktiNotaris, pengisian dilakukan manual oleh staf berwenang di portal resmi, lalu bukti diarsipkan di sini. Tidak ada endpoint pemerintah yang diinventarisasi.</div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Pengajuan Baru</h3></div>
 <form method="post" action="/gov"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="channel"><option value="AHU">AHU</option><option value="OSS">OSS</option></select></div>
