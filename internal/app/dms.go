@@ -13,8 +13,10 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/skip2/go-qrcode"
 	"notaryos/internal/audit"
 	mw "notaryos/internal/middleware"
+	"notaryos/internal/notify"
 	"notaryos/internal/rbac"
 )
 
@@ -761,9 +763,53 @@ func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	itemID, _ := strconv.ParseInt(r.FormValue("item_id"), 10, 64)
-	if err := a.dms.SetChecklistItem(a.officeOf(r), reqID, itemID, r.FormValue("status"), a.uid(r), r.FormValue("note")); err != nil {
+	st := r.FormValue("status")
+	if err := a.dms.SetChecklistItem(a.officeOf(r), reqID, itemID, st, a.uid(r), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "checklist.set", Entity: "service_request", EntityID: strconv.FormatInt(reqID, 10), Detail: st})
+	if st == "NEEDS_REVISION" || st == "REJECTED" {
+		var creator sql.NullInt64
+		var title string
+		_ = a.db.QueryRow(`SELECT created_by, title FROM service_requests WHERE id=?`, reqID).Scan(&creator, &title)
+		if creator.Valid {
+			_ = notify.Create(a.db, creator.Int64, "Berkas perlu perbaikan: "+title, "Status: "+st+" — "+r.FormValue("note"))
+		}
+	}
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Checklist+diperbarui", http.StatusSeeOther)
+}
+
+// ---- QR generik + label arsip ----
+
+// qrText serves a QR PNG for short staff-provided text (capped, no logging of payload).
+func (a *App) qrText(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	d := r.URL.Query().Get("d")
+	if d == "" || len(d) > 200 {
+		http.Error(w, "teks QR kosong/terlalu panjang (maks 200)", http.StatusBadRequest)
+		return
+	}
+	png, err := qrcode.Encode(d, qrcode.Medium, 160)
+	if err != nil {
+		http.Error(w, "gagal membuat QR", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(png)
+}
+
+// dmsLabels renders printable QR labels for archive locations.
+func (a *App) dmsLabels(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageRepert) {
+		a.forbidden(w, r)
+		return
+	}
+	locs, _ := a.dms.Locations(a.officeOf(r))
+	var office string
+	_ = a.db.QueryRow(`SELECT name FROM offices WHERE id=?`, a.officeOf(r)).Scan(&office)
+	a.render(w, r, "dms_labels", "Label QR Arsip", map[string]any{"Locs": locs, "Office": office})
 }

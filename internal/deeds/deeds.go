@@ -3,6 +3,7 @@ package deeds
 import (
 	"database/sql"
 	"errors"
+	"strconv"
 
 	"notaryos/internal/docengine"
 )
@@ -65,12 +66,15 @@ func (s *Store) CreateDraft(officeID int64, requestID *int64, title, kind string
 }
 
 // SaveVersion stores content as a new version (blocked when locked/final).
+// The pre-update draft content is snapshotted as the current version number
+// first (so v1 is never lost), then the new content becomes version+1.
 func (s *Store) SaveVersion(deedID int64, content string, createdBy *int64, note string) error {
 	var locked bool
 	var status string
 	var version int
-	if err := s.db.QueryRow(`SELECT locked, status, version FROM deed_drafts WHERE id=?`,
-		deedID).Scan(&locked, &status, &version); err != nil {
+	var curContent sql.NullString
+	if err := s.db.QueryRow(`SELECT locked, status, version, content FROM deed_drafts WHERE id=?`,
+		deedID).Scan(&locked, &status, &version, &curContent); err != nil {
 		return err
 	}
 	if locked || (status != "DRAFT" && status != "IN_REVIEW") {
@@ -82,6 +86,19 @@ func (s *Store) SaveVersion(deedID int64, content string, createdBy *int64, note
 		return err
 	}
 	defer tx.Rollback()
+	var have int
+	_ = tx.QueryRow(`SELECT COUNT(*) FROM deed_versions WHERE deed_id=? AND version=?`, deedID, version).Scan(&have)
+	if have == 0 {
+		oldBody := ""
+		if curContent.Valid {
+			oldBody = curContent.String
+		}
+		oldHash := docengine.VersionHash(oldBody, nil)
+		if _, err := tx.Exec(`INSERT INTO deed_versions(deed_id, version, content, content_hash, created_by, note)
+			VALUES(?,?,?,?,?,?)`, deedID, version, oldBody, oldHash, createdBy, "snapshot otomatis v"+strconv.Itoa(version)); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.Exec(`INSERT INTO deed_versions(deed_id, version, content, content_hash, created_by, note)
 		VALUES(?,?,?,?,?,?)`, deedID, version+1, content, hash, createdBy, note); err != nil {
 		return err

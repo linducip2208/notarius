@@ -146,7 +146,7 @@
 <div class="col-md-2 mb-2"><input class="form-control" name="box" placeholder="Boks"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
 </div></form></div>
-<div class="card"><div class="card-header"><h3 class="card-title">Lokasi</h3></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Lokasi</h3><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/dms/archive/labels">Cetak Label QR</a></div></div>
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Kode</th><th>Ruang</th><th>Rak</th><th>Boks</th></tr></thead>
 <tbody>{{range .Data.Locs}}<tr><td><strong>{{.Code}}</strong></td><td>{{.Room}}</td><td>{{.Shelf}}</td><td>{{.Box}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada lokasi arsip.</td></tr>{{end}}</tbody></table></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Berkas Terarsip (100 terbaru)</h3></div>
@@ -198,4 +198,14 @@
 </div></form></div>
 <div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Layanan</th><th>Item</th></tr></thead>
 <tbody>{{range .Data.Tpls}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.Service}}</td><td class="small">{{.Items}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada template. Buat per jenis layanan.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "dms_labels"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/dms/archive">Arsip Fisik</a></li><li class="breadcrumb-item active">Label QR</li></ol></nav>
+<div class="alert alert-info no-print">Tempel label ini di rak/boks. Pindai untuk identifikasi lokasi — tanpa data sensitif di dalam QR (hanya kode lokasi).</div>
+<div class="row g-3">{{range .Data.Locs}}<div class="col-md-4"><div class="card"><div class="card-body text-center">
+<img src="/qr?d={{.Code}}" alt="QR {{.Code}}" style="width:140px;height:140px"/>
+<h4 class="mt-2">{{.Code}}</h4><p class="text-secondary small mb-0">{{$.Data.Office}}<br/>{{.Room}} · {{.Shelf}} · {{.Box}}</p>
+</div></div></div>{{else}}<div class="col-12"><div class="alert alert-warning">Belum ada lokasi. <a href="/dms/archive">Buat dulu →</a></div></div>{{end}}</div>
+<div class="no-print mt-3"><button class="btn btn-primary" onclick="window.print()">Cetak Label</button></div>
 {{template "page_close" .}}{{end}}

@@ -52,7 +52,10 @@
 </div>
 <div class="col-lg-5"><div class="card"><div class="card-header"><h3 class="card-title">Riwayat Versi</h3></div>
 <div class="card-body">{{range .Data.Versions}}<div class="mb-3 pb-2 border-bottom"><strong>v{{.No}}</strong> <span class="text-secondary">{{.CreatedAt}} · {{.Hash}}</span><div class="small">{{.Note}}</div><div class="d-flex gap-2 mt-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{$.Data.Deed.ID}}?compare={{.No}}">Bandingkan</a></div><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{.Content}}</pre></div>{{else}}<p class="text-secondary">Belum ada revisi tersimpan.</p>{{end}}</div></div>
-{{if .Data.CmpA}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Komparasi v{{.Data.CmpN}} vs sebelumnya (berdampingan)</h3></div>
+{{if .Data.CmpA}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Komparasi v{{.Data.CmpN}} vs sebelumnya</h3><div class="ms-auto"><span class="badge bg-green-lt">+{{.Data.DiffAdd}}</span> <span class="badge bg-red-lt">-{{.Data.DiffDel}}</span></div></div>
+<div class="card-body"><div class="border rounded" style="max-height:320px;overflow:auto">{{range .Data.DiffOps}}{{if eq .Kind "+"}}<div class="px-2" style="background:#e6f9ed">+ {{.Line}}</div>{{else if eq .Kind "-"}}<div class="px-2" style="background:#ffeef0">− {{.Line}}</div>{{else}}<div class="px-2 text-secondary">{{.Line}}</div>{{end}}{{end}}</div>
+<p class="text-secondary small mt-2 mb-0">Perbandingan baris-per-baris otomatis. Tetap baca naskah penuh sebelum menyetujui.</p></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Berdampingan</h3></div>
 <div class="card-body row"><div class="col-md-6"><strong>Sebelumnya</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{.Data.CmpB}}</pre></div><div class="col-md-6"><strong>v{{.Data.CmpN}}</strong><pre class="small p-2 bg-light border rounded" style="white-space:pre-wrap;max-height:300px;overflow:auto">{{.Data.CmpA}}</pre></div></div></div>{{end}}
 </div></div>
 {{template "page_close" .}}{{end}}

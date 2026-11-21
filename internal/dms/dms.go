@@ -677,6 +677,31 @@ func trimQ(q string) string {
 
 // ---- checklist ----
 
+// AutoChecklist copies template items for a service into MISSING records for a new request.
+func (s *Store) AutoChecklist(officeID, requestID, serviceID int64) int {
+	var code string
+	if err := s.db.QueryRow(`SELECT code FROM services WHERE id=?`, serviceID).Scan(&code); err != nil {
+		return 0
+	}
+	rows, err := s.db.Query(`SELECT i.id FROM doc_checklist_items i
+		JOIN doc_checklist_templates t ON t.id=i.template_id
+		WHERE t.office_id=? AND t.service_code=?`, officeID, code)
+	if err != nil {
+		return 0
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var itemID int64
+		_ = rows.Scan(&itemID)
+		if _, err := s.db.Exec(`INSERT IGNORE INTO doc_checklist_records(office_id, request_id, item_id)
+			VALUES(?,?,?)`, officeID, requestID, itemID); err == nil {
+			n++
+		}
+	}
+	return n
+}
+
 type ChecklistItem struct {
 	ID       int64
 	Label    string

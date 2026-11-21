@@ -364,6 +364,8 @@ func (a *App) Router() http.Handler {
 		p.Get("/dms/checklists", a.dmsChecklists)
 		p.Post("/dms/checklists", a.dmsChecklistCreate)
 		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
+		p.Get("/qr", a.qrText)
+		p.Get("/dms/archive/labels", a.dmsLabels)
 		p.Get("/audit", a.auditPage)
 		p.Get("/office", a.officePage)
 		p.Post("/office", a.officeSave)
@@ -1075,6 +1077,8 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := a.uid(r)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "request.create", Entity: "service_request", EntityID: strconv.FormatInt(id, 10)})
+	// Checklist cerdas: salin item template layanan sebagai MISSING otomatis.
+	_ = a.dms.AutoChecklist(a.officeOf(r), id, serviceID)
 	http.Redirect(w, r, "/requests?flash=Permohonan+dibuat", http.StatusSeeOther)
 }
 

@@ -13,6 +13,7 @@ import (
 	"notaryos/internal/audit"
 	"notaryos/internal/clients"
 	"notaryos/internal/corp"
+	"notaryos/internal/diff"
 	"notaryos/internal/doctpl"
 	"notaryos/internal/docx"
 	"notaryos/internal/gov"
@@ -253,9 +254,19 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	subs, _ := a.govs.List(a.officeOf(r))
 	checklist, _ := a.dms.ChecklistForRequest(a.officeOf(r), id)
 	linked, _ := a.dms.ByRelated(a.officeOf(r), "request", id)
+	done, total := 0, len(checklist)
+	for _, c := range checklist {
+		if c.Status == "VERIFIED" || c.Status == "RECEIVED" {
+			done++
+		}
+	}
+	pct := 0
+	if total > 0 {
+		pct = done * 100 / total
+	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs,
-		"Checklist": checklist, "LinkedDocs": linked,
+		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 	})
 }
 
@@ -806,23 +817,33 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		FROM deed_drafts d LEFT JOIN users u ON u.id=d.created_by LEFT JOIN users a ON a.id=d.approved_by
 		LEFT JOIN doc_templates t ON t.id=d.template_id WHERE d.id=?`, id).
 		Scan(&pr.Created, &pr.Creator, &pr.ApprovedBy, &pr.ApprovedAt, &pr.Hash, &pr.Template)
-	// Komparasi berdampingan: ?compare=N tampilkan vN vs vN-1 (jujur, tanpa diff palsu).
+	// Komparasi: vN vs vN-1 dari riwayat tersimpan; draf berjalan = versi terbaru.
+	// v1 draf lama mungkin tak tersimpan (dibuat sebelum snapshot otomatis) → tulis jujur.
 	var cmpA, cmpB string
 	var cmpN int
+	var diffOps []diff.Op
+	var diffAdd, diffDel int
 	if c := r.URL.Query().Get("compare"); c != "" {
 		fmt.Sscanf(c, "%d", &cmpN)
-		contents := map[int]string{1: body}
+		contents := map[int]string{}
 		for _, v := range vers {
 			contents[v.No] = v.Content
 		}
+		contents[d.Version] = body
 		if aStr, ok := contents[cmpN]; ok {
 			cmpA = aStr
-			cmpB = contents[cmpN-1]
+			if bStr, ok2 := contents[cmpN-1]; ok2 {
+				cmpB = bStr
+			} else {
+				cmpB = "(versi awal draf lama tidak tersimpan — perbandingan dimulai dari versi tercatat pertama)"
+			}
+			diffOps = diff.Compare(cmpB, cmpA)
+			diffAdd, diffDel = diff.Stats(diffOps)
 		}
 	}
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
-		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN,
+		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 	})
 }
