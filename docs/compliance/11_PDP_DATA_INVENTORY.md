@@ -1,0 +1,2 @@
+# PDP Data Inventory (ringkas)
+Kategori: identitas (NIK cipher+last4), kontak, alamat, NPWP, corporate/BO, keuangan, dokumen+OCR, login/IP/UA, inquiry/booking, pageview agregat. Tujuan & akses per peran tercatat di modul 03 inventarisasi. Vendor: lokal default; webhook/SMTP/S3 opsional via env dan dicatat di privacy notice. Retensi: arsip mengikuti kewajiban hukum (tidak auto-delete); data publik 1–2 tahun direncanakan (belum ada purge job → gap).

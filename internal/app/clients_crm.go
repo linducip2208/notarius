@@ -125,7 +125,11 @@ func (a *App) identityFlag(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var cid int64
-	_ = a.db.QueryRow(`SELECT client_id FROM identities WHERE id=?`, id).Scan(&cid)
+	_ = a.db.QueryRow(`SELECT c.id FROM identities i JOIN clients c ON c.id=i.client_id WHERE i.id=? AND c.office_id=?`, id, a.officeOf(r)).Scan(&cid)
+	if cid == 0 {
+		http.NotFound(w, r)
+		return
+	}
 	if err := a.clients.MarkInconsistent(a.officeOf(r), id, r.FormValue("flag") == "1"); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -169,8 +173,12 @@ func (a *App) mergePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var wn, ln string
-	_ = a.db.QueryRow(`SELECT full_name FROM clients WHERE id=?`, winner).Scan(&wn)
-	_ = a.db.QueryRow(`SELECT full_name FROM clients WHERE id=?`, loser).Scan(&ln)
+	_ = a.db.QueryRow(`SELECT full_name FROM clients WHERE id=? AND office_id=?`, winner, a.officeOf(r)).Scan(&wn)
+	_ = a.db.QueryRow(`SELECT full_name FROM clients WHERE id=? AND office_id=?`, loser, a.officeOf(r)).Scan(&ln)
+	if wn == "" || ln == "" {
+		http.Error(w, "klien tidak ditemukan di kantor ini", http.StatusNotFound)
+		return
+	}
 	a.render(w, r, "client_merge", "Gabung Duplikat — Pratinjau", map[string]any{
 		"MP": mp, "Winner": wn, "Loser": ln,
 	})

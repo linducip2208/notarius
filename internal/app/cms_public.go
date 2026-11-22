@@ -194,6 +194,11 @@ func (a *App) publicContact(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// publicPrivacy renders the honest privacy notice (no tracking, local-only data).
+func (a *App) publicPrivacy(w http.ResponseWriter, r *http.Request) {
+	a.renderPub(w, r, "pub_privasi", "Kebijakan Privasi", nil)
+}
+
 func (a *App) publicServices(w http.ResponseWriter, r *http.Request) {
 	office := a.pubOffice()
 	data := a.pubBase(office, r)

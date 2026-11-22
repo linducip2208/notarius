@@ -1,0 +1,2 @@
+# Security Audit
+Bcrypt-12, lockout email+IP 5/15m, rate limit login 20/menit, MFA HMAC stateless + CSRF + re-auth enroll, session IP/UA + new-device notify, cookie HttpOnly/SameSite/Secure(env), RBAC server-side + office scope, CSRF semua POST, CSP/nosniff/HSTS/SAMEORIGIN, SQL parameterized, safeHTML allowlist + cmsHTML URL validation + css allowlist, SSRF webhook guard, upload magic-byte + quota, audit hash chain. Residual: COOKIE_SECURE default false (deploy), CSP unsafe-inline, race-CI Linux.

@@ -51,6 +51,9 @@ const (
 	PermWebAudit        = "website.audit.view"
 	PermWebInquiries    = "website.inquiries.manage"
 	PermWebEngagement   = "website.engagement.manage"
+	PermAuditView       = "audit.view"
+	PermLCCView         = "lcc.view"
+	PermLCCManage       = "lcc.manage"
 )
 
 var rolePerms = map[string][]string{
@@ -63,7 +66,7 @@ var rolePerms = map[string][]string{
 		PermWebsiteView, PermWebsiteManage, PermWebPagesView, PermWebPagesCreate,
 		PermWebPagesUpdate, PermWebPagesDelete, PermWebPagesPublish, PermWebArticles,
 		PermWebNav, PermWebMedia, PermWebSEO, PermWebBranding, PermWebDomain, PermWebAudit,
-		PermWebInquiries, PermWebEngagement,
+		PermWebInquiries, PermWebEngagement, PermAuditView, PermLCCView, PermLCCManage,
 	},
 	RoleNotary: {
 		PermViewClient, PermCreateClient, PermEditClient, PermViewIdentity, PermVerifyIdentity,
@@ -71,32 +74,32 @@ var rolePerms = map[string][]string{
 		PermViewFinance, PermManageTemplates, PermViewReports, PermLegalize, PermGovSubmit,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate,
 		PermWebPagesPublish, PermWebArticles, PermWebMedia,
-		PermWebInquiries, PermWebEngagement,
+		PermWebInquiries, PermWebEngagement, PermAuditView, PermLCCView, PermLCCManage,
 	},
 	RoleSubstitute: {
 		PermViewClient, PermViewIdentity, PermDraftDeed, PermEditDeed, PermApproveDeed,
 		PermViewProtocol, PermViewReports, PermLegalize,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate,
 		PermWebPagesPublish, PermWebArticles, PermWebMedia,
-		PermWebInquiries, PermWebEngagement,
+		PermWebInquiries, PermWebEngagement, PermAuditView, PermLCCView, PermLCCManage,
 	},
 	RoleStaff: {
 		PermViewClient, PermCreateClient, PermEditClient, PermViewIdentity,
 		PermDraftDeed, PermEditDeed, PermViewReports, PermRequestService,
 		PermWebsiteView, PermWebPagesView, PermWebPagesCreate, PermWebPagesUpdate, PermWebMedia,
 		PermWebArticles,
-		PermWebInquiries, PermWebEngagement,
+		PermWebInquiries, PermWebEngagement, PermAuditView,
 	},
 	RoleFinance: {
 		PermViewClient, PermViewFinance, PermManageFinance, PermViewReports,
-		PermWebsiteView,
+		PermWebsiteView, PermAuditView,
 	},
 	RoleDocOperator: {
 		PermViewClient, PermDraftDeed, PermEditDeed, PermViewProtocol, PermManageTemplates,
 		PermWebsiteView,
 	},
 	RoleClient:  {PermRequestService},
-	RoleAuditor: {PermViewClient, PermViewFinance, PermViewProtocol, PermViewReports, PermWebsiteView, PermWebAudit},
+	RoleAuditor: {PermViewClient, PermViewFinance, PermViewProtocol, PermViewReports, PermWebsiteView, PermWebAudit, PermAuditView, PermLCCView},
 }
 
 // Has reports whether role grants permission.

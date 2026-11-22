@@ -1,0 +1,2 @@
+# E-Signature Audit
+Klasifikasi: (1) internal approval hash — dipakai; (2) TTE biasa — hash(body|number|signer|seal|timestamp) internal; (3) TTE tersertifikasi PSrE — TIDAK terhubung (NOT_CONNECTED); (4) formalitas akta Notaris — bukan digantikan aplikasi. Tidak ada status CERTIFIED, tidak ada logo PSrE. deedSign replay dicegah per hash+timestamp. `/verify` menunjukkan segel HMAC + status registry (bukan jaminan kertas).

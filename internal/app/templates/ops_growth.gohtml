@@ -1,3 +1,20 @@
+{{define "mandates"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/office">Kantor</a></li><li class="breadcrumb-item active">Mandat Pengganti</li></ol></nav>
+<p class="text-secondary">Mandat notaris pengganti (SK + periode). Pengesahan akta oleh substitute_notary <strong>diblokir server</strong> bila tanpa mandat aktif hari ini.</p>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Mandat Baru</h3></div>
+<form method="post" action="/office/mandates"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-3 mb-2"><select class="form-select" name="user_id" required><option value="">— Akun pengganti —</option>{{range .Data.Users}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="sk_no" placeholder="No. SK penunjukan" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="date" name="start_date" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="date" name="end_date" required/></div>
+<div class="col-md-1 mb-2"><input class="form-control" name="scope" placeholder="Ruang" value="penuh"/></div>
+<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">+</button></div>
+</div></form></div>
+<div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>Pengganti</th><th>SK</th><th>Mulai</th><th>Berakhir</th><th>Ruang lingkup</th><th></th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.Name}}</td><td>{{.SK}}</td><td>{{.Start}}</td><td>{{.End}}</td><td>{{.Scope}}</td>
+<td><form method="post" action="/office/mandates/{{.ID}}/delete">{{template "csrf" $}}<button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Cabut mandat?')">Cabut</button></form></td></tr>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada mandat. Tanpa mandat aktif, akun pengganti tidak bisa mengesahkan.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
 {{define "specimens"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/clients/{{.Data.ClientID}}">Klien</a></li><li class="breadcrumb-item active">Spesimen</li></ol></nav>
 <p class="text-secondary">Spesimen tanda tangan/cap untuk pembanding visual saat verifikasi dokumen. Unggah dari contoh bertinta basah yang disaksikan.</p>

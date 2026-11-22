@@ -278,11 +278,21 @@ func TestBeneficialOwnerAndWillHandover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.Handover(wid, "Ahli Waris A", "diserahkan di kantor"); err != nil {
+	if err := ws.Handover(office, wid, "Ahli Waris A", "diserahkan di kantor"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.Handover(wid, "X", ""); err == nil {
+	if err := ws.Handover(office, wid, "X", ""); err == nil {
 		t.Fatal("handover ganda harus gagal")
+	}
+	wid2, err := ws.Register(office, cid, nil, "W-TEST-002")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.Handover(office+9999, wid2, "Y", "lintas"); err == nil {
+		t.Fatal("handover lintas kantor harus gagal")
+	}
+	if err := ws.Handover(office, wid2, "Ahli Waris B", "ok"); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -298,7 +308,7 @@ func TestProtocolLegalisasiAppointment(t *testing.T) {
 	if err := ds.CreateProtocol(office, "", 1999, ""); err == nil {
 		t.Fatal("protokol invalid harus gagal")
 	}
-	lid, err := ds.RegisterLegalization(office, "LEGALISASI", "REG-1", cid, "Dok A", 150000)
+	lid, err := ds.RegisterLegalization(office, "LEGALISASI", "REG-1", cid, "Dok A", 150000, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,6 +21,7 @@ import (
 	"notaryos/internal/audit"
 	"notaryos/internal/clients"
 	mw "notaryos/internal/middleware"
+	"notaryos/internal/money"
 	"notaryos/internal/rbac"
 	"notaryos/internal/validate"
 )
@@ -218,16 +219,29 @@ func (a *App) bankManual(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	mid, _ := strconv.ParseInt(r.FormValue("mutation_id"), 10, 64)
 	iid, _ := strconv.ParseInt(r.FormValue("invoice_id"), 10, 64)
-	var n int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM invoices WHERE id=? AND office_id=?`, iid, a.officeOf(r)).Scan(&n)
-	if n == 0 {
-		http.Error(w, "invoice tidak ditemukan di kantor ini", http.StatusNotFound)
+	var mamt, itotal string
+	var moid, ioid, ist int64
+	_ = a.db.QueryRow(`SELECT amount, office_id FROM bank_mutations WHERE id=?`, mid).Scan(&mamt, &moid)
+	_ = a.db.QueryRow(`SELECT total, office_id, status IN ('ISSUED','PARTIAL') FROM invoices WHERE id=?`, iid).Scan(&itotal, &ioid, &ist)
+	if moid == 0 || moid != a.officeOf(r) || ioid != a.officeOf(r) {
+		http.Error(w, "mutasi/invoice tidak ditemukan di kantor ini", http.StatusNotFound)
+		return
+	}
+	if ist != 1 {
+		http.Error(w, "hanya invoice ISSUED/PARTIAL yang bisa ditautkan", http.StatusBadRequest)
+		return
+	}
+	mv, _ := money.Parse(mamt)
+	iv, _ := money.Parse(itotal)
+	if mv != iv {
+		http.Error(w, "nominal mutasi tidak sama dengan total invoice — gunakan automatch untuk selisih", http.StatusBadRequest)
 		return
 	}
 	if _, err := a.db.Exec(`UPDATE bank_mutations SET matched_invoice_id=? WHERE id=? AND office_id=?`, iid, mid, a.officeOf(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "bank.manual", Entity: "bank_mutation", EntityID: strconv.FormatInt(mid, 10), Detail: "invoice#" + strconv.FormatInt(iid, 10)})
 	http.Redirect(w, r, "/finance/bank?flash=Cocok+manual+disimpan", http.StatusSeeOther)
 }
 
@@ -241,7 +255,6 @@ func (a *App) budgetSave(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	cat := strings.TrimSpace(r.FormValue("category"))
 	month := strings.TrimSpace(r.FormValue("month")) // YYYY-MM
-	amt := strings.TrimSpace(r.FormValue("amount"))
 	if cat == "" || month == "" {
 		http.Error(w, "kategori dan bulan wajib diisi", http.StatusBadRequest)
 		return
@@ -253,13 +266,13 @@ func (a *App) budgetSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bulan tidak valid", http.StatusBadRequest)
 		return
 	}
-	amt = strings.ReplaceAll(strings.ReplaceAll(amt, ".", ""), ",", ".")
-	if _, err := strconv.ParseFloat(amt, 64); err != nil {
+	amtVal, err := money.Parse(strings.TrimSpace(r.FormValue("amount")))
+	if err != nil || amtVal < 0 {
 		http.Error(w, "nominal tidak valid", http.StatusBadRequest)
 		return
 	}
 	if _, err := a.db.Exec(`INSERT INTO budgets(office_id, category, month, amount) VALUES(?,?,?,?)
-		ON DUPLICATE KEY UPDATE amount=VALUES(amount)`, a.officeOf(r), cat, month, amt); err != nil {
+		ON DUPLICATE KEY UPDATE amount=VALUES(amount)`, a.officeOf(r), cat, month, amtVal); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -448,7 +461,17 @@ func (a *App) backupNow(w http.ResponseWriter, r *http.Request) {
 	user := getenv("DB_USER", "notaryos")
 	pass := os.Getenv("DB_PASS")
 	dbname := getenv("DB_NAME", "notaryos")
-	cmd := exec.Command(mysqldump, "-h"+host, "-u"+user, "-p"+pass, "--single-transaction", "--routines", dbname)
+	// Kredensial via defaults-file 0600 (tidak lewat argv/ps).
+	cnf, err := os.CreateTemp("", "notaryos-backup-*.cnf")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer os.Remove(cnf.Name())
+	_ = os.Chmod(cnf.Name(), 0o600)
+	fmt.Fprintf(cnf, "[client]\nhost=%s\nuser=%s\npassword=%s\n", host, user, strings.ReplaceAll(pass, "\n", ""))
+	_ = cnf.Close()
+	cmd := exec.Command(mysqldump, "--defaults-extra-file="+cnf.Name(), "--single-transaction", "--routines", dbname)
 	out, err := os.Create(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -551,4 +574,85 @@ func getenv(k, fb string) string {
 		return v
 	}
 	return fb
+}
+
+// ---- substitute mandates (W-12) ----
+
+func (a *App) mandatesPage(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageUsers) {
+		a.forbidden(w, r)
+		return
+	}
+	rows, _ := a.db.Query(`SELECT m.id, u.name, m.sk_no, m.start_date, m.end_date, m.scope FROM substitute_mandates m
+		JOIN users u ON u.id=m.user_id WHERE m.office_id=? ORDER BY m.end_date DESC`, a.officeOf(r))
+	type m struct {
+		ID                          int64
+		Name, SK, Start, End, Scope string
+	}
+	var out []m
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var x m
+			_ = rows.Scan(&x.ID, &x.Name, &x.SK, &x.Start, &x.End, &x.Scope)
+			out = append(out, x)
+		}
+	}
+	urows, _ := a.db.Query(`SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.office_id=? AND r.name='substitute_notary' AND u.is_active=1 ORDER BY u.name`, a.officeOf(r))
+	type u struct {
+		ID   int64
+		Name string
+	}
+	var users []u
+	if urows != nil {
+		defer urows.Close()
+		for urows.Next() {
+			var x u
+			_ = urows.Scan(&x.ID, &x.Name)
+			users = append(users, x)
+		}
+	}
+	a.render(w, r, "mandates", "Mandat Notaris Pengganti", map[string]any{"Rows": out, "Users": users})
+}
+
+func (a *App) mandateSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageUsers) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	uid, _ := strconv.ParseInt(r.FormValue("user_id"), 10, 64)
+	sk, start, end, scope := strings.TrimSpace(r.FormValue("sk_no")), r.FormValue("start_date"), r.FormValue("end_date"), strings.TrimSpace(r.FormValue("scope"))
+	if uid <= 0 || sk == "" || start == "" || end == "" || start > end {
+		http.Error(w, "mandat wajib: pengguna, SK, periode valid", http.StatusBadRequest)
+		return
+	}
+	var role, roid int64
+	_ = a.db.QueryRow(`SELECT role_id, office_id FROM users WHERE id=?`, uid).Scan(&role, &roid)
+	var rname string
+	_ = a.db.QueryRow(`SELECT name FROM roles WHERE id=?`, role).Scan(&rname)
+	if rname != "substitute_notary" || roid != a.officeOf(r) {
+		http.Error(w, "hanya akun substitute_notary kantor ini", http.StatusBadRequest)
+		return
+	}
+	if scope == "" {
+		scope = "penuh"
+	}
+	if _, err := a.db.Exec(`INSERT INTO substitute_mandates(office_id, user_id, sk_no, start_date, end_date, scope, created_by) VALUES(?,?,?,?,?,?,?)`,
+		a.officeOf(r), uid, sk, start, end, scope, a.uid(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "mandate.create", Entity: "mandate", EntityID: sk})
+	http.Redirect(w, r, "/office/mandates?flash=Mandat+dicatat", http.StatusSeeOther)
+}
+
+func (a *App) mandateDelete(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageUsers) {
+		a.forbidden(w, r)
+		return
+	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	_, _ = a.db.Exec(`DELETE FROM substitute_mandates WHERE id=? AND office_id=?`, id, a.officeOf(r))
+	http.Redirect(w, r, "/office/mandates?flash=Mandat+dihapus", http.StatusSeeOther)
 }

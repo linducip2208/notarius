@@ -224,8 +224,12 @@ func (a *App) dmsCompare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var fname, fmime string
-	_ = a.db.QueryRow(`SELECT COALESCE(display_name, original_name), mime FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&fname, &fmime)
+	var fname, fmime, conf string
+	_ = a.db.QueryRow(`SELECT COALESCE(display_name, original_name), mime, confidentiality FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&fname, &fmime, &conf)
+	if !a.canSeeDoc(r, conf) {
+		a.forbidden(w, r)
+		return
+	}
 	aQ, bQ := r.URL.Query().Get("a"), r.URL.Query().Get("b")
 	vers, _ := a.dms.Versions(a.officeOf(r), id)
 	var va, vb *cmpVer
@@ -540,11 +544,16 @@ func (a *App) officeExport(w http.ResponseWriter, r *http.Request) {
 	writeCSV("files.csv", `SELECT id, owner_type, owner_id, original_name, mime, size_bytes, sha256, workflow_status, verification_status, created_at FROM files WHERE office_id=?`, office)
 	type fr struct{ ref, name string }
 	var refs []fr
-	if rows, err := a.db.Query(`SELECT ref, original_name FROM files WHERE office_id=? ORDER BY id`, office); err == nil {
+	// Hanya berkas yang boleh dilihat peran pengekspor (di luar hak tidak ikut).
+	if rows, err := a.db.Query(`SELECT ref, original_name, confidentiality FROM files WHERE office_id=? ORDER BY id`, office); err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var x fr
-			_ = rows.Scan(&x.ref, &x.name)
+			var conf string
+			_ = rows.Scan(&x.ref, &x.name, &conf)
+			if !dmsCanSee(mw.RoleOf(r), conf) {
+				continue
+			}
 			refs = append(refs, x)
 		}
 	}

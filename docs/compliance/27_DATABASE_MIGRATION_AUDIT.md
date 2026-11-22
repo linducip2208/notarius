@@ -1,0 +1,2 @@
+# Migration Audit
+001–020, tracker schema_migrations, apply-once. 001–015 umumnya CREATE IF NOT EXISTS; 016–020 ALTER polos aman karena tracker. Runner split per statement; 1060/1061/1050/1068/1091 ditoleransi untuk rerun parsial (020 hardening). Tidak ada destruktif DROP. Backup mysqldump via defaults-file 0600. Rollback: restore dump (diuji sebelumnya RTO<60s). Fresh + upgrade test: PASS (kolom 020 terdeteksi).

@@ -11,9 +11,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -105,10 +109,13 @@ func (s SMTP) Send(_ int64, c Contact, title, body string) error {
 
 // FromEnv builds the configured sender chain from environment.
 // Empty env → in-app only (nop), which is always honest.
+// Webhook URL divalidasi: hanya http(s) publik (tolak metadata-link-local & host kosong).
 func FromEnv() Sender {
 	var out Multi
 	if url := os.Getenv("NOTARYOS_NOTIFY_WEBHOOK"); url != "" {
-		out = append(out, Webhook{URL: url, Secret: os.Getenv("NOTARYOS_NOTIFY_SECRET")})
+		if okWebhookURL(url) {
+			out = append(out, Webhook{URL: url, Secret: os.Getenv("NOTARYOS_NOTIFY_SECRET")})
+		}
 	}
 	if host := os.Getenv("NOTARYOS_SMTP_HOST"); host != "" {
 		port := os.Getenv("NOTARYOS_SMTP_PORT")
@@ -122,4 +129,37 @@ func FromEnv() Sender {
 		return nop{}
 	}
 	return out
+}
+
+// okWebhookURL allows only http(s) URLs, rejecting link-local/metadata hosts.
+func okWebhookURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	h := strings.ToLower(u.Hostname())
+	if h == "" || h == "localhost" {
+		return false
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return false
+		}
+		// 169.254.0.0/16 (cloud metadata) + RFC1918 privat ditolak eksplisit.
+		if strings.HasPrefix(h, "169.254.") || strings.HasPrefix(h, "10.") || strings.HasPrefix(h, "192.168.") {
+			return false
+		}
+		if strings.HasPrefix(h, "172.") {
+			parts := strings.Split(h, ".")
+			if len(parts) == 4 {
+				if n, err := strconv.Atoi(parts[1]); err == nil && n >= 16 && n <= 31 {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }

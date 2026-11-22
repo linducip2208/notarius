@@ -31,6 +31,7 @@ import (
 	"notaryos/internal/files"
 	"notaryos/internal/finance"
 	"notaryos/internal/gov"
+	"notaryos/internal/money"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/notify"
 	"notaryos/internal/ocr"
@@ -43,7 +44,6 @@ import (
 	"notaryos/internal/users"
 	"notaryos/internal/wib"
 	"notaryos/internal/workers"
-	"sync"
 )
 
 //go:embed templates/*.gohtml
@@ -72,13 +72,6 @@ type App struct {
 	ocr       ocr.Provider
 	files     storage.Store
 	pool      *workers.Pool
-	pending   map[string]pendingAuth
-	pendingMu sync.Mutex
-}
-
-type pendingAuth struct {
-	userID  int64
-	expires time.Time
 }
 
 // Page is template data for every Tabler page.
@@ -114,7 +107,16 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"can":       func(role, perm string) bool { return rbac.Has(role, perm) },
 		"wib":       func(t time.Time) string { return wib.Format(t) },
 		"wibdate":   func(t time.Time) string { return wib.Date(t) },
-		"css":       func(s string) template.CSS { return template.CSS(s) },
+		"css": func(s string) template.CSS {
+			// Allowlist ketat: hanya karakter aman font-stack (huruf, koma, spasi, kutip, strip).
+			var b strings.Builder
+			for _, r := range s {
+				if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == ',' || r == ' ' || r == '\'' || r == '"' || r == '-' {
+					b.WriteRune(r)
+				}
+			}
+			return template.CSS(b.String())
+		},
 		"lower":     func(s string) string { return strings.ToLower(s) },
 		"hasPrefix": func(s, p string) bool { return strings.HasPrefix(s, p) },
 		"hasSuffix": func(s, p string) bool { return strings.HasSuffix(s, p) },
@@ -157,7 +159,6 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		audit:    audit.New(db, log),
 		files:    fstore,
 		pool:     workers.New(4, log),
-		pending:  map[string]pendingAuth{},
 	}
 	mw.SetTrustedProxies(cfg.TrustedProxies)
 	if tp, err := ocr.NewTesseract(cfg.OCRBinary); err != nil {
@@ -417,15 +418,18 @@ func (a *App) Router() http.Handler {
 	r.Use(mw.LoadSession(a.sessions, a.cfg.SessionName))
 	r.Use(a.readOnly)
 	limiter := mw.NewRateLimiter(10, time.Minute)
+	loginLimiter := mw.NewRateLimiter(20, time.Minute) // lockout akun 5x/15mnt tetap jadi perlindungan utama
+	verifyLimiter := mw.NewRateLimiter(30, time.Minute)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
-	r.Get("/s/{token}", a.dmsSharedDownload)
-	r.Get("/verify", a.verifyPage)
-	r.Get("/qr/inv/{id}", a.invoiceQR)
+	r.With(verifyLimiter.Limit).Get("/s/{token}", a.dmsSharedDownload)
+	r.With(verifyLimiter.Limit).Get("/verify", a.verifyPage)
+	r.With(verifyLimiter.Limit).Get("/qr/inv/{id}", a.invoiceQR)
 	r.With(a.pubGate).Get("/", a.publicHome)
 	r.With(a.pubGate).Get("/tentang-kami", a.publicPageSlug("tentang-kami"))
 	r.With(a.pubGate).Get("/kontak", a.publicContact)
+	r.With(a.pubGate).Get("/privasi", a.publicPrivacy)
 	r.With(a.pubGate).Get("/konsultasi", a.pubKonsultasiForm)
 	r.With(a.pubGate, limiter.Limit).Post("/konsultasi", a.pubKonsultasiSave)
 	r.With(a.pubGate).Get("/booking", a.pubBookingForm)
@@ -456,9 +460,9 @@ func (a *App) Router() http.Handler {
 	r.Get("/docs/{step}", a.docsStep)
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
 	r.Get("/login", a.loginForm)
-	r.With(limiter.Limit).Post("/login", a.login)
+	r.With(loginLimiter.Limit).Post("/login", a.login)
 	r.Get("/mfa/verify", a.mfaVerifyForm)
-	r.With(limiter.Limit).Post("/mfa/verify", a.mfaVerify)
+	r.With(loginLimiter.Limit, mw.CSRF(a.sessions, a.cfg.SessionName)).Post("/mfa/verify", a.mfaVerify)
 
 	r.Group(func(p chi.Router) {
 		p.Use(mw.RequireAuth)
@@ -524,6 +528,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/repertorium/export", a.repertoriumExport)
 		p.Get("/protocols", a.protocols)
 		p.Post("/protocols", a.protocolCreate)
+		p.Post("/protocols/{id}/status", a.protocolStatus)
 		p.Get("/legalisasi", a.legalisasi)
 		p.Post("/legalisasi", a.legalisasiCreate)
 		p.Post("/legalisasi/{id}/advance", a.legalisasiAdvance)
@@ -534,6 +539,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/gov/{id}/followup", a.govFollowup)
 		p.Get("/finance", a.financePage)
 		p.Post("/invoices", a.invoiceCreate)
+		p.Post("/invoices/{id}/void", a.invoiceVoid)
 		p.Post("/payments", a.paymentCreate)
 		p.Get("/finance/bank", a.bankPage)
 		p.Post("/finance/bank/upload", a.bankUpload)
@@ -674,6 +680,9 @@ func (a *App) Router() http.Handler {
 		p.Get("/office/export", a.officeExport)
 		p.Get("/office/license", a.licensePage)
 		p.Post("/office/license", a.licenseSave)
+		p.Get("/office/mandates", a.mandatesPage)
+		p.Post("/office/mandates", a.mandateSave)
+		p.Post("/office/mandates/{id}/delete", a.mandateDelete)
 		p.Post("/office/backup", a.backupNow)
 		p.Get("/portal/invoices/{id}/receipt", a.portalReceipt)
 		p.Post("/cms/inquiries/{id}/convert", a.inquiryToRequest)
@@ -719,9 +728,10 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	email := r.FormValue("email")
 	ip := clientIPOf(r)
-	// Penguncian akun: 5 gagal dalam 15 menit → tolak 15 menit (anti brute-force lintas IP).
+	// Penguncian akun: 5 gagal dalam 15 menit (per email+IP) → tolak 15 menit.
+	// Kunci per pasangan email+IP agar penyerang tak bisa mengunci korban dari IP lain.
 	var fails int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM login_attempts WHERE email=? AND success=0 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)`, email).Scan(&fails)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM login_attempts WHERE email=? AND ip=? AND success=0 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)`, email, ip).Scan(&fails)
 	if fails >= 5 {
 		a.audit.Record(audit.Entry{Action: "login.locked", Entity: "user", EntityID: email, Detail: ip})
 		a.render(w, r, "login", "Masuk — SaktiNotaris", map[string]string{"Error": "Akun terkunci sementara setelah 5x gagal (15 menit). Coba lagi nanti.", "Email": email})
@@ -737,10 +747,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	_, _ = a.db.Exec(`DELETE FROM login_attempts WHERE email=? AND success=0`, email)
 	// Step-up: accounts with TOTP enrolled must pass a second factor.
 	if a.users.MFAEnabled(u.ID) {
-		tok, _ := auth.NewCSRFToken()
-		a.pendingMu.Lock()
-		a.pending[tok] = pendingAuth{userID: u.ID, expires: time.Now().Add(5 * time.Minute)}
-		a.pendingMu.Unlock()
+		tok := a.signPendingMFA(u.ID)
 		http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Value: tok, Path: "/",
 			HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: a.cfg.TLSCookie, MaxAge: 300})
 		http.Redirect(w, r, "/mfa/verify", http.StatusSeeOther)
@@ -1409,6 +1416,10 @@ func (a *App) clientCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
+	if r.FormValue("consent") != "1" {
+		a.render(w, r, "client_wizard", "Klien Baru", map[string]any{"Step": "3", "F": formMap(r), "Error": "persetujuan klien wajib dicentang"})
+		return
+	}
 	id, err := a.clients.Create(clients.Client{
 		OfficeID: a.officeOf(r),
 		Kind:     r.FormValue("kind"),
@@ -1548,6 +1559,9 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 // ---- requests ----
 
 func (a *App) requestList(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	clientID, _ := strconv.ParseInt(r.URL.Query().Get("client"), 10, 64)
 	list, _ := a.reqs.List(a.officeOf(r), r.URL.Query().Get("status"), clientID)
 	svcs, _ := a.reqs.Services()
@@ -1562,6 +1576,10 @@ func (a *App) requestList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
 	serviceID, _ := strconv.ParseInt(r.FormValue("service_id"), 10, 64)
@@ -1581,6 +1599,10 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := a.reqs.Move(a.officeOf(r), id, r.FormValue("to"), a.uid(r), r.FormValue("note")); err != nil {
@@ -1769,19 +1791,23 @@ func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		Bundle string
-		Year   int
-		Ref    string
+		ID            int64
+		Bundle        string
+		Year          int
+		Ref           string
+		Status        string
+		Loc, Hold     string
 	}
 	var rows []row
 	if a.db != nil {
-		rs, err := a.db.Query(`SELECT bundle_no, year, minuta_ref FROM protocols WHERE office_id=? ORDER BY year DESC, bundle_no LIMIT 200`, a.officeOf(r))
+		rs, err := a.db.Query(`SELECT p.id, p.bundle_no, p.year, p.minuta_ref, p.status, COALESCE(l.code,''), COALESCE(p.holder,'')
+			FROM protocols p LEFT JOIN doc_archive_locations l ON l.id=p.location_id WHERE p.office_id=? ORDER BY p.year DESC, p.bundle_no LIMIT 200`, a.officeOf(r))
 		if err == nil {
 			defer rs.Close()
 			for rs.Next() {
 				var x row
 				var ref sql.NullString
-				_ = rs.Scan(&x.Bundle, &x.Year, &ref)
+				_ = rs.Scan(&x.ID, &x.Bundle, &x.Year, &ref, &x.Status, &x.Loc, &x.Hold)
 				if ref.Valid {
 					x.Ref = ref.String
 				}
@@ -1789,10 +1815,14 @@ func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	a.render(w, r, "protocols", "Protokol", rows)
+	locs, _ := a.dms.Locations(a.officeOf(r))
+	a.render(w, r, "protocols", "Protokol", map[string]any{"Rows": rows, "Locs": locs})
 }
 
 func (a *App) legalisasi(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	type row struct {
 		ID                       int64
 		Kind, Reg, Title, Status string
@@ -1821,7 +1851,8 @@ func (a *App) legalisasi(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
-	a.render(w, r, "legalisasi", "Legalisasi & Waarmerking", map[string]any{"Rows": rows, "Clients": cl})
+	deeds, _ := a.deeds.List(a.officeOf(r))
+	a.render(w, r, "legalisasi", "Legalisasi & Waarmerking", map[string]any{"Rows": rows, "Clients": cl, "Deeds": deeds})
 }
 
 func (a *App) legalisasiCreate(w http.ResponseWriter, r *http.Request) {
@@ -1831,9 +1862,24 @@ func (a *App) legalisasiCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
-	var fee float64
-	_, _ = fmt.Sscanf(r.FormValue("fee"), "%f", &fee)
-	_, err := a.deeds.RegisterLegalization(a.officeOf(r), r.FormValue("kind"), r.FormValue("register_no"), clientID, r.FormValue("doc_title"), fee)
+	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
+		http.Error(w, "klien tidak ditemukan di kantor ini", http.StatusBadRequest)
+		return
+	}
+	var fee int64
+	if f, err := money.Parse(r.FormValue("fee")); err == nil && f >= 0 {
+		fee = f
+	} else if strings.TrimSpace(r.FormValue("fee")) != "" && strings.TrimSpace(r.FormValue("fee")) != "0" {
+		http.Error(w, "biaya tidak valid", http.StatusBadRequest)
+		return
+	}
+	var deedID *int64
+	if v := strings.TrimSpace(r.FormValue("deed_id")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			deedID = &n
+		}
+	}
+	_, err := a.deeds.RegisterLegalization(a.officeOf(r), r.FormValue("kind"), r.FormValue("register_no"), clientID, r.FormValue("doc_title"), float64(fee), deedID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1845,6 +1891,9 @@ func (a *App) legalisasiCreate(w http.ResponseWriter, r *http.Request) {
 // ---- gov assisted ----
 
 func (a *App) gov(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	subs, _ := a.govs.List(a.officeOf(r))
 	a.render(w, r, "gov", "AHU & OSS (Asistensi)", map[string]any{"Subs": subs})
 }
@@ -1893,8 +1942,12 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		q, _ := strconv.Atoi(qtys[i])
-		p, _ := parseIDR(prices[i])
-		lines = append(lines, finance.Line{Description: descs[i], Qty: q, UnitPrice: int64(p)})
+		p, perr := money.Parse(prices[i])
+		if perr != nil || p < 0 {
+			http.Error(w, "harga baris tidak valid: "+descs[i], http.StatusBadRequest)
+			return
+		}
+		lines = append(lines, finance.Line{Description: descs[i], Qty: q, UnitPrice: p})
 	}
 	_, err := a.fin.CreateInvoice(a.officeOf(r), clientID, reqID, r.FormValue("number"), lines, 1100, r.FormValue("due_date"))
 	if err != nil {
@@ -1912,14 +1965,32 @@ func (a *App) paymentCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	invID, _ := strconv.ParseInt(r.FormValue("invoice_id"), 10, 64)
-	var amount float64
-	_, _ = fmt.Sscanf(r.FormValue("amount"), "%f", &amount)
-	if err := a.fin.RecordPayment(invID, int64(amount), r.FormValue("method"), r.FormValue("reference"), a.uid(r)); err != nil {
+	amount, err := money.Parse(r.FormValue("amount"))
+	if err != nil || amount <= 0 {
+		http.Error(w, "nominal tidak valid", http.StatusBadRequest)
+		return
+	}
+	if err := a.fin.RecordPayment(invID, amount, r.FormValue("method"), r.FormValue("reference"), a.uid(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "payment.create", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10)})
 	http.Redirect(w, r, "/finance?flash=Pembayaran+dicatat", http.StatusSeeOther)
+}
+
+func (a *App) invoiceVoid(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageFinance) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	invID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err := a.fin.VoidInvoice(a.officeOf(r), invID, r.FormValue("reason")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "invoice.void", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10), Detail: r.FormValue("reason")})
+	http.Redirect(w, r, "/finance?flash=Invoice+di-void", http.StatusSeeOther)
 }
 
 // ---- misc pages ----

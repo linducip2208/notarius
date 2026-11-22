@@ -229,6 +229,11 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// RESTRICTED: metadata pun tidak boleh terlihat oleh peran tak berhak.
+	if m.Conf == "RESTRICTED" && !dmsCanSee(mw.RoleOf(r), m.Conf) {
+		a.forbidden(w, r)
+		return
+	}
 	if disp.Valid {
 		m.Disp = disp.String
 	}

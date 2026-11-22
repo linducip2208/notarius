@@ -71,6 +71,16 @@ with sync_playwright() as p:
 
     pg.goto(f"{BASE}/deeds/{did}")
     pg.wait_for_load_state("networkidle")
+    # Isi naskah(draf) agar lolos gate integritas >=50 karakter sebelum review.
+    try:
+        pg.fill("#deedbody", "Akta uji TTE — naskah dengan isi cukup panjang untuk memenuhi pemeriksaan formalitas pengesahan notaris.")
+        pg.fill('form[action$="/version"] input[name=note]', "isi awal uji")
+        pg.locator('form[action$="/version"] button[type=submit]').click()
+        pg.wait_for_load_state("networkidle")
+        pg.goto(f"{BASE}/deeds/{did}")
+        pg.wait_for_load_state("networkidle")
+    except Exception:
+        pass
     try:
         pg.locator('form[action$="/review"] button[type=submit]').click()
         pg.wait_for_load_state("networkidle")
@@ -84,6 +94,9 @@ with sync_playwright() as p:
         uniq = f"TTE-{int(_t.time()) % 100000}"
         nform = pg.locator('form[action$="/approve"]').first
         nform.locator('input[name=number]').fill(uniq)
+        nform.locator('input[name=witness1]').fill("Saksi Satu")
+        nform.locator('input[name=witness2]').fill("Saksi Dua")
+        nform.locator('input[name=read_place]').fill("Kantor Notaris")
         nform.locator('button[type=submit]').click()
         pg.wait_for_load_state("networkidle")
         c = pg.content()

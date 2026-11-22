@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // Company, Shareholder, Officer mirror the corporate tables.
@@ -14,16 +16,16 @@ type Company struct {
 	Name       string
 	Domicile   string
 	Address    string
-	Authorized float64
-	Issued     float64
-	Paid       float64
+	Authorized int64
+	Issued     int64
+	Paid       int64
 }
 
 type Shareholder struct {
 	ID      int64
 	Name    string
 	Shares  int
-	Nominal float64
+	Nominal int64
 }
 
 type Officer struct {
@@ -83,9 +85,9 @@ func (s *Store) GetByRequest(requestID int64) (Company, []Shareholder, []Officer
 		}
 		return Company{}, nil, nil, err
 	}
-	fmt.Sscanf(sauth, "%f", &c.Authorized)
-	fmt.Sscanf(siss, "%f", &c.Issued)
-	fmt.Sscanf(spaid, "%f", &c.Paid)
+	c.Authorized = decRupiah(sauth)
+	c.Issued = decRupiah(siss)
+	c.Paid = decRupiah(spaid)
 	if dom.Valid {
 		c.Domicile = dom.String
 	}
@@ -98,7 +100,7 @@ func (s *Store) GetByRequest(requestID int64) (Company, []Shareholder, []Officer
 	}
 	var shs []Shareholder
 	for _, r := range sh {
-		shs = append(shs, Shareholder{ID: r[0].(int64), Name: r[1].(string), Shares: int(r[2].(int64)), Nominal: r[3].(float64)})
+		shs = append(shs, Shareholder{ID: r[0].(int64), Name: r[1].(string), Shares: int(r[2].(int64)), Nominal: r[3].(int64)})
 	}
 	rows, err := s.db.Query(`SELECT id, role, name, title FROM company_officers WHERE company_id=?`, c.ID)
 	if err != nil {
@@ -135,15 +137,21 @@ func (s *Store) list(q string, id int64) ([][]any, error) {
 		if err := rows.Scan(&id, &name, &shares, &nomStr); err != nil {
 			return nil, err
 		}
-		var nom float64
-		fmt.Sscanf(nomStr, "%f", &nom)
-		out = append(out, []any{id, name, shares, nom})
+		out = append(out, []any{id, name, shares, decRupiah(nomStr)})
 	}
 	return out, rows.Err()
 }
 
-// AddShareholder appends a shareholder row.
-func (s *Store) AddShareholder(companyID int64, name string, shares int, nominal float64) error {
+// decRupiah parses DECIMAL(18,2) into whole rupiah (drops cent fraction honestly).
+func decRupiah(s string) int64 {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, "."); i >= 0 {
+		s = s[:i]
+	}
+	n, _ := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	return n
+}
+func (s *Store) AddShareholder(companyID int64, name string, shares int, nominal int64) error {
 	if name == "" || shares <= 0 || nominal < 0 {
 		return errors.New("data pemegang saham tidak valid")
 	}
@@ -183,6 +191,11 @@ func (s *Store) AddBeneficialOwner(companyID int64, name, nik string, pct float6
 	}
 	if pct <= 0 || pct > 100 {
 		return errors.New("persentase kepemilikan harus 1-100")
+	}
+	var total float64
+	_ = s.db.QueryRow(`SELECT COALESCE(SUM(ownership_pct),0) FROM beneficial_owners WHERE company_id=?`, companyID).Scan(&total)
+	if total+pct > 100 {
+		return errors.New("total kepemilikan melebihi 100% — periksa kembali")
 	}
 	var last4 any
 	if len(nik) >= 4 {
@@ -292,7 +305,7 @@ func WizardProgress(c Company, shs []Shareholder, offs []Officer, nbos int) (ste
 	boDone := !boNeed || nbos >= 1
 	steps = append(steps, WizardStep{Key: "bo", Title: "Beneficial Owner", Done: boDone,
 		Hint: "Wajib untuk PT/CV/Firma (ketentuan transparansi BO)"})
-	if needsCapital && c.Authorized > 0 && c.Paid < 0.25*c.Authorized {
+	if needsCapital && c.Authorized > 0 && c.Paid*4 < c.Authorized {
 		warnings = append(warnings, "Modal disetor lazimnya ≥25% modal dasar (UU PT) — periksa kembali")
 	}
 	if c.Issued > c.Authorized {

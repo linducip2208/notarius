@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"strings"
 
 	"notaryos/internal/docengine"
 )
@@ -112,12 +113,27 @@ func (s *Store) SaveVersion(deedID int64, content string, createdBy *int64, note
 
 // Approve locks the deed with notary approval, assigns a number, and writes
 // the automatic repertorium entry (UUJN tertib administrasi).
-// Concurrency-safe: the deed row is locked with FOR UPDATE; entry_no is
-// MAX+1 inside the same tx (UNIQUE(office,entry_no) as backstop).
+// Race-safe: deed row locked; repertorium range locked via FOR UPDATE predicate;
+// on 1062 collision the tx retries once with a fresh number, else friendly error.
 func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	if number == "" {
 		return errors.New("nomor akta wajib diisi saat pengesahan")
 	}
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := s.approveOnce(deedID, number, approverID); err == nil {
+			return nil
+		} else if isDupEntry(err) && attempt == 0 {
+			continue
+		} else if isDupEntry(err) {
+			return errors.New("nomor akta/entri repertorium sudah dipakai — gunakan nomor lain")
+		} else {
+			return err
+		}
+	}
+	return errors.New("pengesahan gagal setelah 2 percobaan — coba lagi")
+}
+
+func (s *Store) approveOnce(deedID int64, number string, approverID int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -133,17 +149,35 @@ func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	if status != "IN_REVIEW" {
 		return errors.New("hanya draf IN_REVIEW yang dapat disetujui")
 	}
-	if _, err := tx.Exec(`UPDATE deed_drafts SET status='APPROVED', number=?, approved_by=?, approved_at=UTC_TIMESTAMP()
+	var dup int
+	_ = tx.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND number=? AND id<>?`, officeID, number, deedID).Scan(&dup)
+	if dup > 0 {
+		return errDupNumber()
+	}
+	if _, err := tx.Exec(`UPDATE deed_drafts SET status='APPROVED', locked=1, number=?, approved_by=?, approved_at=UTC_TIMESTAMP()
 		WHERE id=?`, number, approverID, deedID); err != nil {
+		if isDupEntry(err) {
+			return errDupNumber()
+		}
 		return err
 	}
 	var next int64 = 1
-	_ = tx.QueryRow(`SELECT COALESCE(MAX(entry_no),0)+1 FROM repertorium WHERE office_id=?`, officeID).Scan(&next)
+	_ = tx.QueryRow(`SELECT COALESCE(MAX(entry_no),0)+1 FROM repertorium WHERE office_id=? FOR UPDATE`, officeID).Scan(&next)
 	if _, err := tx.Exec(`INSERT INTO repertorium(office_id, entry_no, entry_date, deed_id, description)
 		VALUES(?,?,CURDATE(),?,?)`, officeID, next, deedID, "Akta "+number+": "+title); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+func errDupNumber() error { return errors.New("nomor akta sudah dipakai di kantor ini") }
+
+func isDupEntry(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "1062") || strings.Contains(msg, "Duplicate entry")
 }
 
 // List returns deeds newest first (optional status filter).
@@ -177,17 +211,24 @@ func (s *Store) List(officeID int64, status ...string) ([]Deed, error) {
 }
 
 // RegisterLegalization creates a repertorium-style register entry with fee.
-func (s *Store) RegisterLegalization(officeID int64, kind, regNo string, clientID int64, title string, fee float64) (int64, error) {
+// deedID links SALINAN/KUTIPAN/GROSSE to their minuta (nullable for standalone legalisasi).
+func (s *Store) RegisterLegalization(officeID int64, kind, regNo string, clientID int64, title string, fee float64, deedID *int64) (int64, error) {
 	switch kind {
-	case "LEGALISASI", "WAARMERKING", "SALINAN", "KUTIPAN":
+	case "LEGALISASI", "WAARMERKING", "SALINAN", "KUTIPAN", "GROSSE":
 	default:
 		return 0, errors.New("jenis register tidak dikenal")
 	}
 	if regNo == "" || title == "" {
 		return 0, errors.New("nomor register dan judul dokumen wajib diisi")
 	}
-	res, err := s.db.Exec(`INSERT INTO legalizations(office_id, kind, register_no, client_id, doc_title, fee)
-		VALUES(?,?,?,?,?,?)`, officeID, kind, regNo, clientID, title, fee)
+	if deedID != nil {
+		var n int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE id=? AND office_id=?`, *deedID, officeID).Scan(&n); err != nil || n == 0 {
+			return 0, errors.New("akta minuta tidak ditemukan di kantor ini")
+		}
+	}
+	res, err := s.db.Exec(`INSERT INTO legalizations(office_id, kind, register_no, client_id, doc_title, fee, deed_id)
+		VALUES(?,?,?,?,?,?,?)`, officeID, kind, regNo, clientID, title, fee, deedID)
 	if err != nil {
 		return 0, err
 	}

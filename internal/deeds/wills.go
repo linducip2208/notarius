@@ -60,12 +60,12 @@ func (s *WillStore) List(officeID int64) ([]Will, error) {
 }
 
 // Handover records serah-terima minuta wasiat (F-014: hanya notaris, tercatat + audit).
-func (s *WillStore) Handover(willID int64, handedTo, note string) error {
+func (s *WillStore) Handover(officeID, willID int64, handedTo, note string) error {
 	if handedTo == "" {
 		return errors.New("penerima serah-terima wajib diisi")
 	}
 	res, err := s.db.Exec(`UPDATE wills SET status='ARCHIVED', handed_over=1, handed_to=?, handed_at=UTC_TIMESTAMP(), handover_note=?
-		WHERE id=? AND handed_over=0`, handedTo, nullStr(note), willID)
+		WHERE id=? AND office_id=? AND handed_over=0`, handedTo, nullStr(note), willID, officeID)
 	if err != nil {
 		return err
 	}

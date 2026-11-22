@@ -1,8 +1,10 @@
 package app
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -15,8 +17,10 @@ import (
 	"notaryos/internal/audit"
 	"notaryos/internal/clients"
 	"notaryos/internal/corp"
+	"notaryos/internal/cryptoxx"
 	"notaryos/internal/diff"
 	"notaryos/internal/doctpl"
+	"notaryos/internal/docengine"
 	"notaryos/internal/docx"
 	"notaryos/internal/gov"
 	"notaryos/internal/mfa"
@@ -30,6 +34,49 @@ import (
 
 // ---- MFA ----
 
+// signPendingMFA issues a stateless, HMAC-signed step-up token (uid:exp:mac).
+// Survives restarts and multi-instance; 5-minute expiry; key from cryptoxx.
+func (a *App) signPendingMFA(userID int64) string {
+	exp := time.Now().Add(5 * time.Minute).Unix()
+	msg := fmt.Sprintf("%d:%d", userID, exp)
+	key, err := cryptoxx.Key()
+	if err != nil {
+		return ""
+	}
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte("mfa-stepup:" + msg))
+	return base64.RawURLEncoding.EncodeToString([]byte(msg)) + "." + hex.EncodeToString(mac.Sum(nil))
+}
+
+// verifyPendingMFA validates the step-up token and returns the user id.
+func (a *App) verifyPendingMFA(token string) (int64, bool) {
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) != 2 {
+		return 0, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return 0, false
+	}
+	key, err := cryptoxx.Key()
+	if err != nil {
+		return 0, false
+	}
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte("mfa-stepup:" + string(raw)))
+	if !hmac.Equal([]byte(hex.EncodeToString(mac.Sum(nil))), []byte(parts[1])) {
+		return 0, false
+	}
+	var uid, exp int64
+	if _, err := fmt.Sscanf(string(raw), "%d:%d", &uid, &exp); err != nil || uid <= 0 {
+		return 0, false
+	}
+	if time.Now().Unix() > exp {
+		return 0, false
+	}
+	return uid, true
+}
+
 func (a *App) mfaVerifyForm(w http.ResponseWriter, r *http.Request) {
 	a.render(w, r, "mfa_verify", "Verifikasi MFA", nil)
 }
@@ -41,26 +88,19 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	a.pendingMu.Lock()
-	p, ok := a.pending[c.Value]
-	if ok {
-		delete(a.pending, c.Value)
-	}
-	a.pendingMu.Unlock()
-	if !ok || time.Now().After(p.expires) {
+	// Token stateless bertanda HMAC (tahan restart/replika): uid:exp:mac.
+	uid, ok := a.verifyPendingMFA(c.Value)
+	if !ok {
 		http.Redirect(w, r, "/login?flash=Sesi+verifikasi+kedaluwarsa", http.StatusSeeOther)
 		return
 	}
 	var role string
-	_ = a.db.QueryRow(`SELECT r.name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?`, p.userID).Scan(&role)
-	if !a.users.VerifyMFA(p.userID, r.FormValue("code")) {
-		a.pendingMu.Lock()
-		a.pending[c.Value] = pendingAuth{userID: p.userID, expires: time.Now().Add(5 * time.Minute)}
-		a.pendingMu.Unlock()
+	_ = a.db.QueryRow(`SELECT r.name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?`, uid).Scan(&role)
+	if !a.users.VerifyMFA(uid, r.FormValue("code")) {
 		a.render(w, r, "mfa_verify", "Verifikasi MFA", map[string]string{"Error": "Kode MFA salah."})
 		return
 	}
-	sess, err := a.sessions.Create(p.userID, role)
+	sess, err := a.sessions.Create(uid, role)
 	if err != nil {
 		http.Error(w, "gagal membuat sesi", http.StatusInternalServerError)
 		return
@@ -68,10 +108,10 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	lip := clientIPOf(r)
 	_, _ = a.db.Exec(`UPDATE sessions SET ip=?, user_agent=? WHERE token=?`, lip, r.UserAgent(), sess.Token)
 	var seen, ever int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=? AND ip=? AND token<>?`, p.userID, lip, sess.Token).Scan(&seen)
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=?`, p.userID).Scan(&ever)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=? AND ip=? AND token<>?`, uid, lip, sess.Token).Scan(&seen)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE user_id=?`, uid).Scan(&ever)
 	if seen == 0 && ever > 1 {
-		_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, p.userID, "Login dari IP baru", "Akun Anda login dari "+lip+". Abaikan bila itu Anda.")
+		_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, uid, "Login dari IP baru", "Akun Anda login dari "+lip+". Abaikan bila itu Anda.")
 	}
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1})
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
@@ -106,6 +146,13 @@ func (a *App) mfaEnable(w http.ResponseWriter, r *http.Request) {
 		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kode salah — pindai ulang & coba lagi."})
 		return
 	}
+	// Re-autentikasi: enroll MFA wajib membuktikan kata sandi saat ini.
+	var email string
+	_ = a.db.QueryRow(`SELECT email FROM users WHERE id=?`, *id).Scan(&email)
+	if _, err := a.users.Authenticate(email, r.FormValue("password")); err != nil {
+		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kata sandi salah — enroll MFA dibatalkan."})
+		return
+	}
 	if err := a.users.SetMFASecret(*id, secret); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -137,25 +184,32 @@ func (a *App) identityAdd(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) identityVerify(w http.ResponseWriter, r *http.Request) {
+	// Legacy direct-verify kept for compatibility; routed through the audited
+	// IdentityStatus path (requires verifier note? no — default note recorded).
 	if !rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	uid := a.uid(r)
-	var vid int64
-	if uid != nil {
-		vid = *uid
+	var cid int64
+	_ = a.db.QueryRow(`SELECT c.id FROM identities i JOIN clients c ON c.id=i.client_id WHERE i.id=? AND c.office_id=?`, id, a.officeOf(r)).Scan(&cid)
+	if cid == 0 {
+		http.NotFound(w, r)
+		return
 	}
-	if err := a.clients.VerifyIdentity(id, vid); err != nil {
+	if err := a.clients.IdentityStatus(a.officeOf(r), id, "VERIFIED", "verifikasi langsung (legacy)", a.uid(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "identity.verify", Entity: "identity", EntityID: strconv.FormatInt(id, 10)})
-	http.Redirect(w, r, "/clients?flash=Identitas+terverifikasi", http.StatusSeeOther)
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "identity.verify", Entity: "identity", EntityID: strconv.FormatInt(id, 10)})
+	http.Redirect(w, r, "/clients/"+strconv.FormatInt(cid, 10)+"?flash=Identitas+terverifikasi#tab-id", http.StatusSeeOther)
 }
 
 func (a *App) repAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
@@ -176,6 +230,10 @@ func (a *App) repAdd(w http.ResponseWriter, r *http.Request) {
 // ---- uploads & OCR ----
 
 func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseMultipartForm(32 << 20)
 	clientID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
@@ -217,6 +275,9 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var oid int64
 	if err := a.db.QueryRow(`SELECT office_id FROM files WHERE id=?`, id).Scan(&oid); err != nil {
@@ -264,6 +325,32 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", m.MIME)
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if r.URL.Query().Get("verify") == "1" {
+		// Integritas on-demand: hash ulang dari storage, bandingkan dengan DB
+		// SEBELUM byte dikirim; mismatch = 409 + karantina, bukan byte rusak.
+		_, hr, herr := a.uploads.Get(a.officeOf(r), id)
+		if herr != nil {
+			http.NotFound(w, r)
+			return
+		}
+		h := sha256.New()
+		_, herr = io.Copy(h, hr)
+		hr.Close()
+		if herr != nil {
+			http.Error(w, "gagal membaca berkas untuk verifikasi", http.StatusInternalServerError)
+			return
+		}
+		var stored string
+		_ = a.db.QueryRow(`SELECT sha256 FROM files WHERE id=?`, id).Scan(&stored)
+		got := fmt.Sprintf("%x", h.Sum(nil))
+		if stored != "" && stored != got {
+			_, _ = a.db.Exec(`UPDATE files SET verification_status='REJECTED' WHERE id=?`, id)
+			a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.hash.mismatch", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "db=" + stored + " got=" + got})
+			http.Error(w, "hash berkas tidak cocok dengan catatan (dikarantina sebagai REJECTED)", http.StatusConflict)
+			return
+		}
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.download.verify", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: got})
+	}
 	_, _ = io.Copy(w, rc)
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.download", Entity: "file", EntityID: strconv.FormatInt(id, 10)})
 }
@@ -285,6 +372,21 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Isolasi portal: klien hanya boleh melihat permohonannya sendiri.
+	if mw.RoleOf(r) == rbac.RoleClient {
+		uid := a.uid(r)
+		var linked int64
+		if uid != nil {
+			linked = a.users.LinkedClient(*uid)
+		}
+		if linked == 0 || linked != d.ClientID {
+			a.forbidden(w, r)
+			return
+		}
+	} else if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+		a.forbidden(w, r)
+		return
+	}
 	co, shs, offs, _ := a.corp.GetByRequest(id)
 	// Peringatan konsistensi korporat (peringatan, bukan blokir).
 	var corpWarn []string
@@ -294,7 +396,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		for _, s := range shs {
 			totalShares += s.Shares
 			if co.Issued > 0 {
-				pctSum += float64(s.Shares) / co.Issued * 100
+				pctSum += float64(s.Shares) / float64(co.Issued) * 100
 			}
 			var cname string
 			_ = a.db.QueryRow(`SELECT c.full_name FROM clients c JOIN shareholders sh ON sh.client_id=c.id WHERE sh.id=?`, s.ID).Scan(&cname)
@@ -337,9 +439,12 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func numForm(r *http.Request, k string) float64 {
-	f, _ := parseIDR(r.FormValue(k))
-	return f
+func numForm(r *http.Request, k string) int64 {
+	n, err := money.Parse(r.FormValue(k))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 func parseIDR(s string) (float64, error) {
@@ -348,6 +453,10 @@ func parseIDR(s string) (float64, error) {
 }
 
 func (a *App) corpSave(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
@@ -373,15 +482,23 @@ func (a *App) corpSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) shareholderAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	co, _, _, _ := a.corp.GetByRequest(reqID)
 	if co.ID == 0 {
 		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
 		return
 	}
 	shares, _ := strconv.Atoi(r.FormValue("shares"))
-	nominal, _ := parseIDR(r.FormValue("nominal"))
+	nominal := numForm(r, "nominal")
 	if err := a.corp.AddShareholder(co.ID, r.FormValue("name"), shares, nominal); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -391,8 +508,16 @@ func (a *App) shareholderAdd(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) officerAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	co, _, _, _ := a.corp.GetByRequest(reqID)
 	if co.ID == 0 {
 		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
@@ -445,6 +570,10 @@ func (a *App) corpLegalSave(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	co, _, _, _ := a.corp.GetByRequest(reqID)
 	if co.ID == 0 {
 		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
@@ -473,6 +602,10 @@ func (a *App) shareholderLink(w http.ResponseWriter, r *http.Request) {
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	sid, _ := strconv.ParseInt(chi.URLParam(r, "sid"), 10, 64)
 	cid, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	co, _, _, _ := a.corp.GetByRequest(reqID)
 	if co.ID == 0 {
 		http.Error(w, "perusahaan tidak ditemukan", http.StatusNotFound)
@@ -497,12 +630,17 @@ func nullCID(id int64) any {
 	return id
 }
 
-func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) && !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermCreateClient) && !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	_ = r.ParseForm()
 	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	co, _, _, _ := a.corp.GetByRequest(reqID)
 	if co.ID == 0 {
 		http.Error(w, "simpan data perusahaan dulu", http.StatusBadRequest)
@@ -521,6 +659,9 @@ func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {	if !rbac.Has(mw.Ro
 // ---- appointments ----
 
 func (a *App) appointments(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	list, _ := a.reqs.Appointments(a.officeOf(r))
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
 	names := map[int64]string{}
@@ -551,8 +692,16 @@ func (a *App) appointments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) appointmentCreate(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
+		http.Error(w, "klien tidak ditemukan di kantor ini", http.StatusBadRequest)
+		return
+	}
 	at, err := time.Parse("2006-01-02T15:04", r.FormValue("scheduled_at"))
 	if err != nil {
 		http.Error(w, "format jadwal tidak valid", http.StatusBadRequest)
@@ -765,12 +914,57 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "akta sudah disahkan — gunakan revisi tercatat untuk perubahan", http.StatusConflict)
 		return
 	}
+	// Mandat pengganti: substitute_notary wajib punya mandat aktif hari ini.
+	if mw.RoleOf(r) == rbac.RoleSubstitute {
+		var m int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM substitute_mandates WHERE office_id=? AND user_id=? AND start_date<=CURDATE() AND end_date>=CURDATE()`,
+			office, approver).Scan(&m)
+		if m == 0 {
+			http.Error(w, "notaris pengganti wajib memiliki mandat aktif (SK + periode) — catat di administrasi jabatan", http.StatusForbidden)
+			return
+		}
+	}
+	// Formalitas: saksi + pembacaan wajib tercatat (kolom baru, datarkan dari form).
+	w1, w2 := strings.TrimSpace(r.FormValue("witness1")), strings.TrimSpace(r.FormValue("witness2"))
+	rdPlace := strings.TrimSpace(r.FormValue("read_place"))
+	if w1 == "" || w2 == "" || rdPlace == "" {
+		http.Error(w, "formalitas belum lengkap: dua saksi + tempat pembacaan wajib diisi", http.StatusBadRequest)
+		return
+	}
+	_, _ = a.db.Exec(`UPDATE deed_drafts SET witness1_name=?, witness1_id=?, witness2_name=?, witness2_id=?, read_at=NOW(), read_place=?, renvoi_note=? WHERE id=?`,
+		w1, nullStrOpt(r.FormValue("witness1_id")), w2, nullStrOpt(r.FormValue("witness2_id")), rdPlace, nullStrOpt(r.FormValue("renvoi_note")), id)
+	// Checklist permohonan tertaut harus VERIFIED semua (bila ada item).
+	var reqID sql.NullInt64
+	_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=?`, id).Scan(&reqID)
+	if reqID.Valid {
+		var bad int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM doc_checklist_records WHERE office_id=? AND request_id=? AND status NOT IN ('VERIFIED','RECEIVED')`,
+			office, reqID.Int64).Scan(&bad)
+		if bad > 0 {
+			http.Error(w, "masih ada syarat permohonan belum terverifikasi — selesaikan checklist dulu", http.StatusConflict)
+			return
+		}
+	}
+	// Integritas: bandingkan hash isi (docengine, 16 hex) dengan yang tersimpan.
+	// Self-heal hanya bila kolom kosong (draf lama); mismatch nyata ditolak.
+	var stored string
+	_ = a.db.QueryRow(`SELECT COALESCE(content_hash,'') FROM deed_drafts WHERE id=?`, id).Scan(&stored)
+	fresh := docengine.VersionHash(body, nil)
+	if stored == "" {
+		_, _ = a.db.Exec(`UPDATE deed_drafts SET content_hash=? WHERE id=?`, fresh, id)
+	} else if stored != fresh {
+		http.Error(w, "hash isi tidak cocok dengan tersimpan — kemungkinan perubahan di luar versi; hubungi administrator", http.StatusConflict)
+		return
+	}
 	if err := a.deeds.Approve(id, r.FormValue("number"), approver); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	seal, _ := verifyCode("DEED", id)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number") + " segel:" + seal})
+	var entryNo int64
+	_ = a.db.QueryRow(`SELECT entry_no FROM repertorium WHERE office_id=? AND deed_id=?`, office, id).Scan(&entryNo)
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "repertorium.insert", Entity: "repertorium", EntityID: strconv.FormatInt(entryNo, 10), Detail: "akta#" + strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Akta+disahkan+segel:"+seal, http.StatusSeeOther)
 }
 
@@ -803,7 +997,10 @@ func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
 		_ = a.db.QueryRow(`SELECT name FROM users WHERE id=?`, signerID).Scan(&signerName)
 	}
 	seal, _ := verifyCode("DEED", id)
-	hash := sha256Of(fmt.Sprintf("%s|%s|%d|%s|%s", body, number, signerID, signerName, seal))
+	// Ikat waktu penandatanganan (nonce): dua penandatangan berbeda tak pernah
+	// menghasilkan hash sama; replay hash lama tetap ditolak.
+	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	hash := sha256Of(fmt.Sprintf("%s|%s|%d|%s|%s|%s", body, number, signerID, signerName, seal, now))
 	var dup int
 	_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_signatures WHERE deed_id=? AND content_hash=?`, id, hash).Scan(&dup)
 	if dup > 0 {
@@ -838,7 +1035,13 @@ func deedSigs(db *sql.DB, deedID int64) []deedSig {
 	if db == nil {
 		return out
 	}
-	rs, err := db.Query(`SELECT signer_name, content_hash, seal_code, created_at, note FROM deed_signatures WHERE deed_id=? ORDER BY id`, deedID)
+	var officeID int64
+	if err := db.QueryRow(`SELECT office_id FROM deed_drafts WHERE id=?`, deedID).Scan(&officeID); err != nil {
+		return out
+	}
+	rs, err := db.Query(`SELECT s.signer_name, s.content_hash, s.seal_code, s.created_at, s.note
+		FROM deed_signatures s JOIN deed_drafts d ON d.id=s.deed_id
+		WHERE s.deed_id=? AND d.office_id=? AND s.office_id=? ORDER BY s.id`, deedID, officeID, officeID)
 	if err != nil {
 		return out
 	}
@@ -932,6 +1135,48 @@ func (a *App) protocolCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/protocols?flash=Bendel+protokol+dicatat", http.StatusSeeOther)
 }
 
+// protocolStatus records location/status/holder movements (in/out/return audit trail).
+func (a *App) protocolStatus(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	to := strings.ToUpper(strings.TrimSpace(r.FormValue("status")))
+	switch to {
+	case "IN_STORAGE", "OUT", "RETURNED":
+	default:
+		http.Error(w, "status tidak dikenal", http.StatusBadRequest)
+		return
+	}
+	var loc any
+	if v := strings.TrimSpace(r.FormValue("location_id")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			var nloc int
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM doc_archive_locations WHERE id=? AND office_id=?`, n, a.officeOf(r)).Scan(&nloc)
+			if nloc == 0 {
+				http.Error(w, "lokasi tidak dikenal", http.StatusBadRequest)
+				return
+			}
+			loc = n
+		}
+	}
+	holder := strings.TrimSpace(r.FormValue("holder"))
+	res, err := a.db.Exec(`UPDATE protocols SET status=?, location_id=COALESCE(?,location_id), holder=NULLIF(?,''), handover_note=CONCAT(COALESCE(handover_note,''),'\n',?) WHERE id=? AND office_id=?`,
+		to, loc, holder, time.Now().Format("2006-01-02 15:04")+" "+to+" "+holder, id, a.officeOf(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		http.NotFound(w, r)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "protocol.move", Entity: "protocol", EntityID: strconv.FormatInt(id, 10), Detail: to + " " + holder})
+	http.Redirect(w, r, "/protocols?flash=Status+protokol+diperbarui", http.StatusSeeOther)
+}
+
 func (a *App) legalisasiAdvance(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermLegalize) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
@@ -948,6 +1193,10 @@ func (a *App) legalisasiAdvance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) appointmentStatus(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err := a.reqs.SetAppointmentStatus(a.officeOf(r), id, r.FormValue("to")); err != nil {
@@ -1063,7 +1312,7 @@ func (a *App) willHandover(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err := a.wills.Handover(id, r.FormValue("handed_to"), r.FormValue("note")); err != nil {
+	if err := a.wills.Handover(a.officeOf(r), id, r.FormValue("handed_to"), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -1217,7 +1466,7 @@ func (a *App) documents(w http.ResponseWriter, r *http.Request) {
 // ---- audit log ----
 
 func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
-	if !rbac.Has(mw.RoleOf(r), rbac.PermViewReports) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermAuditView) {
 		a.forbidden(w, r)
 		return
 	}
@@ -1445,9 +1694,8 @@ func (a *App) expenseCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	var amount float64
-	_, _ = fmt.Sscanf(r.FormValue("amount"), "%f", &amount)
-	if amount <= 0 || r.FormValue("description") == "" {
+	amount, err := money.Parse(r.FormValue("amount"))
+	if err != nil || amount <= 0 || r.FormValue("description") == "" {
 		http.Error(w, "nominal dan uraian wajib diisi", http.StatusBadRequest)
 		return
 	}
@@ -1455,7 +1703,7 @@ func (a *App) expenseCreate(w http.ResponseWriter, r *http.Request) {
 	if spent == "" {
 		spent = time.Now().Format("2006-01-02")
 	}
-	_, err := a.db.Exec(`INSERT INTO expenses(office_id, category, description, amount, spent_at, created_by)
+	_, err = a.db.Exec(`INSERT INTO expenses(office_id, category, description, amount, spent_at, created_by)
 		VALUES(?,?,?,?,?,?)`, a.officeOf(r), r.FormValue("category"), r.FormValue("description"), amount, spent, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1474,7 +1722,7 @@ func (a *App) tariffsPage(w http.ResponseWriter, r *http.Request) {
 	type tariff struct {
 		ID     int64
 		Name   string
-		Amount float64
+		Amount int64
 		Active bool
 	}
 	var out []tariff
@@ -1484,7 +1732,7 @@ func (a *App) tariffsPage(w http.ResponseWriter, r *http.Request) {
 			var t tariff
 			var samt string
 			_ = rows.Scan(&t.ID, &t.Name, &samt, &t.Active)
-			fmt.Sscanf(samt, "%f", &t.Amount)
+			t.Amount, _ = money.Parse(samt)
 			out = append(out, t)
 		}
 	}
@@ -1498,9 +1746,8 @@ func (a *App) tariffSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	var amount float64
-	_, _ = fmt.Sscanf(r.FormValue("amount"), "%f", &amount)
-	if r.FormValue("name") == "" || amount < 0 {
+	amount, err := money.Parse(r.FormValue("amount"))
+	if r.FormValue("name") == "" || err != nil || amount < 0 {
 		http.Error(w, "nama dan tarif tidak valid", http.StatusBadRequest)
 		return
 	}
@@ -1508,7 +1755,7 @@ func (a *App) tariffSave(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("service_id") != "" {
 		sid = r.FormValue("service_id")
 	}
-	_, err := a.db.Exec(`INSERT INTO price_items(service_id, name, amount) VALUES(?,?,?)`, sid, r.FormValue("name"), amount)
+	_, err = a.db.Exec(`INSERT INTO price_items(service_id, name, amount) VALUES(?,?,?)`, sid, r.FormValue("name"), amount)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1519,6 +1766,9 @@ func (a *App) tariffSave(w http.ResponseWriter, r *http.Request) {
 // ---- global search ----
 
 func (a *App) search(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	q := r.URL.Query().Get("q")
 	cl, _ := a.clients.List(a.officeOf(r), q, 20)
 	type hit struct {

@@ -1,0 +1,17 @@
+{{define "pub_privasi"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
+<section class="sec"><div class="wrap" style="max-width:760px"><h1>Kebijakan Privasi</h1>
+<p class="meta">Dokumen ini menjelaskan data yang kami kumpulkan — tanpa bahasa kabur.</p>
+<h2>Data yang dikumpulkan</h2>
+<ul>
+<li><strong>Konsultasi/booking:</strong> nama, kontak, kebutuhan, jadwal. Dasar: permintaan layanan Anda. Disimpan di kantor ini saja, tidak dibagikan.</li>
+<li><strong>Klien:</strong> identitas, kontak, alamat, NPWP, dokumen pendukung — untuk pelaksanaan jasa notaris. NIK tidak pernah disimpan utuh (hanya 4 digit terakhir + arsip terenkripsi).</li>
+<li><strong>Statistik situs:</strong> hitung kunjungan agregat per halaman, tanpa pelacak pihak ketiga.</li>
+</ul>
+<h2>Hak Anda</h2>
+<p>Akses, koreksi, dan penghapusan data dapat diminta langsung ke kantor. Penghapusan mengikuti ketentuan arsip: dokumen yang wajib disimpan menurut peraturan jabatan notaris (mis. minuta) <strong>tidak dapat dihapus</strong> meski diminta — kami jelaskan dasarnya secara tertulis.</p>
+<h2>Keamanan &amp; insiden</h2>
+<p>Akses dibatasi per peran; setiap akses penting tercatat. Bila terjadi insiden kebocoran, kami memberitahu subjek terdampak dan mencatat penanganannya.</p>
+<h2>Kontak</h2>
+<p>{{.Data.Office.Name}} · {{.Data.Office.Phone}} · {{.Data.Office.Email}}</p>
+</div></section>
+</main>{{template "pub_foot" .}}{{end}}

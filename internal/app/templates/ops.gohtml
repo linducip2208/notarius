@@ -1,10 +1,11 @@
 {{define "legalisasi"}}{{template "head" .}}{{template "page_open" .}}
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Register Baru</h3></div>
 <form method="post" action="/legalisasi">{{template "csrf" .}}<div class="card-body row">
-<div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="LEGALISASI">Legalisasi</option><option value="WAARMERKING">Waarmerking</option><option value="SALINAN">Salinan</option><option value="KUTIPAN">Kutipan</option></select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="LEGALISASI">Legalisasi</option><option value="WAARMERKING">Waarmerking</option><option value="SALINAN">Salinan</option><option value="KUTIPAN">Kutipan</option><option value="GROSSE">Grosse</option></select></div>
 <div class="col-md-2 mb-2"><input class="form-control" name="register_no" placeholder="No. register" required/></div>
-<div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="doc_title" placeholder="Judul dokumen" required/></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="deed_id"><option value="">Minuta: —</option>{{range .Data.Deeds}}<option value="{{.ID}}">#{{.ID}} {{.Title}}</option>{{end}}</select></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="doc_title" placeholder="Judul dokumen" required/></div>
 <div class="col-md-1 mb-2"><input class="form-control" name="fee" placeholder="Biaya" value="0"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
 </div></form></div>
@@ -61,7 +62,7 @@
 <div class="card"><div class="card-header"><h3 class="card-title">Daftar Invoice</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nomor</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Status</th><th>Bayar</th></tr></thead>
 <tbody>{{range .Data.Invoices}}<tr><td><a href="/invoices/{{.ID}}/receipt">{{.Number}}</a></td><td>{{.Total}}</td><td>{{.Paid}}</td><td>{{.Outstanding}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
-<td><form method="post" action="/payments" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal"/><select class="form-select form-select-sm" name="method"><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="QRIS">QRIS</option><option value="OTHER">OTHER</option></select><button class="btn btn-sm btn-primary" type="submit">Catat</button></form></td></tr>
+<td><div class="d-flex gap-1 flex-wrap"><form method="post" action="/payments" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal"/><select class="form-select form-select-sm" name="method"><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="QRIS">QRIS</option><option value="OTHER">OTHER</option></select><button class="btn btn-sm btn-primary" type="submit">Catat</button></form>{{if or (eq .Status "ISSUED") (eq .Status "PARTIAL")}}<form method="post" action="/invoices/{{.ID}}/void" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="reason" placeholder="Alasan void" style="max-width:110px"/><button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Void invoice ini? Tidak dapat dibatalkan.')">Void</button></form>{{end}}</div></td></tr>
 {{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada invoice.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 

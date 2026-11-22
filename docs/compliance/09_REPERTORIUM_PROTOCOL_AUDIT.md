@@ -1,0 +1,2 @@
+# Repertorium & Protocol Audit
+Repertorium: MAX+1 FOR UPDATE + UNIQUE + retry 1062 + audit `repertorium.insert` + gap detection + QR label + CSV (tanpa edit/add delete final). Protocol: bundle, minuta_ref, location (doc_archive_locations), status IN_STORAGE/OUT/RETURNED, holder, handover_note, audit `protocol.move`. Pernyataan digital menggantikan fisik TIDAKUsed (disclaimer ada). Retensi minuta tidak auto-hapus.

@@ -91,6 +91,9 @@ func (s *Store) CreateInvoice(officeID int64, clientID int64, requestID *int64, 
 	res, err := tx.Exec(`INSERT INTO invoices(office_id, client_id, request_id, number, subtotal, tax, total, status, due_date)
 		VALUES(?,?,?,?,?,?,?,'ISSUED',?)`, officeID, clientID, requestID, number, sub, tax, total, dueVal)
 	if err != nil {
+		if isDupErr(err) {
+			return 0, errors.New("nomor invoice sudah dipakai")
+		}
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
@@ -102,6 +105,29 @@ func (s *Store) CreateInvoice(officeID int64, clientID int64, requestID *int64, 
 		}
 	}
 	return id, tx.Commit()
+}
+
+// VoidInvoice cancels an unpaid invoice with reason (never deletes history).
+func (s *Store) VoidInvoice(officeID, invoiceID int64, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return errors.New("alasan void wajib diisi")
+	}
+	res, err := s.db.Exec(`UPDATE invoices SET status='VOID' WHERE id=? AND office_id=? AND status IN ('ISSUED','PARTIAL')`, invoiceID, officeID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return errors.New("hanya invoice ISSUED/PARTIAL yang dapat di-void")
+	}
+	return nil
+}
+
+func isDupErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "1062") || strings.Contains(msg, "Duplicate entry")
 }
 
 // RecordPayment applies a payment and updates invoice status.

@@ -52,7 +52,7 @@ input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;bo
 <div><strong>Navigasi</strong><br/>{{range .Data.Foot}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a><br/>{{end}}</div>
 <div><strong>Kantor</strong><br/><span class="meta">{{.Data.Office.Name}}</span><br/><a href="/kontak">Hubungi kami →</a></div>
 </div>
-<p class="meta" style="margin-top:26px">{{if .Data.Brand.FooterText}}{{.Data.Brand.FooterText}}{{end}} {{if .Data.Brand.CopyrightText}}· {{.Data.Brand.CopyrightText}}{{end}}</p>
+<p class="meta" style="margin-top:26px">{{if .Data.Brand.FooterText}}{{.Data.Brand.FooterText}}{{end}} {{if .Data.Brand.CopyrightText}}· {{.Data.Brand.CopyrightText}}{{end}} · <a href="/privasi">Privasi</a></p>
 </div></footer></body></html>{{end}}
 
 {{define "pub_home"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">

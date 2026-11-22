@@ -67,6 +67,11 @@ func Migrate(db *sql.DB, files fs.FS, dir string) (int, error) {
 				continue
 			}
 			if _, err := db.Exec(stmt); err != nil {
+				// Idempotensi parsial: kolom/tabel yang sudah ada (1060/1050/1061)
+				// dilewati agar migrasi lama tetap dapat diselesaikan ulang.
+				if isAlreadyExists(err) {
+					continue
+				}
 				return applied, fmt.Errorf("migration %s: %w", n, err)
 			}
 		}
@@ -78,8 +83,7 @@ func Migrate(db *sql.DB, files fs.FS, dir string) (int, error) {
 	return applied, nil
 }
 
-func splitStatements(s string) []string {
-	lines := strings.Split(s, "\n")
+func splitStatements(s string) []string {	lines := strings.Split(s, "\n")
 	var b strings.Builder
 	var out []string
 	for _, ln := range lines {
@@ -97,4 +101,19 @@ func splitStatements(s string) []string {
 		out = append(out, b.String())
 	}
 	return out
+}
+
+// isAlreadyExists tolerates re-runs of bare DDL: 1060 duplicate column,
+// 1061 duplicate key, 1050 table exists, 1068 multiple PK, 1091 missing key/drop.
+func isAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, code := range []string{"1060", "1061", "1050", "1068", "1091", "Duplicate"} {
+		if strings.Contains(msg, code) {
+			return true
+		}
+	}
+	return false
 }

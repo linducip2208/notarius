@@ -1,0 +1,2 @@
+# Threat Model (ringkas)
+Aset: NIK/akta/keuangan. Ancaman: IDOR lintas kantor (dimodelkan & diuji matrix), privilege escalation (role client default-deny), brute-force (lockout), XSS (sanitizer), CSRF (token), upload malicious (sniff+quota), SSRF webhook (guard), tamper audit (hash chain), race repertorium (lock+retry), data leak via export (confidentiality gate). Mitigasi terverifikasi di 25_SECURITY_REMEDIATION.

@@ -1,0 +1,2 @@
+# Human Legal Review Checklist
+1) Apakah formalitas akta (saksi, pembacaan, renvoi) sudah sesuai praktik kantor? 2) Dasar hukum retensi 25 tahun (UUJN vs arsip)? 3) Pernyataan protokol digital vs fisik cukup jujur? 4) PPN untuk jasa notaris taxable/exempt? 5) SLA notifikasi insiden PDP berhari? 6) Ruang lingkup mandat substitute (penuh vs terbatas)? 7) Kebijakan EDD/PEP. STATUS: HUMAN_REVIEW_REQUIRED — tidak ada kesimpulan hukum otomatis.

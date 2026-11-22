@@ -61,7 +61,8 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Catat</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Arsip Protokol Notaris</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Bendel</th><th>Tahun</th><th>Referensi minuta</th></tr></thead>
-<tbody>{{range .Data}}<tr><td>{{.Bundle}}</td><td>{{.Year}}</td><td>{{.Ref}}</td></tr>
-{{else}}<tr><td colspan="3" class="text-center text-secondary py-4">Belum ada bendel protokol.</td></tr>{{end}}</tbody></table></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Bendel</th><th>Tahun</th><th>Referensi minuta</th><th>Lokasi</th><th>Status</th><th>Penanggung jawab</th><th>Ubah</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td>{{.Bundle}}</td><td>{{.Year}}</td><td>{{.Ref}}</td><td>{{.Loc}}</td><td><span class="badge {{if eq .Status "IN_STORAGE"}}bg-green-lt{{else}}bg-yellow-lt{{end}}">{{.Status}}</span></td><td>{{.Hold}}</td>
+<td><form method="post" action="/protocols/{{.ID}}/status" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="location_id"><option value="">Lokasi…</option>{{range $.Data.Locs}}<option value="{{.ID}}">{{.Code}} {{.Room}}/{{.Shelf}}/{{.Box}}</option>{{end}}</select><select class="form-select form-select-sm" name="status"><option>IN_STORAGE</option><option>OUT</option><option>RETURNED</option></select><input class="form-control form-control-sm" name="holder" placeholder="Penanggung jawab" style="max-width:120px"/><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada bendel protokol.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}

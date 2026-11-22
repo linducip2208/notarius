@@ -37,6 +37,7 @@ with sync_playwright() as p:
     pg.wait_for_load_state("networkidle")
     pg.locator('form[action="/clients/new?step=2"] button[type=submit]').click()
     pg.wait_for_load_state("networkidle")
+    pg.check('form[action="/clients"] input[name=consent]')
     pg.locator('form[action="/clients"]:not([action="/clients/new"]) button[type=submit]').click()
     pg.wait_for_load_state("networkidle")
     cid = pg.url.strip("/").split("/")[-1].split("?")[0]
@@ -148,6 +149,9 @@ with sync_playwright() as p:
     pg.goto(BASE + "/deeds/" + did)
     pg.evaluate("() => document.querySelectorAll('form[action$=\"/approve\"] input[name=number]').forEach(i => i.removeAttribute('required'))")
     f = pg.locator('form[action="/deeds/' + did + '/approve"]').first
+    f.locator('input[name=witness1]').fill("Saksi Uji A")
+    f.locator('input[name=witness2]').fill("Saksi Uji B")
+    f.locator('input[name=read_place]').fill("Kantor Uji")
     f.locator('button[type=submit]').click()
     pg.wait_for_load_state("networkidle")
     step("gate nomor menolak", "nomor akta wajib diisi" in pg.content())
@@ -172,6 +176,10 @@ with sync_playwright() as p:
     f.locator('input[name=name]').fill("Portal Ops " + ts)
     f.locator('input[name=email]').fill("portalops" + ts + "@uji.id")
     f.locator('input[name=password]').fill("Rahasia123!")
+    try:
+        f.locator('select[name=role]').select_option("client")
+    except Exception:
+        pass
     f.locator('button[type=submit]').click()
     pg.wait_for_load_state("networkidle")
     step("user portal dibuat", "flash=Pengguna" in pg.url)

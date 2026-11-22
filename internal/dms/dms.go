@@ -418,8 +418,14 @@ func (s *Store) UseShare(token string) (int64, error) {
 	if revoked || expired == 1 || dls >= maxDl {
 		return 0, errors.New("tautan kedaluwarsa/dicabut/habis")
 	}
-	if _, err := s.db.Exec(`UPDATE doc_shares SET downloads=downloads+1 WHERE id=?`, id); err != nil {
+	// Atomik: klaim satu slot hanya bila masih berlaku (tahan balapan unduhan).
+	res, err := s.db.Exec(`UPDATE doc_shares SET downloads=downloads+1 WHERE id=? AND revoked=0
+		AND expires_at > UTC_TIMESTAMP() AND downloads < max_downloads`, id)
+	if err != nil {
 		return 0, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return 0, errors.New("tautan kedaluwarsa/dicabut/habis")
 	}
 	return fid, nil
 }

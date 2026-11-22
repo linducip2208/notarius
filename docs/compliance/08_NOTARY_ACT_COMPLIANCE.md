@@ -1,0 +1,2 @@
+# UUJN Compliance (teknis)
+Sistem membantu administrasi, bukan menggantikan Notaris. Gate: nomor unik, isi ≥50, saksi 2, tempat baca, checklist verified, hash cocok, mandat substitute. Final terkunci, revisi tercatat, repertorium otomatis + audit. Tidak ada keputusan hukum otomatis. Kekurangan: field `read_at` dicatat tapi bukan bukti pembacaan aktual; butuh review Notaris → HUMAN_REVIEW_REQUIRED.
