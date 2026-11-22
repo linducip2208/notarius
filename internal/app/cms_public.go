@@ -66,6 +66,17 @@ func (a *App) publicHome(w http.ResponseWriter, r *http.Request) {
 		data["Page"] = p
 		data["Sections"] = secs
 		data["CMSServices"], _ = a.web.PublicServices(office, pubLang(r))
+		var nServices, nArticles, nFaq int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_services WHERE office_id=? AND visible=1`, office).Scan(&nServices)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_articles WHERE office_id=? AND status='PUBLISHED' AND deleted_at IS NULL`, office).Scan(&nArticles)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_faqs WHERE office_id=? AND visible=1`, office).Scan(&nFaq)
+		data["Stats"] = map[string]int{"Services": nServices, "Articles": nArticles, "FAQ": nFaq}
+		data["ServiceImages"] = []string{
+			"/assets/landing/notarius-feat-akta.jpg",
+			"/assets/landing/notarius-feat-dokumen.jpg",
+			"/assets/landing/notarius-feat-klien.jpg",
+			"/assets/landing/notarius-feat-keamanan.jpg",
+		}
 		data["HasCMS"] = true
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := a.tmpl.ExecuteTemplate(w, "pub_home", map[string]any{"Title": p.Title, "Data": data}); err != nil {
