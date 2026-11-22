@@ -116,7 +116,7 @@ with sync_playwright() as p:
     pub2 = b.new_context().new_page()
     pub2.goto(BASE + "/")
     pub2.wait_for_load_state("networkidle")
-    step("beranda CMS menggantikan landing", "Melayani kebutuhan notaris kantor" in pub2.content(), pub2.url)
+    step("beranda CMS menggantikan landing", "Solusi Digital untuk Kantor Notaris" in pub2.content(), pub2.url)
 
     # 5. artikel + faq + nav
     pg.goto(BASE + "/cms/articles/new")
