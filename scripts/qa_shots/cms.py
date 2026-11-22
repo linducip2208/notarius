@@ -32,6 +32,8 @@ with sync_playwright() as p:
     pg.goto(BASE + "/cms/branding")
     pg.wait_for_load_state("networkidle")
     f = pg.locator('form[action="/cms/branding"]').first
+    orig_name = f.locator('input[name=app_name]').input_value()
+    orig_primary = f.locator('input[name=primary]').input_value()
     f.locator('input[name=app_name]').fill("Kantor Uji CMS")
     f.locator('input[name=primary]').fill("#0a7d44")
     f.locator('button[type=submit]').click()
@@ -189,4 +191,24 @@ with sync_playwright() as p:
 
 fails = sum(1 for r in results if r.startswith("- [FAIL]"))
 print("CMS DONE:", results, flush=True)
+# Kembalikan branding asal (E2E tidak boleh meninggalkan polusi di DB prod).
+try:
+    with sync_playwright() as p2:
+        b2 = p2.chromium.launch(); pg2 = b2.new_page()
+        pg2.goto(BASE + "/login")
+        pg2.fill("input[name=email]", "admin@contoh.id")
+        pg2.fill("input[name=password]", "Admin123!")
+        pg2.click("button[type=submit]")
+        pg2.wait_for_url(BASE + "/app**")
+        pg2.goto(BASE + "/cms/branding")
+        pg2.wait_for_load_state("networkidle")
+        f2 = pg2.locator('form[action="/cms/branding"]').first
+        f2.locator('input[name=app_name]').fill(orig_name or "SaktiNotaris")
+        f2.locator('input[name=primary]').fill(orig_primary or "#1f6feb")
+        f2.locator('button[type=submit]').click()
+        pg2.wait_for_load_state("networkidle")
+        print("- [INFO] branding dikembalikan:", orig_name, flush=True)
+        b2.close()
+except Exception as e:
+    print("- [INFO] kembalikan branding gagal (manual via /cms/branding):", str(e)[:100], flush=True)
 raise SystemExit(1 if fails else 0)
