@@ -11,57 +11,62 @@
 <link rel="icon" type="image/png" href="{{if .Data.Brand.FaviconURL}}{{.Data.Brand.FaviconURL}}{{else}}/assets/brand/favicon.svg{{end}}"/>
 <style>
 :root{--pri:{{.Data.Brand.Primary}};--sec:{{.Data.Brand.Secondary}};--acc:{{.Data.Brand.Accent}};--rad:{{.Data.Brand.ButtonRadius}}}
-*{box-sizing:border-box}body{margin:0;font-family:{{css .Data.Brand.FontStack}};color:#1a2333;line-height:1.65;background:#fff}
-a{color:var(--pri)}.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
-.top{background:var(--sec);color:#fff}.top .wrap{display:flex;align-items:center;gap:14px;padding:12px 20px}
-.top img{height:38px;width:38px;object-fit:cover;border-radius:9px}.top .nm{font-weight:800;font-size:1.15rem}
-.top nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}.top nav a{color:#fff;text-decoration:none;padding:8px 12px;border-radius:var(--rad)}
-.top nav a:hover,.top nav a.on{background:rgba(255,255,255,.15)}
-.burger{display:none;background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:8px 12px;font-size:1.1rem}
-.hero{background:linear-gradient(180deg,var(--sec),#24344f);color:#fff;padding:72px 0;text-align:center}
-.hero h1{font-size:2.4rem;margin:0 0 12px}.hero p{opacity:.85;max-width:640px;margin:0 auto 24px}
-.btn{display:inline-block;background:var(--pri);color:#fff !important;text-decoration:none;padding:12px 26px;border-radius:var(--rad);font-weight:700;border:0}
-.btn.ghost{background:transparent;border:2px solid var(--pri);color:var(--pri) !important}
-.sec{padding:56px 0}.sec.dark{background:var(--sec);color:#fff}.sec.primary{background:var(--pri);color:#fff}.sec .kicker{color:var(--acc);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem}
-.sec h2{font-size:1.9rem;margin:6px 0 14px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
-.card{border:1px solid #e5e9f0;border-radius:12px;padding:22px;background:#fff}.dark .card{background:rgba(255,255,255,.06);border-color:transparent}
-.faq details{border:1px solid #e5e9f0;border-radius:10px;padding:14px 18px;margin-bottom:10px}.faq summary{font-weight:700;cursor:pointer}
-footer{background:#0d1526;color:#c6cfdd;padding:44px 0 26px;margin-top:0}footer a{color:#c6cfdd}
-.meta{font-size:.85rem;color:#667}.tag{background:#eef2f7;border-radius:20px;padding:2px 12px;font-size:.8rem;display:inline-block;margin:2px}
-input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;border-radius:8px;width:100%}
-.skip{position:absolute;left:-9999px}.skip:focus{left:8px;top:8px;background:#fff;padding:8px;z-index:99}
-@media(max-width:760px){.grid2{grid-template-columns:1fr}.hero h1{font-size:1.7rem}.top nav{display:none}.top nav.open{display:flex;flex-direction:column;width:100%}.burger{display:block}.hero .wrap{grid-template-columns:1fr !important;text-align:center !important}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:{{css .Data.Brand.FontStack}};color:#1c2533;line-height:1.7;background:#fff;-webkit-font-smoothing:antialiased}
+a{color:var(--pri);text-decoration:none}a:hover{text-decoration:underline}.wrap{width:100%;max-width:1140px;margin:0 auto;padding:0 24px}
+.site-header{position:sticky;top:0;z-index:50;background:rgba(16,31,60,.96);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.08)}
+.header-inner{display:flex;align-items:center;gap:18px;min-height:66px}.brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:800;font-size:1.05rem;letter-spacing:.2px}.brand:hover{text-decoration:none}.brand img{width:34px;height:34px;object-fit:cover;border-radius:9px}
+.navlinks{display:flex;gap:2px;margin-left:auto;flex-wrap:wrap}.navlink{color:rgba(255,255,255,.82);padding:8px 11px;border-radius:8px;font-size:.9rem}.navlink:hover{background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+.header-actions{display:flex;gap:8px;align-items:center}.pill{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.25);color:#fff;font-size:.82rem;font-weight:600}.pill:hover{background:rgba(255,255,255,.12);text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;background:var(--pri);color:#fff !important;text-decoration:none;padding:13px 26px;border-radius:var(--rad);font-weight:700;border:0;line-height:1.2;box-shadow:0 8px 20px rgba(31,111,235,.22)}.btn:hover{text-decoration:none;filter:brightness(1.06)}.btn.ghost{background:transparent;border:2px solid var(--pri);color:var(--pri) !important;box-shadow:none}.btn.light{background:#fff;color:var(--sec) !important;box-shadow:none}.btn.small{padding:9px 16px;font-size:.88rem}
+.eyebrow{display:inline-block;color:var(--acc);font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:.72rem;margin-bottom:8px}
+.hero{position:relative;overflow:hidden;color:#fff;background:radial-gradient(900px 420px at 85% 10%,rgba(201,168,68,.28),transparent 60%),linear-gradient(135deg,#101f3c 0%,#1b3358 55%,#24456f 100%);padding:74px 0 66px}
+.hero:after{content:"";position:absolute;right:-80px;bottom:-160px;width:420px;height:420px;border:1px solid rgba(255,255,255,.08);border-radius:50%;pointer-events:none}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}.hero h1{font-size:2.9rem;line-height:1.15;margin:0 0 16px;letter-spacing:-.02em}.hero .lede{font-size:1.08rem;color:rgba(255,255,255,.86);max-width:520px;margin:0 0 22px}.hero .mini{margin-top:20px;color:rgba(255,255,255,.7);font-size:.9rem;display:flex;gap:16px;flex-wrap:wrap}
+.hero-visual{position:relative}.hero-visual:before{content:"";position:absolute;inset:-14px -14px 14px 14px;border:1px solid rgba(201,168,68,.45);border-radius:20px;z-index:0}.hero-visual img{position:relative;z-index:1;width:100%;border-radius:18px;box-shadow:0 28px 60px rgba(0,0,0,.38);display:block}
+.section{padding:72px 0}.section.muted{background:#f5f7fa}.section.tint{background:linear-gradient(180deg,#fff,#f9fafc)}.section-head{max-width:650px;margin-bottom:34px}.section h2{font-size:2rem;line-height:1.25;margin:4px 0 12px;letter-spacing:-.015em}.section p.lead{font-size:1.02rem;color:#536174;margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:20px}.card{background:#fff;border:1px solid #e6ebf2;border-radius:14px;padding:24px;box-shadow:0 2px 4px rgba(16,31,60,.02)}.card:hover{box-shadow:0 14px 30px rgba(16,31,60,.08);transform:translateY(-2px);transition:.18s ease}
+.service-card{overflow:hidden;padding:0;display:flex;flex-direction:column}.service-img{width:100%;height:132px;object-fit:cover;background:#eef2f7}.service-body{padding:20px;display:flex;flex-direction:column;gap:6px;flex:1}.service-body h3{margin:0;font-size:1.1rem}.service-body p{margin:0;color:#64748b;font-size:.92rem}.service-body .btn{margin-top:auto;align-self:flex-start}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;counter-reset:step}.step{position:relative;background:#fff;border:1px solid #e6ebf2;border-radius:12px;padding:22px 20px 20px 62px}.step:before{counter-increment:step;content:counter(step);position:absolute;left:18px;top:20px;width:30px;height:30px;border-radius:9px;background:rgba(31,111,235,.1);color:var(--pri);font-weight:800;display:flex;align-items:center;justify-content:center}.step strong{display:block;margin-bottom:3px}.step span{font-size:.9rem;color:#64748b}
+.cta-band{background:linear-gradient(120deg,var(--pri),#174ea6);color:#fff;border-radius:18px;padding:44px;text-align:center}.cta-band h2{margin:0 0 8px;font-size:1.9rem}.cta-band p{margin:0 0 22px;color:rgba(255,255,255,.85)}
+.site-footer{background:#0c1629;color:#b8c4d6;padding:54px 0 28px}.footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:40px}.site-footer h4{color:#fff;margin:0 0 12px;font-size:1rem}.site-footer a{color:#b8c4d6;font-size:.92rem;display:block;padding:3px 0}.site-footer a:hover{color:#fff}.footer-bottom{border-top:1px solid rgba(255,255,255,.1);margin-top:36px;padding-top:18px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:.85rem}
+.meta{font-size:.88rem;color:#7b8798}.tag{background:#eef2f7;border-radius:20px;padding:2px 12px;font-size:.8rem;display:inline-block;margin:2px}
+input,textarea,select{font:inherit;padding:11px 13px;border:1px solid #cdd5e0;border-radius:9px;width:100%;background:#fff}input:focus,textarea:focus,select:focus{outline:3px solid rgba(31,111,235,.14);border-color:var(--pri)}
+.faq details{border:1px solid #e6ebf2;border-radius:12px;padding:16px 20px;margin-bottom:10px;background:#fff}.faq summary{font-weight:700;cursor:pointer}.skip{position:absolute;left:-9999px}.skip:focus{left:8px;top:8px;background:#fff;padding:10px;z-index:99;border-radius:8px}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:28px}.hero h1{font-size:2.2rem}.footer-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:680px){.navlinks{display:none}.navlinks.open{display:flex;flex-direction:column;width:100%;background:#101f3c;padding:12px;margin-top:8px;border-radius:12px}.header-inner{flex-wrap:wrap}.burger{display:inline-flex}.hero{padding:52px 0}.section{padding:52px 0}.hero h1{font-size:1.9rem}.footer-grid{grid-template-columns:1fr}.cta-band{padding:28px 20px}}
+.burger{display:none;background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 11px;font-size:1rem;margin-left:auto}
 </style>
 </head>{{end}}
 
 {{define "pub_nav"}}<a class="skip" href="#isi">Lewati ke konten</a>
 {{if .Data.Announcement}}<div style="background:#fff8c5;color:#1a2333;text-align:center;padding:8px 16px;font-size:.9rem">{{.Data.Announcement}}</div>{{end}}
 {{if .Data.Maintenance}}{{if .Data.LoggedIn}}<div style="background:#ffebe9;color:#82071e;text-align:center;padding:8px 16px;font-size:.9rem">MODE PEMELIHARAAN aktif — pengunjung anonim melihat halaman 503. <a href="/cms/site">Matikan di Pengaturan Website</a></div>{{end}}{{end}}
-<header class="top"><div class="wrap">
-{{if .Data.Brand.LogoURL}}<img src="{{.Data.Brand.LogoURL}}" alt="{{.Data.Brand.AppName}}"/>{{end}}
-<span class="nm">{{.Data.Brand.AppName}}</span>
-{{if .Data.Brand.Tagline}}<span style="opacity:.7;font-size:.85rem">{{.Data.Brand.Tagline}}</span>{{end}}
-<button class="burger" aria-label="Menu" onclick="document.getElementById('mnav').classList.toggle('open')">☰</button>
-<nav id="mnav" aria-label="Navigasi utama">{{range .Data.Nav}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}<a href="/cari" aria-label="Cari">⌕</a><a href="?lang={{.Data.OtherLang}}" aria-label="Ganti bahasa">{{.Data.OtherLang}}</a></nav>
+<header class="site-header"><div class="wrap header-inner">
+<a class="brand" href="/">{{if .Data.Brand.LogoURL}}<img src="{{.Data.Brand.LogoURL}}" alt=""/>{{end}}<span>{{.Data.Brand.AppName}}</span></a>
+<button class="burger" type="button" aria-label="Buka menu" onclick="document.getElementById('mnav').classList.toggle('open')">☰</button>
+<nav class="navlinks" id="mnav" aria-label="Navigasi utama">{{range .Data.Nav}}<a class="navlink" href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}</nav>
+<div class="header-actions"><a class="pill" href="/cari">Cari</a><a class="pill" href="?lang={{.Data.OtherLang}}">{{.Data.OtherLang}}</a></div>
 </div></header>{{end}}
 
-{{define "pub_foot"}}<footer><div class="wrap">
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px">
-<div><strong>{{.Data.Brand.AppName}}</strong><br/><span class="meta">{{.Data.Office.Addr}}</span><br/><span class="meta">{{.Data.Office.Phone}} · {{.Data.Office.Email}}</span></div>
-<div><strong>Navigasi</strong><br/>{{range .Data.Foot}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a><br/>{{end}}</div>
-<div><strong>Kantor</strong><br/><span class="meta">{{.Data.Office.Name}}</span><br/><a href="/kontak">Hubungi kami →</a></div>
+{{define "pub_foot"}}<footer class="site-footer"><div class="wrap">
+<div class="footer-grid">
+<div><h4>{{.Data.Brand.AppName}}</h4><p class="meta" style="margin:0 0 6px">{{.Data.Office.Addr}}</p><p class="meta" style="margin:0 0 6px">{{.Data.Office.Phone}} · {{.Data.Office.Email}}</p><p class="meta">Sistem administrasi notaris mandiri. Bukan PPAT dan bukan firma hukum.</p></div>
+<div><h4>Navigasi</h4>{{range .Data.Nav}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Label}}</a>{{end}}</div>
+<div><h4>Kantor</h4><p class="meta" style="margin-top:0">{{.Data.Office.Name}}</p><a href="/konsultasi">Konsultasi →</a><a href="/booking">Booking kunjungan →</a><a href="/privasi">Kebijakan privasi →</a></div>
 </div>
-<p class="meta" style="margin-top:26px">{{if .Data.Brand.FooterText}}{{.Data.Brand.FooterText}}{{end}} {{if .Data.Brand.CopyrightText}}· {{.Data.Brand.CopyrightText}}{{end}} · <a href="/privasi">Privasi</a></p>
+<div class="footer-bottom"><span>{{if .Data.Brand.CopyrightText}}{{.Data.Brand.CopyrightText}}{{else}}© 2026 SaktiNotaris{{end}}</span><span>Dibuat untuk kerapian administrasi, bukan pengganti keputusan Notaris.</span></div>
 </div></footer></body></html>{{end}}
 
 {{define "pub_home"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
-{{if .Data.HasCMS}}<section class="sec"><div class="wrap"><div>{{cmsHTML .Data.Page.Content}}</div></div></section>{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}
-{{if .Data.CMSServices}}<section class="sec"><div class="wrap"><h2>Layanan Kami</h2><div class="cards">{{range .Data.CMSServices}}<div class="card">
-{{if .ImageMediaID.Valid}}<img src="/media/{{.ImageMediaID.Int64}}" alt="{{.Name}}" style="width:100%;height:150px;object-fit:cover;border-radius:10px" loading="lazy"/>{{end}}
-<h3 style="margin:12px 0 4px"><a href="/layanan-kami/{{.Slug}}">{{.Name}}</a></h3><p class="meta">{{.Description}}</p>
-<a class="btn ghost" href="/layanan-kami/{{.Slug}}">Detail →</a></div>{{end}}</div></div></section>{{end}}
-{{else}}<section class="hero"><div class="wrap"><h1>{{.Data.Brand.AppName}}</h1><p>Website kantor dalam penyiapan. Kembali lagi segera.</p></div></section>{{end}}
+{{if .Data.HasCMS}}
+<section class="section tint"><div class="wrap"><span class="eyebrow">Kantor Notaris · Jakarta</span><h2 style="max-width:720px">{{.Data.Page.Title}}</h2><p class="lead">{{cmsHTML .Data.Page.Content}}</p></div></section>
+{{range .Data.Sections}}{{template "pub_sec" .}}{{end}}
+{{if .Data.CMSServices}}<section class="section" id="layanan"><div class="wrap"><div class="section-head"><span class="eyebrow">Ruang lingkup</span><h2>Layanan Kami</h2><p class="lead">Dokumen disiapkan dengan alur yang jelas. Keputusan hukum tetap menjadi wewenang Notaris.</p></div>
+<div class="cards">{{range .Data.CMSServices}}<div class="card service-card">
+{{if .ImageMediaID.Valid}}<img class="service-img" src="/media/{{.ImageMediaID.Int64}}" alt="{{.Name}}" loading="lazy"/>{{end}}
+<div class="service-body"><h3><a href="/layanan-kami/{{.Slug}}">{{.Name}}</a></h3><p>{{.Description}}</p><a class="btn ghost small" href="/layanan-kami/{{.Slug}}">Lihat detail →</a></div>
+</div>{{end}}</div></div></section>{{end}}
+{{else}}<section class="hero"><div class="wrap"><h1>{{.Data.Brand.AppName}}</h1><p class="lede">Website kantor dalam penyiapan. Kembali lagi segera.</p></div></section>{{end}}
 </main>{{template "pub_foot" .}}{{end}}
 
 {{define "pub_home_empty"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
@@ -69,15 +74,17 @@ input,textarea,select{font:inherit;padding:10px 12px;border:1px solid #cdd5e0;bo
 </main>{{template "pub_foot" .}}{{end}}
 
 {{define "pub_sec"}}
-{{if eq .Type "hero"}}<section class="hero"><div class="wrap" style="display:grid;grid-template-columns:1.1fr .9fr;gap:32px;align-items:center;text-align:left">
-<div><h1>{{.Title}}</h1><p style="opacity:.9">{{.Subtitle}}</p>{{if .CTALabel}}<p><a class="btn" href="{{.CTAURL}}">{{.CTALabel}}</a></p>{{end}}<div>{{cmsHTML .Content}}</div></div>
-{{if .ImageMediaID.Valid}}<div><img src="/media/{{.ImageMediaID.Int64}}" alt="{{.Title}}" style="width:100%;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.35)" loading="lazy"/></div>{{else}}<div><img src="/assets/landing/notarius-hero.png" alt="Kantor notaris" style="width:100%;border-radius:16px" loading="lazy"/></div>{{end}}
+{{if eq .Type "hero"}}<section class="hero"><div class="wrap hero-grid">
+<div><span class="eyebrow">{{.Subtitle}}</span><h1>{{.Title}}</h1>
+{{if .CTALabel}}<p><a class="btn light" href="{{.CTAURL}}">{{.CTALabel}} →</a></p>{{end}}
+<div class="mini"><span>Identitas terverifikasi</span><span>Proses tercatat</span><span>Repertorium rapi</span></div>
+<div class="mini" style="display:block;margin-top:18px">{{cmsHTML .Content}}</div></div>
+<div class="hero-visual"><img src="{{if .ImageMediaID.Valid}}/media/{{.ImageMediaID.Int64}}{{else}}/assets/landing/notarius-hero.png{{end}}" alt="{{.Title}}" loading="lazy"/></div>
 </div></section>
-{{else if eq .Type "cta"}}<section class="sec primary" style="text-align:center"><div class="wrap"><h2>{{.Title}}</h2><p>{{.Subtitle}}</p>{{if .CTALabel}}<a class="btn ghost" style="border-color:#fff;color:#fff !important" href="{{.CTAURL}}">{{.CTALabel}}</a>{{end}}</div></section>
-{{else}}<section class="sec {{.Background}}"><div class="wrap{{if eq .Layout "wide"}}{{else if eq .Layout "split"}} grid2{{end}}">
-<div><div class="kicker">{{.Subtitle}}</div><h2>{{.Title}}</h2><div>{{cmsHTML .Content}}</div>{{if .CTALabel}}<p><a class="btn" href="{{.CTAURL}}">{{.CTALabel}}</a></p>{{end}}</div>
-{{if .ImageMediaID.Valid}}<div><img src="/media/{{.ImageMediaID.Int64}}" alt="{{.Title}}" style="width:100%;border-radius:14px" loading="lazy"/></div>{{end}}
-</div></section>{{end}}
+{{else if eq .Type "cta"}}<section class="section"><div class="wrap"><div class="cta-band"><h2>{{.Title}}</h2><p>{{.Subtitle}}</p>{{if .CTALabel}}<a class="btn light" href="{{.CTAURL}}">{{.CTALabel}} →</a>{{end}}</div></div></section>
+{{else if eq .Type "services"}}<section class="section {{.Background}}"><div class="wrap"><div class="section-head"><span class="eyebrow">{{.Subtitle}}</span><h2>{{.Title}}</h2></div><div class="cards">{{cmsHTML .Content}}</div>{{if .CTALabel}}<p><a class="btn ghost" href="{{.CTAURL}}">{{.CTALabel}} →</a></p>{{end}}</div></section>
+{{else if eq .Type "process"}}<section class="section muted"><div class="wrap"><div class="section-head"><span class="eyebrow">{{.Subtitle}}</span><h2>{{.Title}}</h2><p class="lead">Tahapan administrasi yang tercatat. Tidak menggantikan tindakan hukum Notaris.</p></div><div class="steps"><div class="step"><strong>Konsultasi</strong><span>Pengecekan syarat dan kebutuhan.</span></div><div class="step"><strong>Verifikasi</strong><span>Identitas diperiksa oleh staf.</span></div><div class="step"><strong>Penyusunan</strong><span>Draf akta berversi dari template.</span></div><div class="step"><strong>Pengesahan</strong><span>Review dan tanda tangan Notaris.</span></div><div class="step"><strong>Pencatatan</strong><span>Repertorium dan pengarsipan.</span></div></div></div></section>
+{{else}}<section class="section {{.Background}}"><div class="wrap"><div class="section-head"><span class="eyebrow">{{.Subtitle}}</span><h2>{{.Title}}</h2><div>{{cmsHTML .Content}}</div>{{if .CTALabel}}<p><a class="btn ghost" href="{{.CTAURL}}">{{.CTALabel}} →</a></p>{{end}}</div></div></section>{{end}}
 {{end}}
 
 {{define "pub_page"}}{{template "pub_head" .}}<body>{{template "pub_nav" .}}<main id="isi">
