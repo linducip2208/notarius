@@ -65,6 +65,7 @@ func (a *App) publicHome(w http.ResponseWriter, r *http.Request) {
 	if p, secs, err := a.web.PublicPage(office, "beranda", pubLang(r)); err == nil {
 		data["Page"] = p
 		data["Sections"] = secs
+		data["CMSServices"], _ = a.web.PublicServices(office, pubLang(r))
 		data["HasCMS"] = true
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := a.tmpl.ExecuteTemplate(w, "pub_home", map[string]any{"Title": p.Title, "Data": data}); err != nil {
