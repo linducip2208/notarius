@@ -194,6 +194,13 @@ func (s *Store) SaveNavItem(officeID int64, n *NavItem) (int64, error) {
 	if strings.TrimSpace(n.Label) == "" || !ValidNavURL(n.URL) {
 		return 0, errors.New("label dan URL aman wajib diisi")
 	}
+	// Idempoten: satu (label, url, area) per kantor. Submit ulang tidak menumpuk menu.
+	var dup int64
+	_ = s.db.QueryRow(`SELECT id FROM website_nav_items WHERE office_id=? AND area=? AND label=? AND url=? AND id<>? LIMIT 1`,
+		officeID, n.Area, strings.TrimSpace(n.Label), strings.TrimSpace(n.URL), n.ID).Scan(&dup)
+	if dup > 0 {
+		return dup, nil
+	}
 	if n.ParentID.Valid {
 		var po int64
 		if err := s.db.QueryRow(`SELECT office_id FROM website_nav_items WHERE id=?`,
