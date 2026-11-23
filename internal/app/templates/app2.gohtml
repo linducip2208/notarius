@@ -78,6 +78,9 @@ window.insertClause=insertClause;
 </tbody></table></div></div>
 {{if .Data.Parties}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Para Pihak (dari permohonan)</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Parties}}<div class="list-group-item"><a href="/clients/{{.ClientID}}">{{.ClientName}}</a> <span class="badge bg-azure-lt ms-1">{{.Role}}</span></div>{{end}}</div></div>{{end}}
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Jadwal Pembacaan</h3><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/appointments">Buat Janji</a></div></div>
+{{if and (ne .Data.Deed.Status "APPROVED") (not .Data.HasReadingDone)}}<div class="alert alert-warning m-3 mb-0 small">Belum ada pembacaan terjadwal (tidak ada janji DONE tertaut via permohonan) — pengesahan tetap bisa dilanjutkan; formalitas saksi + tempat pembacaan dicatat pada formulir Sahkan.</div>{{end}}
+<div class="list-group list-group-flush">{{range .Data.Readings}}<div class="list-group-item"><span class="badge {{if eq .Status "DONE"}}bg-green-lt{{else if eq .Status "SCHEDULED"}}bg-azure-lt{{else}}bg-yellow-lt{{end}} me-2">{{.Status}}</span>{{.At}} — {{.Purpose}}</div>{{else}}<div class="list-group-item text-secondary">Belum ada janji tertaut via permohonan.</div>{{end}}</div></div>
 {{if .Data.CanSign}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Tanda Tangan Elektronik Internal</h3></div>
 <div class="card-body"><p class="text-secondary small">Hash SHA-256 atas isi + identitas + segel tercatat permanen. Bukan PSrE.</p>
 <form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-dark" type="submit" data-confirm="Tandatangani isi saat ini? Hash tercatat permanen.">Tandatangani</button></form></div></div>{{end}}

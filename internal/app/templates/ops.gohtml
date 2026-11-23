@@ -116,6 +116,9 @@
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Selesai</div><div class="h1">{{.Data.Completed}}</div></div></div></div>
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Piutang</div><div class="h1">Rp {{.Data.Outstanding}}</div></div></div></div>
 </div>
+<div class="row row-deck row-cards mt-3">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Sudah Diserahkan ({{.Data.Month}})</div><div class="h1">{{.Data.HandoverMonth}}</div><div class="small text-secondary">Akta + legalisasi HANDED_OVER bulan berjalan</div></div></div></div>
+</div>
 <p class="text-secondary mt-3">Seluruh angka dihitung dari query database — tanpa data fabrikasi.</p>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Anggaran vs Realisasi ({{.Data.Month}})</h3><div class="ms-auto"><form method="post" action="/budgets" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="category" placeholder="Kategori" style="max-width:130px"/><input class="form-control form-control-sm" name="month" placeholder="YYYY-MM" style="max-width:100px"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal" style="max-width:110px"/><button class="btn btn-sm btn-outline-primary" type="submit">Simpan</button></form></div></div>
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Kategori</th><th class="text-end">Anggaran</th><th class="text-end">Realisasi</th><th class="text-end">Sisa</th></tr></thead>

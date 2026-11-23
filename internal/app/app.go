@@ -1352,6 +1352,14 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	// langsung. Best-effort: gagal query → widget disembunyikan template.
 	var slaTop []remind.ServiceOverdueItem
 	var docOver []remind.OverdueDoc
+	// Widget serah-terima (031): tipe baris + var di luar if agar terbaca
+	// render di bawah (best-effort, disembunyikan template bila kosong).
+	type handoverPending struct {
+		ID    int64
+		Title string
+	}
+	var pendingHandover []handoverPending
+	handoverToday := 0
 	if a.db != nil {
 		if items, err := remind.ServiceOverdue(a.db, office); err == nil {
 			if len(items) > 5 {
@@ -1365,6 +1373,29 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			}
 			docOver = docs
 		}
+		// Widget serah-terima (031): akta APPROVED/SIGNED tanpa handover
+		// (LIMIT 5, office-scoped) + count serah hari ini (deed_handovers +
+		// legalisasi HANDED_OVER via proxy completed_at hari ini).
+		// Best-effort: tabel 031 belum ada → gagal query = widget
+		// disembunyikan template (mirip SLA di atas).
+		if rows, err := a.db.Query(`SELECT d.id, d.title FROM deed_drafts d WHERE d.office_id=? AND d.status IN ('APPROVED','SIGNED') AND NOT EXISTS (SELECT 1 FROM deed_handovers h WHERE h.deed_id=d.id AND h.office_id=?) ORDER BY d.id DESC LIMIT 5`, office, office); err == nil && rows != nil {
+			func() {
+				defer rows.Close()
+				for rows.Next() {
+					var h handoverPending
+					if err := rows.Scan(&h.ID, &h.Title); err == nil {
+						pendingHandover = append(pendingHandover, h)
+					}
+				}
+			}()
+		}
+		var dhToday, legToday int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_handovers WHERE office_id=? AND DATE(COALESCE(handed_at,created_at))=CURDATE()`, office).Scan(&dhToday)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM legalizations WHERE office_id=? AND status='HANDED_OVER' AND DATE(completed_at)=CURDATE()`, office).Scan(&legToday)
+		handoverToday = dhToday + legToday
+		for _, h := range pendingHandover {
+			pendingWork = append(pendingWork, work{"Serah", h.Title + " — menunggu serah ke klien", "/deeds/" + strconv.FormatInt(h.ID, 10)})
+		}
 	}
 	a.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed,
@@ -1376,6 +1407,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
 		"SLAOverdue": slaTop, "DocOverdue": docOver, "MFAWarn": mfaWarn,
+		"PendingHandover": pendingHandover, "HandoverToday": handoverToday,
 	})
 }
 
@@ -2949,10 +2981,22 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 			slaOver = over
 		}
 	}
+	// Rekap serah bulan berjalan (031): count deed_handovers + legalisasi
+	// HANDED_OVER bulan ini (proxy completed_at bulan berjalan — HANDED_OVER
+	// selalu lewat COMPLETED sehingga completed_at terisi). Best-effort,
+	// query existing di atas tidak diubah.
+	var handoverMonth int64
+	if a.db != nil {
+		ymH := time.Now().Format("2006-01")
+		var dh, lg int64
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_handovers WHERE office_id=? AND DATE_FORMAT(COALESCE(handed_at,created_at),'%Y-%m')=?`, a.officeOf(r), ymH).Scan(&dh)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM legalizations WHERE office_id=? AND status='HANDED_OVER' AND DATE_FORMAT(completed_at,'%Y-%m')=?`, a.officeOf(r), ymH).Scan(&lg)
+		handoverMonth = dh + lg
+	}
 	a.render(w, r, "reports", "Laporan", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed, "Outstanding": out,
 		"Budgets": budgets, "Profits": profits, "Month": time.Now().Format("2006-01"), "ByCat": byCat,
-		"TopSvc": topSvc, "SLAOver": slaOver,
+		"TopSvc": topSvc, "SLAOver": slaOver, "HandoverMonth": handoverMonth,
 	})
 }
 

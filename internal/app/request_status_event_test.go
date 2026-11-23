@@ -26,6 +26,14 @@ func TestRequestEventMatrix(t *testing.T) {
 	if _, ok := requestEventTarget("acara_tidak_ada"); ok {
 		t.Fatal("event tak dikenal harus ok=false (diam/fail-open)")
 	}
+	// Rantai IN_REVIEW→APPROVED→IN_PROGRESS harus legal berurutan
+	// (menutup jalan buntu: akta disahkan padahal permohonan IN_REVIEW).
+	if !requests.CanMove("IN_REVIEW", "APPROVED") {
+		t.Fatal("rantai butuh IN_REVIEW→APPROVED yang legal")
+	}
+	if !requests.CanMove("APPROVED", "IN_PROGRESS") {
+		t.Fatal("rantai butuh APPROVED→IN_PROGRESS yang legal")
+	}
 	// Fail-open tanpa DB: nil db / id tak valid tidak boleh panic.
 	if advanceOnEvent(nil, 0, 0, "deed_approved", nil, nil) {
 		t.Fatal("advanceOnEvent tanpa DB tak boleh bergerak")

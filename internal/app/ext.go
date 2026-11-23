@@ -1763,6 +1763,11 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 	if tplID.Valid {
 		_ = a.db.QueryRow(`SELECT body FROM doc_templates WHERE id=? AND office_id=?`, tplID.Int64, a.officeOf(r)).Scan(&tplBody)
 	}
+	// Jadwal pembacaan (lunak, non-blokir): janji temu tertaut via request_id
+	// akta — appointments tak punya kolom deed_id (migrasi 002), jadi relasi
+	// via deed.request_id. Tak pernah memblokir approve, hanya data + teks.
+	reqID := deedRequestID(a.db, id)
+	readings, hasDone := a.deedReadings(a.officeOf(r), reqID)
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
@@ -1775,7 +1780,8 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"CanHandover": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"Attached": a.deedFiles(a.officeOf(r), id),
 		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
-		"Parties":  a.matterParties(a.officeOf(r), deedRequestID(a.db, id)),
+		"Parties":  a.matterParties(a.officeOf(r), reqID),
+		"Readings": readings, "HasReadingDone": hasDone,
 	})
 }
 
@@ -1812,6 +1818,35 @@ func (a *App) matterParties(officeID, reqID int64) []partyView {
 		}
 	}
 	return out
+}
+
+// deedReadings memuat janji temu tertaut via request_id draf (read-only untuk
+// deedDetail) + flag lunak apakah sudah ada pembacaan DONE. appointments tak
+// punya kolom deed_id (migrasi 002) sehingga relasi via deed.request_id.
+// Tak pernah memblokir approve — hanya data list + teks peringatan di kartu.
+func (a *App) deedReadings(officeID, reqID int64) ([]map[string]any, bool) {
+	var out []map[string]any
+	if a.db == nil || reqID == 0 {
+		return out, false
+	}
+	rows, err := a.db.Query(`SELECT id, scheduled_at, purpose, status FROM appointments
+		WHERE office_id=? AND request_id=? ORDER BY scheduled_at`, officeID, reqID)
+	if err != nil {
+		return out, false
+	}
+	defer rows.Close()
+	hasDone := false
+	for rows.Next() {
+		var id int64
+		var at, purpose, status string
+		if err := rows.Scan(&id, &at, &purpose, &status); err == nil {
+			if status == "DONE" {
+				hasDone = true
+			}
+			out = append(out, map[string]any{"ID": id, "At": at, "Purpose": purpose, "Status": status})
+		}
+	}
+	return out, hasDone
 }
 
 // deedFiles lists DMS files linked to a deed (lampiran dua arah).
