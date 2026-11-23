@@ -738,6 +738,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/dms/checklists", a.dmsChecklistCreate)
 		p.Post("/dms/checklists/seed", a.dmsChecklistSeed)
 		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
+		p.Post("/requests/{id}/workflow/step", a.workflowStep)
 		p.Get("/qr", a.qrText)
 		p.Get("/dms/archive/labels", a.dmsLabels)
 		p.Get("/audit", a.auditPage)
@@ -1799,6 +1800,9 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 	if plan.Allowed(a.officeTier(a.officeOf(r)), plan.FeatChecklist) {
 		_ = a.dms.AutoChecklist(a.officeOf(r), id, serviceID)
 	}
+	// Alur kerja generik (027): buat instance dari template aktif service_code
+	// bila ada; tanpa template / gagal = lewati diam-diam, permohonan tetap jadi.
+	_ = a.ensureWorkflowInstance(a.officeOf(r), id)
 	// Korporat: langsung bentuk record perusahaan anak agar wizard/wizard-lanjut tinggal isi.
 	if code := r.FormValue("x_svccode"); code != "" {
 		if ent := corpEntityOf(code); ent != "" {

@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.1 (2026-11-24) — NOTARIUS 3.0 TAHAP 1-4 + WORKFLOW ENGINE + AUDIT OFFICE_ID + CI
+Ringkasan: sejak v0.5.0 ada 3 commit (75b89f0, dc8ee0d, 68af938; 2026-11-24): (1) fondasi matter + workflowGate generik — migrasi 026 (matter_parties, service_workflow_rules + seed, wills.register_no unik), multi-pihak di akta, 9 bug audit, SIGNED + bedakan 1062, seed HUTANG/PK/SEWA + Wasiat; (2) BPR + finalisasi — audit 38 paket/277 route/127 template/98 tabel/11 state machine, 8 docs NOTARIUS_3_0_* + label 27 paket/9 konsep, E2E lulus; (3) lanjutan — migrasi 027 (workflow_templates/steps/instances/states + package workflow teruji), migrasi 028 (audit_logs.office_id + index, 12 jalur kritis), CI build/vet/unit + integrasi MySQL non-blocking.
+Go-Live: seperti v0.5.0 + pastikan migrasi 026–028 jalan otomatis saat boot (cek schema_migrations), verifikasi gate workflow per layanan + multi-pihak di akta, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.0 (2026-11-23) — PRODUKSI PERDANA, 5 PENAHAN GO-LIVE TERTUTUP
 Ringkasan: RILIS PRODUKSI PERDANA — 5 penahan go-live tertutup: (1) backup GPG streaming tanpa plaintext + purge file lama + kredensial via env; (2) PPAT gate checklist strict + larang resi fiktif; (3) payment office-scope + test isolasi; (4) race booking serial + versi terkunci + approve bedakan 1062; (5) test jujur — fixture dummy KTP palsu, 22 uji nyata, skip eksplisit + docs CI-vs-lokal.
 Go-Live: seperti v0.4.8 + pastikan backup .sql.gz.gpg terbaru bisa di-restore (gpg --decrypt | gunzip | mysql) lalu purge plaintext lama via tombol /office, verifikasi gate PPAT strict + payment scope, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

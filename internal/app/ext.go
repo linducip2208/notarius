@@ -537,6 +537,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	partyClients, _ := a.clients.List(a.officeOf(r), "", 200)
+	wfSteps, wfCur, wfStatus, wfHas := a.workflowView(a.officeOf(r), id)
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
@@ -544,6 +545,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		"WAPhone": waPhone, "WAText": waText, "WALink": waLink,
 		"Ppat": ppatRefs,
 		"Parties": parties, "PartyClients": partyClients, "PartyRoles": partyRoles,
+		"WF": wfSteps, "WFHas": wfHas, "WFCur": wfCur, "WFStatus": wfStatus,
 	})
 }
 

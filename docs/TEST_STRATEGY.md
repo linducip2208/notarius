@@ -9,10 +9,9 @@
 - Seed katalog: `standardChecklistSeeds`/`standardTemplateSeeds` diuji murni tanpa DB (`internal/app/seed_catalog_test.go`: HUTANG/PK-UMUM/SEWA + Wasiat/Will).
 - Bukti: `docs/TEST_RESULTS.md` + `project/progress.json`. Mock bukan bukti integrasi MySQL.
 
-## Status jujur CI-vs-lokal (PR #5, 2026-11-23)
-Repo ini TIDAK punya `.github/workflows` (tidak ada CI MySQL service), jadi
-aturan jujurnya: tidak ada workflow baru — yang jalan di CI hanyalah suite
-tanpa dependensi eksternal. Klaim "hijau" hanya sah untuk kolom CI.
+## Status jujur CI-vs-lokal (PR #5, 2026-11-23; CI ada sejak commit terpisah — lihat `.github/workflows/ci.yml`)
+Repo kini PUNYA `.github/workflows/ci.yml` (build/vet/unit + integrasi MySQL non-blocking),
+jadi aturan jujurnya: klaim "hijau" hanya sah untuk kolom CI.
 
 | Suite | Perintah | CI (tanpa Tesseract/DB) | Lokal (dengan deps) | Bila deps absen |
 |---|---|---|---|---|
@@ -30,3 +29,9 @@ Catatan:
 - Perintah lokal lengkap: `go test ./internal/ocr/ -count=1 -v` (selalu),
   lalu sesuai kebutuhan tambah `NOTARYOS_TEST_TESSERACT=1` dan/atau
   `NOTARYOS_TEST_DSN=...`.
+- TERVERIFIKASI LIVE 2026-11-24: `go test ./tests/ -count=1 -v` dengan
+  `NOTARYOS_TEST_DSN` ke DB `notaryos_test` (migrasi 001–028 diterapkan):
+  23/23 PASS, 0 FAIL, cleanup bersih (0 baris uji tersisa). Termasuk
+  `TestWorkflowInstanceLifecycle` perdana. DB uji butuh migrasi lengkap —
+  jika tabel workflow hilang, terapkan `migrations/021,022,023,025,027,028`
+  (idempoten) sebelum run.

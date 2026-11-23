@@ -1148,7 +1148,8 @@ func (a *App) dmsChecklistCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dms/checklists?flash=Template+checklist+disimpan", http.StatusSeeOther)
 }
 
-// dmsChecklistSeed memasang 5 paket standar badan usaha bila belum ada.
+// dmsChecklistSeed memasang 5 paket standar badan usaha + 3 template alur
+// kerja standar (027: PT-DIRIAN, PPAT-AJB, KUASA) bila belum ada.
 // Idempoten per service_code: template yang sudah ada dilewati.
 func (a *App) dmsChecklistSeed(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
@@ -1171,8 +1172,9 @@ func (a *App) dmsChecklistSeed(w http.ResponseWriter, r *http.Request) {
 			made++
 		}
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "checklist.seed", Entity: "office", EntityID: strconv.FormatInt(office, 10), Detail: strconv.Itoa(made) + " paket"})
-	http.Redirect(w, r, "/dms/checklists?flash="+url.QueryEscape(strconv.Itoa(made)+" paket standar dipasang"), http.StatusSeeOther)
+	wfMade := a.seedWorkflowTemplates(office)
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "checklist.seed", Entity: "office", EntityID: strconv.FormatInt(office, 10), Detail: strconv.Itoa(made) + " paket+" + strconv.Itoa(wfMade) + " alur"})
+	http.Redirect(w, r, "/dms/checklists?flash="+url.QueryEscape(strconv.Itoa(made)+" paket standar + "+strconv.Itoa(wfMade)+" template alur kerja dipasang"), http.StatusSeeOther)
 }
 
 func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {

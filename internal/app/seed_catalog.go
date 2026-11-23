@@ -168,6 +168,54 @@ func standardChecklistSeeds() []checklistSeed {
 
 type templateSeed struct{ name, cat, body string }
 
+// ---- workflow engine seeds (migrasi 027) ----
+
+type workflowStepSeed struct {
+	key, label, requiredRole string
+	requireChecklist        bool
+	requireEvidence         string
+	skippable               bool
+}
+
+type workflowSeed struct {
+	code, name string
+	steps      []workflowStepSeed
+}
+
+// standardWorkflowSeeds mengembalikan 3 template standar per layanan:
+// PT-DIRIAN (9 langkah), PPAT-AJB (7), KUASA (5). Murni tanpa DB.
+func standardWorkflowSeeds() []workflowSeed {
+	return []workflowSeed{
+		{"PT-DIRIAN", "Alur Pendirian PT", []workflowStepSeed{
+			{"Intake", "Penerimaan", "staff", false, "", false},
+			{"Pihak", "Data pihak", "staff", false, "", false},
+			{"Data", "Data perusahaan", "staff", false, "", false},
+			{"Syarat", "Kelengkapan syarat", "staff", true, "", false},
+			{"Draf", "Penyusunan draf", "staff", false, "", false},
+			{"Review", "Reviu notaris", "notary", false, "", false},
+			{"Sahkan", "Pengesahan", "notary", false, "", false},
+			{"Register", "Registrasi AHU", "staff", false, "", true},
+			{"Serah", "Penyerahan", "staff", false, "", false},
+		}},
+		{"PPAT-AJB", "Alur AJB", []workflowStepSeed{
+			{"Intake", "Penerimaan", "staff", false, "", false},
+			{"Pihak", "Para pihak", "staff", false, "", false},
+			{"Objek", "Verifikasi objek", "staff", true, "", false},
+			{"Resi", "Cek bersih & resi", "staff", true, "", false},
+			{"Akta", "Pembuatan akta", "notary", false, "", false},
+			{"Lapor", "Pelaporan BPN", "staff", false, "BPN_RECEIPT", false},
+			{"Serah", "Penyerahan", "staff", false, "", false},
+		}},
+		{"KUASA", "Alur Surat Kuasa", []workflowStepSeed{
+			{"Intake", "Penerimaan", "staff", false, "", false},
+			{"Pihak", "Para pihak", "staff", false, "", false},
+			{"Draf", "Penyusunan draf", "staff", false, "", false},
+			{"Sahkan", "Pengesahan", "notary", false, "", false},
+			{"Serah", "Penyerahan", "staff", false, "", false},
+		}},
+	}
+}
+
 // standardTemplateSeeds mengembalikan seluruh template KONSEP (DRAFT).
 // Template konsep tidak bisa dipakai membuat draf — notaris wajib review
 // & approve dulu. Fallback aman: tetap DRAFT.
