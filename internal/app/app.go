@@ -714,6 +714,7 @@ func (a *App) Router() http.Handler {
 		p.Get("/qr", a.qrText)
 		p.Get("/dms/archive/labels", a.dmsLabels)
 		p.Get("/audit", a.auditPage)
+		p.Get("/audit/export", a.auditExport)
 		p.Get("/office", a.officePage)
 		p.Post("/office", a.officeSave)
 		p.Get("/office/export", a.officeExport)
@@ -809,7 +810,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
-		Expires: sess.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie,
+		Expires: sess.ExpiresAt, MaxAge: 43200, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie,
 	})
 	uid := u.ID
 	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(u.ID, 10)})
@@ -820,7 +821,7 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(a.cfg.SessionName); err == nil {
 		a.sessions.Revoke(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -845,12 +846,16 @@ func (a *App) robotsTxt(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "User-agent: *")
 	fmt.Fprintln(w, "Allow: /")
 	fmt.Fprintln(w, "Allow: /layanan")
+	fmt.Fprintln(w, "Allow: /docs")
+	fmt.Fprintln(w, "Allow: /verify")
 	fmt.Fprintln(w, "Allow: /assets/")
 	fmt.Fprintln(w, "Disallow: /app")
 	fmt.Fprintln(w, "Disallow: /clients")
 	fmt.Fprintln(w, "Disallow: /requests")
 	fmt.Fprintln(w, "Disallow: /deeds")
 	fmt.Fprintln(w, "Disallow: /finance")
+	fmt.Fprintln(w, "Disallow: /portal")
+	fmt.Fprintln(w, "Disallow: /admin")
 	fmt.Fprintln(w, "Disallow: /settings")
 	fmt.Fprintln(w, "Disallow: /login")
 	fmt.Fprintln(w, "Sitemap: /sitemap.xml")
@@ -897,6 +902,8 @@ func (a *App) sitemapXML(w http.ResponseWriter, r *http.Request) {
 }
 
 // llmsTxt exposes a crawler- and LLM-friendly summary (GEO: factual, no hype).
+// The service list renders live from the services catalog (incl. PPAT + bundel)
+// so the count can never drift from the sitemap/PSEO pages.
 func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Write([]byte(`# SaktiNotaris
@@ -909,15 +916,38 @@ func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 - Permohonan layanan 9 status; akta draf berversi dari template terapproved;
   pengesahan notaris mengunci final + repertorium otomatis.
 - Register: repertorium, legalisasi/waarmerking/salinan/kutipan, protokol 25 tahun, wasiat terbatas.
+- PPAT: register akta tanah terpisah (AJB, hibah, tukar-menukar, APHB, inbreng, SKMHT, APHT) + lapor BPN.
+- Paket bundel: pendirian PT/CV + NIB/NPWP, AJB + balik nama (satu permohonan, syarat gabungan).
 - Keuangan: invoice multi-baris anti-overpay, pembayaran, piutang, pengeluaran, tarif.
 - Keamanan: bcrypt-12, sesi server-side, MFA TOTP, RBAC 9 peran/19 izin, NIK AES-256-GCM,
   audit imutabel, HSTS+CSP+CSRF+rate-limit.
 - Notaris & PPAT (bukan advokat). Tanpa API resmi AHU/OSS/BPN (asistensi manual + bukti).
 - Harga: konsultasi via penawaran resmi (tidak ada harga publik).
 
+## Layanan (katalog aktif — tiap baris = satu halaman /layanan/{kode lower-case}, sama dengan sitemap.xml)
+`))
+	if a.db != nil {
+		rows, _ := a.db.Query(`SELECT code, category, name FROM services WHERE is_active=1 ORDER BY category, code`)
+		if rows != nil {
+			defer rows.Close()
+			lastCat := ""
+			for rows.Next() {
+				var code, cat, name string
+				_ = rows.Scan(&code, &cat, &name)
+				if cat != lastCat {
+					lastCat = cat
+					fmt.Fprintf(w, "\n### %s\n", cat)
+				}
+				fmt.Fprintf(w, "- %s: %s (/layanan/%s)\n", code, name, strings.ToLower(code))
+			}
+		}
+	}
+	w.Write([]byte(`
 ## Halaman
 - / (landing) · /layanan (indeks) · /layanan/{kode} (detail per layanan, syarat + alur)
-- /docs (tutorial) · /docs/{langkah} (ktp-masuk, ocr-proses, review-verifikasi, dokumen-sah)
+- /docs (tutorial 8 langkah) · /docs/{langkah} (ktp-masuk, ocr-proses, review-verifikasi,
+  permohonan-layanan, akta-template, dokumen-sah, keuangan-invoice, portal-pantau)
+- /verify?code=... (verifikasi publik kuitansi/akta via kode HMAC)
 - Aplikasi butuh akun: /login (demo: admin@contoh.id — sandi demo di halaman login).
 `))
 }
@@ -979,8 +1009,13 @@ func (a *App) layananDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	base := "https://" + r.Host
+	if r.Host == "" || strings.HasPrefix(r.Host, "127.") || strings.HasPrefix(r.Host, "localhost") {
+		base = "https://notarius.example"
+	}
 	if err := a.tmpl.ExecuteTemplate(w, "layanan_detail", map[string]any{
 		"Code": code, "Name": name, "Category": category, "Price": price, "Reqs": reqs,
+		"Canon": base + "/layanan/" + strings.ToLower(code),
 	}); err != nil {
 		a.log.Error("render", "page", "layanan_detail", "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
@@ -1014,7 +1049,7 @@ func docSteps() []docStep {
 			"OCR tidak pernah auto-verify. Tanpa verifikasi manusia, data tidak boleh masuk akta.",
 			"Verifikasi identitas", "/clients"},
 		{"permohonan-layanan", "4. Permohonan & Workflow Layanan", "notarius-doc-permohonan.svg", "Buat permohonan layanan dan gerakkan status workflow",
-			"Pilih klien + katalog 35 layanan → buat permohonan → gerakkan 9 status hingga selesai.",
+			"Pilih klien + katalog 32 layanan → buat permohonan → gerakkan 9 status hingga selesai.",
 			[]string{"Buka /requests → pilih Klien + Layanan + judul → Buat", "Gerakkan status: DRAFT → SUBMITTED → IN_REVIEW → APPROVED → IN_PROGRESS → COMPLETED (transisi legal divalidasi)", "Untuk korporat: isi Data Korporat, Legal AHU/OSS checklist + bukti di tab yang sama; atur Janji/Reminder bila perlu"},
 			"Status tidak bisa loncat. Bukti AHU/OSS hanya checklist asistensi — bukan klaim pengajuan otomatis.",
 			"Buat permohonan", "/requests"},
@@ -1782,7 +1817,8 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if miss > 0 {
-				http.Error(w, fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi dulu di /requests/%d", miss, id), http.StatusBadRequest)
+				msg := fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi dulu di checklist bawah.", miss)
+				http.Redirect(w, r, "/requests/"+strconv.FormatInt(id, 10)+"?flash="+url.QueryEscape(msg)+"#checklist", http.StatusSeeOther)
 				return
 			}
 		}

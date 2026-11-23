@@ -118,9 +118,9 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	if seen == 0 && ever > 1 {
 		_, _ = a.db.Exec(`INSERT INTO notifications(user_id, title, body) VALUES(?,?,?)`, uid, "Login dari IP baru", "Akun Anda login dari "+lip+". Abaikan bila itu Anda.")
 	}
-	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName + "_mfa", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: a.cfg.TLSCookie})
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Value: sess.Token, Path: "/",
-		Expires: sess.ExpiresAt, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
+		Expires: sess.ExpiresAt, MaxAge: 43200, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
 	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
@@ -1656,6 +1656,40 @@ func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
 		out = append(out, e)
 	}
 	a.render(w, r, "audit", "Audit Log", out)
+}
+
+// auditExport downloads the last 1000 audit rows as CSV (same guard as auditPage).
+// Optional q filters server-side on action/entity/entity_id/actor.
+func (a *App) auditExport(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermAuditView) {
+		a.forbidden(w, r)
+		return
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	where := ""
+	var args []any
+	if q != "" {
+		where = ` WHERE a.action LIKE ? OR a.entity LIKE ? OR a.entity_id LIKE ? OR u.name LIKE ?`
+		like := "%" + q + "%"
+		args = append(args, like, like, like, like)
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"audit.csv\"")
+	w.Write([]byte("\xef\xbb\xbf"))
+	fmt.Fprintln(w, "waktu,aktor,aksi,entitas,id_entitas,detail")
+	rs, err := a.db.Query(`SELECT a.created_at, COALESCE(u.name,''), a.action, a.entity, COALESCE(a.entity_id,''), COALESCE(a.detail,'')
+		FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id`+where+` ORDER BY a.id DESC LIMIT 1000`, args...)
+	if err != nil {
+		return
+	}
+	defer rs.Close()
+	esc := func(s string) string { return strings.ReplaceAll(s, `"`, `""`) }
+	for rs.Next() {
+		var at, actor, action, entity, entityID, detail string
+		_ = rs.Scan(&at, &actor, &action, &entity, &entityID, &detail)
+		fmt.Fprintf(w, "%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+			at, esc(actor), esc(action), esc(entity), esc(entityID), esc(detail))
+	}
 }
 
 // ---- office profile ----

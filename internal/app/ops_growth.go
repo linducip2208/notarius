@@ -294,6 +294,10 @@ func (a *App) inquiryToRequest(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if status != "BARU" {
+		http.Error(w, "inquiry sudah diproses/dikonversi (status "+status+") — ubah status ke BARU dulu bila yakin ingin membuat permohonan lagi", http.StatusConflict)
+		return
+	}
 	svcID, _ := strconv.ParseInt(r.FormValue("service_id"), 10, 64)
 	if svcID <= 0 {
 		_ = a.db.QueryRow(`SELECT id FROM services WHERE is_active=1 ORDER BY id LIMIT 1`).Scan(&svcID)
@@ -321,7 +325,7 @@ func (a *App) inquiryToRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_, _ = a.db.Exec(`UPDATE website_inquiries SET status='DIPROSES' WHERE id=?`, id)
+	_, _ = a.db.Exec(`UPDATE website_inquiries SET status='DIPROSES' WHERE id=? AND office_id=?`, id, a.officeOf(r))
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "inquiry.convert", Entity: "inquiry", EntityID: strconv.FormatInt(id, 10), Detail: fmt.Sprintf("client#%d request#%d", cid, rid)})
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(rid, 10)+"?flash=Permohonan+dari+konsultasi+dibuat", http.StatusSeeOther)
 }

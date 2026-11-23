@@ -7,6 +7,7 @@
 6. `cp deploy/nginx/notaryos.conf /etc/nginx/sites-enabled/`; `certbot --nginx` untuk TLS; set `COOKIE_SECURE=true`.
 7. Health: `/healthz` (liveness), `/readyz` (DB). Log: journald JSON (slog).
 8. Backup: cron `deploy/backup/backup.sh` (full-dump mysqldump seluruh DB incl. ppat_register, office_flags, doc_checklist_*, ai_results; GPG via `GPG_RECIPIENT`, honours DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME dari `/etc/notaryos/env`); uji restore tiap bulan (`restore.sh`).
+   Prasyarat GPG: impor public key penerima di mesin backup (`gpg --import pubkey.asc`) SEBELUM cron pertama — tanpa ini backup gagal di tahap enkripsi. Target drill yang valid dengan kredensial app adalah `notaryos_restore` (sesuai grant).
    Urutan restore aman: stop app → backup DB berjalan → `restore.sh <file> [db_restore]` (skrip buat DB target + verifikasi count tabel & schema_migrations otomatis) → promote (repoint app/rename DB) → start app → cek `/readyz` 200.
    8a. Backup BERKAS (wajib — `backup.sh` hanya DB; KTP/minuta/bukti ada di storage):
        Mode storage (`internal/storage/s3.go` `FromEnv`): lokal bila `NOTARYOS_S3_ENDPOINT` kosong

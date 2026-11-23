@@ -23,7 +23,7 @@
 <dt class="col-4">Status</dt><dd class="col-8"><span class="badge bg-blue-lt">{{.Data.Deed.Status}}</span></dd>
 <dt class="col-4">Versi</dt><dd class="col-8">{{.Data.Deed.Version}} · terkunci={{.Data.Deed.Locked}}</dd>
 </dl>
-<div class="p-3 bg-white border rounded" style="min-height:120px" id="deedview">{{safeHTML .Data.Body}}</div>
+<div class="p-3 bg-white border rounded" style="min-height:120px;max-width:100%;overflow:auto;overflow-wrap:break-word" id="deedview">{{safeHTML .Data.Body}}</div>
 {{if .Data.Seal}}<div class="alert alert-success mt-2 mb-0 small">Segel verifikasi: <code>{{.Data.Seal}}</code> · cek di <a href="/verify?code={{.Data.Seal}}">/verify</a><br/><span class="text-secondary">TTE internal (hash tersertifikasi sistem, bukan PSrE). Berlaku sebagai segel integritas naskah + identitas penandatangan tercatat.</span></div>{{end}}
 <div class="d-flex gap-2 mt-3">
 <form method="post" action="/tasks" class="d-inline">{{template "csrf" .}}<input type="hidden" name="title" value="Tindaklanjuti draft: {{.Data.Deed.Title}}"/><input type="hidden" name="ref_type" value="deed"/><input type="hidden" name="ref_id" value="{{.Data.Deed.ID}}"/><button class="btn btn-outline-warning" type="submit" title="Buat tugas Todo tertaut ke draft ini — bisa preview & edit dari /tasks">+ Todo</button></form>
@@ -66,7 +66,7 @@ window.insertClause=insertClause;
 {{if .Data.Clauses}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Pustaka Klausul — klik untuk menyisipkan</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Clauses}}<div class="list-group-item"><strong>{{.Title}}</strong> <span class="text-secondary small">{{.Tags}}</span><textarea id="clause-{{.ID}}" class="d-none">{{.Body}}</textarea><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:100px;overflow:auto">{{.Body}}</pre><button class="btn btn-sm btn-outline-primary" type="button" onclick="insertClause('clause-{{.ID}}')">Sisipkan ↓</button></div>{{end}}</div></div>{{end}}
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Informasi Akta</h3></div>
-<div class="card-body p-0"><table class="table mb-0"><tbody>
+<div class="card-body p-0 table-responsive"><table class="table mb-0"><tbody>
 <tr><td class="text-secondary">Nomor</td><td><strong>{{.Data.Deed.Number}}</strong></td></tr>
 <tr><td class="text-secondary">Status</td><td><span class="badge bg-blue-lt">{{.Data.Deed.Status}}</span></td></tr>
 <tr><td class="text-secondary">Versi</td><td>v{{.Data.Deed.Version}} {{if .Data.Deed.Locked}}🔒 terkunci{{end}}</td></tr>
@@ -105,7 +105,7 @@ window.insertClause=insertClause;
 {{template "page_close" .}}{{end}}
 
 {{define "audit"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card"><div class="card-header"><h3 class="card-title">Audit Log (imutabel)</h3><span class="text-secondary small ms-2" id="audit-count"></span></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Audit Log (imutabel)</h3><span class="text-secondary small ms-2" id="audit-count"></span><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/audit/export">Ekspor CSV</a></div></div>
 <div class="card-body d-flex gap-2 flex-wrap"><input class="form-control" id="audit-q" placeholder="Saring: ketik aksi / entitas… (cth. login, deed)" style="max-width:320px" aria-label="Saring audit"/><select class="form-select" id="audit-limit" style="max-width:140px" aria-label="Batas tampil"><option value="20">20 baris</option><option value="50">50 baris</option><option value="100" selected>100 baris</option><option value="0">Semua</option></select><span class="text-secondary small align-self-center">Filter lokal (tanpa reload) — cocokkan kolom Aksi/Entitas/ID Entitas.</span></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Aktor</th><th>Aksi</th><th>Entitas</th><th>ID Entitas</th><th>Waktu</th></tr></thead>
 <tbody id="audit-rows">{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Actor}}</td><td>{{.Action}}</td><td>{{.Entity}}</td><td>{{.EntityID}}</td><td>{{.At}}</td></tr>

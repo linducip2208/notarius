@@ -38,11 +38,13 @@
 <title>{{.Name}} — Syarat, Alur & Penawaran | SaktiNotaris</title>
 <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>
 <meta name="description" content="{{.Name}} ({{.Code}}): persyaratan dokumen, tahapan notaris, dan cara meminta penawaran resmi via SaktiNotaris."/>
-<link rel="canonical" href="/layanan/{{.Code | lower}}"/>
+<link rel="canonical" href="{{.Canon}}"/>
+<meta property="og:url" content="{{.Canon}}"/>
+<meta property="og:type" content="website"/>
 <meta property="og:title" content="{{.Name}} — SaktiNotaris"/>
 <meta property="og:description" content="Syarat dokumen, tahapan, dan penawaran resmi {{.Name}}."/>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"{{.Name}}","serviceType":"Layanan Notaris Indonesia","provider":{"@type":"Organization","name":"SaktiNotaris"},"areaServed":"ID"}}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Apa saja syarat {{.Name}}?","acceptedAnswer":{"@type":"Answer","text":"{{range .Reqs}}{{.}}; {{end}}"}},{"@type":"Question","name":"Bagaimana alurnya di SaktiNotaris?","acceptedAnswer":{"@type":"Answer","text":"Permohonan dicatat, persyaratan diperiksa, draf dibuat dari template terapproved, direview, disahkan notaris, lalu diregister dan diarsip."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Apa saja syarat {{.Name}}?","acceptedAnswer":{"@type":"Answer","text":"{{range .Reqs}}{{.}}; {{end}}{{if not .Reqs}}Hubungi kantor untuk daftar persyaratan layanan ini.{{end}}"}},{"@type":"Question","name":"Bagaimana alurnya di SaktiNotaris?","acceptedAnswer":{"@type":"Answer","text":"Permohonan dicatat, persyaratan diperiksa, draf dibuat dari template terapproved, direview, disahkan notaris, lalu diregister dan diarsip."}}]}</script>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 </head>
 <body>

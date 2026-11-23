@@ -366,7 +366,7 @@ func (a *App) officeAct(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	if v := r.FormValue("office_id"); v == "" {
-		http.SetCookie(w, &http.Cookie{Name: a.actingCookieName(), Path: "/", MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{Name: a.actingCookieName(), Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: a.cfg.TLSCookie})
 		http.Redirect(w, r, "/offices?flash=Kembali+ke+kantor+sendiri", http.StatusSeeOther)
 		return
 	} else {
