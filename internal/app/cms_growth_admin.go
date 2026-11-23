@@ -228,7 +228,7 @@ func (a *App) cmsBookingDecide(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		_, _ = a.db.Exec(`UPDATE website_bookings SET status='DISETUJUI', appointment_id=? WHERE id=?`, apptID, id)
+		_, _ = a.db.Exec(`UPDATE website_bookings SET status='DISETUJUI', appointment_id=? WHERE id=? AND office_id=?`, apptID, id, a.officeOf(r))
 		// Tugas persiapan office-scoped agar kunjungan tidak menggantung (best-effort:
 		// kegagalan insert tidak menggagalkan approval; tanpa ubah skema/status flow).
 		need := strings.TrimSpace(bpurpose)
@@ -240,7 +240,7 @@ func (a *App) cmsBookingDecide(w http.ResponseWriter, r *http.Request) {
 			a.officeOf(r), taskTitle, bdate, a.uid(r))
 		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "cms.booking.approve", Entity: "booking", EntityID: strconv.FormatInt(id, 10), Detail: fmt.Sprintf("appt#%d", apptID)})
 	} else {
-		_, _ = a.db.Exec(`UPDATE website_bookings SET status=? WHERE id=?`, to, id)
+		_, _ = a.db.Exec(`UPDATE website_bookings SET status=? WHERE id=? AND office_id=?`, to, id, a.officeOf(r))
 		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "cms.booking.decide", Entity: "booking", EntityID: strconv.FormatInt(id, 10), Detail: to})
 	}
 	http.Redirect(w, r, "/cms/bookings?flash=Booking+"+to, http.StatusSeeOther)

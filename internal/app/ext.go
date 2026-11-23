@@ -1500,7 +1500,7 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 	var pr props
 	_ = a.db.QueryRow(`SELECT d.created_at, COALESCE(u.name,''), COALESCE(a.name,''), COALESCE(d.approved_at,''), COALESCE(d.content_hash,''), COALESCE(t.name,'')
 		FROM deed_drafts d LEFT JOIN users u ON u.id=d.created_by LEFT JOIN users a ON a.id=d.approved_by
-		LEFT JOIN doc_templates t ON t.id=d.template_id WHERE d.id=?`, id).
+		LEFT JOIN doc_templates t ON t.id=d.template_id WHERE d.id=? AND d.office_id=?`, id, a.officeOf(r)).
 		Scan(&pr.Created, &pr.Creator, &pr.ApprovedBy, &pr.ApprovedAt, &pr.Hash, &pr.Template)
 	// Komparasi: vN vs vN-1 dari riwayat tersimpan; draf berjalan = versi terbaru.
 	// v1 draf lama mungkin tak tersimpan (dibuat sebelum snapshot otomatis) → tulis jujur.
@@ -1529,9 +1529,9 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 	// 3-way: template sebagai kolom ketiga (isi mentah bervariabel — pembanding struktur).
 	var tplBody string
 	var tplID sql.NullInt64
-	_ = a.db.QueryRow(`SELECT template_id FROM deed_drafts WHERE id=?`, id).Scan(&tplID)
+	_ = a.db.QueryRow(`SELECT template_id FROM deed_drafts WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&tplID)
 	if tplID.Valid {
-		_ = a.db.QueryRow(`SELECT body FROM doc_templates WHERE id=?`, tplID.Int64).Scan(&tplBody)
+		_ = a.db.QueryRow(`SELECT body FROM doc_templates WHERE id=? AND office_id=?`, tplID.Int64, a.officeOf(r)).Scan(&tplBody)
 	}
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
@@ -1540,7 +1540,7 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
-		"Timeline": a.deedTimeline(id),
+		"Timeline": a.deedTimeline(a.officeOf(r), id),
 		"Attached": a.deedFiles(a.officeOf(r), id),
 		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
 	})
@@ -1561,12 +1561,14 @@ func (a *App) deedFiles(officeID, deedID int64) []map[string]any {
 }
 
 // deedTimeline unions versions, approval, and TTE signatures chronologically.
-func (a *App) deedTimeline(deedID int64) []map[string]any {
+// officeID scopes every sub-query so a deed id from another office yields nothing.
+func (a *App) deedTimeline(officeID, deedID int64) []map[string]any {
 	type ev struct {
 		at, kind, text string
 	}
 	var evs []ev
-	rows, err := a.db.Query(`SELECT version, note, created_at FROM deed_versions WHERE deed_id=? ORDER BY id`, deedID)
+	rows, err := a.db.Query(`SELECT v.version, v.note, v.created_at FROM deed_versions v
+		JOIN deed_drafts d ON d.id=v.deed_id WHERE v.deed_id=? AND d.office_id=? ORDER BY v.id`, deedID, officeID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1578,12 +1580,12 @@ func (a *App) deedTimeline(deedID int64) []map[string]any {
 	}
 	var approvedBy, approvedAt, number string
 	_ = a.db.QueryRow(`SELECT COALESCE(u.name,''), COALESCE(d.approved_at,''), COALESCE(d.number,'')
-		FROM deed_drafts d LEFT JOIN users u ON u.id=d.approved_by WHERE d.id=?`, deedID).
+		FROM deed_drafts d LEFT JOIN users u ON u.id=d.approved_by WHERE d.id=? AND d.office_id=?`, deedID, officeID).
 		Scan(&approvedBy, &approvedAt, &number)
 	if approvedAt != "" {
 		evs = append(evs, ev{approvedAt, "Pengesahan", "No. " + number + " oleh " + approvedBy})
 	}
-	srows, _ := a.db.Query(`SELECT signer_name, created_at FROM deed_signatures WHERE deed_id=? ORDER BY id`, deedID)
+	srows, _ := a.db.Query(`SELECT signer_name, created_at FROM deed_signatures WHERE deed_id=? AND office_id=? ORDER BY id`, deedID, officeID)
 	if srows != nil {
 		defer srows.Close()
 		for srows.Next() {
@@ -1634,7 +1636,8 @@ func (a *App) auditPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := a.db.Query(`SELECT a.id, u.name, a.action, a.entity, a.entity_id, a.created_at
 		FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id
-		ORDER BY a.id DESC LIMIT 200`)
+		WHERE (u.office_id=? OR a.actor_id IS NULL)
+		ORDER BY a.id DESC LIMIT 200`, a.officeOf(r))
 	if err != nil {
 		http.Error(w, "gagal memuat audit", http.StatusInternalServerError)
 		return
@@ -1666,10 +1669,10 @@ func (a *App) auditExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	where := ""
-	var args []any
+	where := ` WHERE (u.office_id=? OR a.actor_id IS NULL)`
+	args := []any{a.officeOf(r)}
 	if q != "" {
-		where = ` WHERE a.action LIKE ? OR a.entity LIKE ? OR a.entity_id LIKE ? OR u.name LIKE ?`
+		where += ` AND (a.action LIKE ? OR a.entity LIKE ? OR a.entity_id LIKE ? OR u.name LIKE ?)`
 		like := "%" + q + "%"
 		args = append(args, like, like, like, like)
 	}
@@ -1698,13 +1701,47 @@ func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
 	var name, notary, sk, addr, phone, email, plan string
 	_ = a.db.QueryRow(`SELECT o.name, o.notary_name, o.sk_number, o.address, o.phone, o.email, o.plan
 		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email, &plan)
+	officeID := a.officeOf(r)
 	var strictInt int
-	_ = a.db.QueryRow(`SELECT strict_checklist FROM office_flags WHERE office_id=?`, a.officeOf(r)).Scan(&strictInt)
+	_ = a.db.QueryRow(`SELECT strict_checklist FROM office_flags WHERE office_id=?`, officeID).Scan(&strictInt)
 	var slaJSON sql.NullString
-	_ = a.db.QueryRow(`SELECT sla_days_json FROM office_flags WHERE office_id=?`, a.officeOf(r)).Scan(&slaJSON)
+	_ = a.db.QueryRow(`SELECT sla_days_json FROM office_flags WHERE office_id=?`, officeID).Scan(&slaJSON)
+	// Kartu aktivasi kantor (Go-Live): 5 langkah office-scoped, fail-open 0
+	// bila tabel belum termigrasi agar halaman profil tidak pernah rusak.
+	countOf := func(q string, args ...any) int {
+		var n int
+		if err := a.db.QueryRow(q, args...).Scan(&n); err != nil {
+			return 0
+		}
+		return n
+	}
+	checklistN := countOf(`SELECT COUNT(*) FROM doc_checklist_templates WHERE office_id=?`, officeID)
+	docTplN := countOf(`SELECT COUNT(*) FROM doc_templates WHERE office_id=?`, officeID)
+	docApprN := countOf(`SELECT COUNT(*) FROM doc_templates WHERE office_id=? AND approved=1`, officeID)
+	invN := countOf(`SELECT COUNT(*) FROM invoices WHERE office_id=?`, officeID)
+	reqN := countOf(`SELECT COUNT(*) FROM service_requests WHERE office_id=?`, officeID)
+	flagN := countOf(`SELECT COUNT(*) FROM office_flags WHERE office_id=?`, officeID)
+	hasChecklist := checklistN > 0
+	hasDocTpl := docTplN > 0
+	hasDocAppr := docApprN > 0
+	templatesOK := hasDocTpl && hasDocAppr
+	hasTrial := invN > 0 || reqN > 0
+	hasRequest := reqN > 0
+	strictKnown := flagN > 0
+	done := 0
+	for _, ok := range []bool{hasChecklist, templatesOK, hasTrial, hasRequest, strictKnown} {
+		if ok {
+			done++
+		}
+	}
+	activation := map[string]any{
+		"Checklist": hasChecklist, "DocTemplate": hasDocTpl, "DocApproved": hasDocAppr,
+		"TemplatesOK": templatesOK, "Trial": hasTrial, "HasRequest": hasRequest,
+		"StrictKnown": strictKnown, "Done": done, "Total": 5,
+	}
 	a.render(w, r, "office", "Profil Kantor", map[string]any{
 		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email, "Plan": plan,
-		"Strict": strictInt == 1, "SLAJSON": slaJSON.String,
+		"Strict": strictInt == 1, "SLAJSON": slaJSON.String, "Activation": activation,
 	})
 }
 

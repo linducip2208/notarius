@@ -1252,7 +1252,9 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	if a.db != nil {
 		canWill := willReader(mw.RoleOf(r))
 		rows, _ := a.db.Query(`SELECT a.action, COALESCE(u.name,'sistem'), a.created_at, a.entity, a.entity_id
-			FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 10`)
+			FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id
+			WHERE (u.office_id=? OR a.actor_id IS NULL)
+			ORDER BY a.id DESC LIMIT 10`, office)
 		if rows != nil {
 			defer rows.Close()
 			link := map[string]string{"client": "/clients/", "service_request": "/requests/", "deed": "/deeds/", "invoice": "/finance", "will": "/wills", "gov_submission": "/gov"}
@@ -1710,7 +1712,7 @@ func (a *App) requestList(w http.ResponseWriter, r *http.Request) {
 			clientName = c.FullName
 		}
 	}
-	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "NotarySvcs": notarySvcs, "PpatSvcs": ppatSvcs, "Clients": cl, "ClientName": clientName})
+	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "NotarySvcs": notarySvcs, "PpatSvcs": ppatSvcs, "Clients": cl, "ClientName": clientName, "St": r.URL.Query().Get("status"), "ClientID": clientID})
 }
 
 func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
@@ -1859,8 +1861,20 @@ func (a *App) deedList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, _ := a.deeds.List(a.officeOf(r), r.URL.Query().Get("status"))
+	// Filter kind di Go (tanpa ubah signature Store.List): cocokkan persis
+	// dengan nilai ENUM kind agar aman dari injeksi (perbandingan string Go).
+	kind := r.URL.Query().Get("kind")
+	if kind != "" {
+		kept := list[:0]
+		for _, d := range list {
+			if d.Kind == kind {
+				kept = append(kept, d)
+			}
+		}
+		list = kept
+	}
 	tpls, _ := a.tpl.List(a.officeOf(r))
-	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls, "St": r.URL.Query().Get("status")})
+	a.render(w, r, "deeds", "Akta", map[string]any{"Deeds": list, "Templates": tpls, "St": r.URL.Query().Get("status"), "Kind": kind})
 }
 
 func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
@@ -2449,10 +2463,14 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 	// karena skema invoices tidak memiliki kolom jenis/catatan — tanpa migrasi.
 	type invView struct {
 		finance.Invoice
-		Kind string
-		Pct  int
+		Kind        string
+		Pct         int
+		Overdue     bool
+		OverdueDays int
 	}
 	views := make([]invView, 0, len(invs))
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, iv := range invs {
 		v := invView{Invoice: iv}
 		if iv.Total > 0 && iv.Paid >= 0 {
@@ -2467,7 +2485,7 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 		}
 		if a.db != nil {
 			var first string
-			if err := a.db.QueryRow(`SELECT description FROM invoice_lines WHERE invoice_id=? ORDER BY id LIMIT 1`, iv.ID).Scan(&first); err == nil {
+			if err := a.db.QueryRow(`SELECT l.description FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE l.invoice_id=? AND i.office_id=? ORDER BY l.id LIMIT 1`, iv.ID, a.officeOf(r)).Scan(&first); err == nil {
 				switch {
 				case strings.HasPrefix(first, "[DP]"):
 					v.Kind = "DP"
@@ -2478,6 +2496,34 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 		}
 		views = append(views, v)
 	}
+	// Flag jatuh tempo: today > due_date dan outstanding > 0.
+	// DueDate dari kolom DATE (diparse 10 char pertama agar toleran format driver).
+	for i := range views {
+		dueStr := strings.TrimSpace(views[i].DueDate)
+		if len(dueStr) < 10 || views[i].Outstanding <= 0 {
+			continue
+		}
+		if due, err := time.Parse("2006-01-02", dueStr[:10]); err == nil {
+			dueLocal := time.Date(due.Year(), due.Month(), due.Day(), 0, 0, 0, 0, now.Location())
+			if days := int(today.Sub(dueLocal).Hours() / 24); days > 0 {
+				views[i].Overdue = true
+				views[i].OverdueDays = days
+			}
+		}
+	}
+	// Overdue di atas (partisi stabil, tanpa mengubah ORDER BY store).
+	ordered := make([]invView, 0, len(views))
+	for _, v := range views {
+		if v.Overdue {
+			ordered = append(ordered, v)
+		}
+	}
+	for _, v := range views {
+		if !v.Overdue {
+			ordered = append(ordered, v)
+		}
+	}
+	views = ordered
 	a.render(w, r, "finance", "Keuangan", map[string]any{
 		"Invoices": views, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID, "Suggest": suggestVal,
 	})

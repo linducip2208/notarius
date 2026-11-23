@@ -1,3 +1,15 @@
+# RELEASE_NOTES — v0.4.5 (2026-11-23) — TIMER PENGINGAT + CETAK RAPI + MFA WARNING
+Ringkasan: pengingat otomatis harian 07:00 WIB (systemd timer+service via skrip login-CSRF localhost, akun layanan office_admin tanpa MFA, idempoten dengan ticker + tombol manual), CSS print global + .no-print (akta, kuitansi, docs, blanko PPAT), banner MFA untuk peran berhak wasiat yang belum enroll, cookie flags konsisten (MaxAge + HttpOnly + SameSite + Secure), drill backup DB+files lolos, audit SEO/responsif, sweep TODO.
+Go-Live: seperti v0.4.4 + pasang timer pengingat (langkah 10 docs/DEPLOYMENT_GUIDE.md: akun layanan, /etc/notaryos/reminder.env 0600, enable timer, verifikasi journalctl + /audit memuat reminders.run). Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
+# RELEASE_NOTES — v0.4.4 (2026-11-23) — SEO DINAMIS + RESPONSIF + AUDIT CSV + STRICT UX FLASH
+Ringkasan: SEO dinamis (robots + llms.txt live dari katalog, canonical/og absolut, FAQ fallback), responsif 5 halaman (table-responsive, flex-wrap, grid BO, deedview anti-luber), audit CSV (/audit/export + tombol Ekspor, guard PermAuditView), strict UX flash (mode ketat redirect ke #checklist, inquiry guard 409 + scope kantor), cookie flags konsisten, backup DB --no-tablespaces; infra rilis dipakai ulang (SLA override + papan + widget, booking → tugas, wasiat hardening, mapping 35 kode, migrasi 025, S3 env fix, backup berkas, USER_MANUAL + panduan uji).
+Go-Live: backup DB + backup BERKAS → deploy biner → restart (migrasi otomatis incl. 025) → cek schema_migrations + SHOW INDEX → ⚡ Pasang Standar di /dms/checklists → ⚡ Pasang 8 Konsep di /templates → Approve template → uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.4.2 (2026-11-24) — PENGERASAN + SLA + WASIAT + INFRA RILIS
 Ringkasan: di atas 0.4.0 (tanpa ubah skema bisnis): mapping 35 kode layanan + test (case-insensitive + alias lama + 3 bundel), dashboard + laporan (top 5, rekap kategori, papan SLA + override JSON per kantor), wasiat hardening (gate deed/portal/sidebar, wizard wasiat), booking → tugas persiapan otomatis, WA reminder H-1 (bila gateway ada), PII masking + rate-limit upload/OCR, migrasi 025 indeks (MySQL-8 safe, idempoten), S3 env fix, backup berkas, repair kategori PPAT, USER_MANUAL baru + panduan uji + template konsep + kesiapan jual.
 Go-Live: backup DB + backup BERKAS → deploy biner → restart (migrasi otomatis incl. 025) → cek schema_migrations + SHOW INDEX → ⚡ Pasang Standar di /dms/checklists → ⚡ Pasang 8 Konsep di /templates → Approve template → uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

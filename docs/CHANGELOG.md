@@ -1,4 +1,17 @@
 # CHANGELOG
+## [0.4.5] — 2026-11-23 — Timer pengingat + cetak rapi + MFA warning + cookie flags
+- Pengingat otomatis: systemd timer+service harian 07:00 WIB via deploy/reminder/run-reminder.sh (login-CSRF localhost, tolak BASE non-localhost, kredensial di /etc/notaryos/reminder.env 0600, akun layanan office_admin tanpa MFA); idempoten berdampingan dengan ticker in-process + tombol manual; panduan langkah 10 baru di docs/DEPLOYMENT_GUIDE.md.
+- Cetak rapi: CSS print global di partials (sembunyikan sidebar/form/tombol, anti-putus baris, margin 12mm) + .no-print di revisi/riwayat akta, breadcrumb kuitansi, halaman docs HowTo, dan konsep blanko PPAT.
+- MFA warning: banner dashboard + halaman /mfa untuk peran berhak wasiat (notary/super_admin/substitute_notary/auditor) yang belum enroll TOTP (peringatan saja, tanpa blokir login); halaman MFA tampilkan status Enabled.
+- Cookie flags: MaxAge 43200 sesi login/MFA konsisten + HttpOnly + SameSite + Secure di logout, cookie MFA, dan acting-office cookie.
+- Drill backup DB+files lolos; audit SEO/responsif; sweep TODO (docs/dms/API_AND_ROUTES.md, docs/integration/CONTINUATION_STATE.md).
+## [0.4.4] — 2026-11-23 — SEO dinamis + responsif + audit CSV + strict UX flash + cookie flags
+- SEO dinamis: robots (Allow /docs /verify, Disallow /portal /admin) + llms.txt live dari katalog services (tak bisa drift dari sitemap/PSEO); canonical + og:url absolut (fallback notarius.example untuk localhost); FAQ JSON-LD fallback bila syarat kosong.
+- Responsif 5 halaman: table-responsive info akta, flex-wrap form ubah-status/invoice, grid col-md form BO, deedview overflow anti-luber.
+- Audit CSV: GET /audit/export (guard PermAuditView, filter q opsional, BOM + 1000 baris) + tombol Ekspor CSV di halaman audit.
+- Strict UX flash: mode ketat checklist gagal → redirect 303 ke #checklist dengan flash (bukan 400 teks); inquiry→permohonan tolak 409 bila status bukan BARU + scope office_id saat update DIPROSES.
+- Keamanan: cookie sesi MaxAge 43200 + flags konsisten di logout/MFA/acting-office; backup DB tambah --no-tablespaces.
+- Infra rilis (dipakai ulang dari v0.4.3/v0.4.2): SLA override JSON per kantor + papan SLA + widget 5 permohonan mendesak; booking DISETUJUI → tugas persiapan otomatis; wasiat hardening (gate deed/portal/sidebar/feed); mapping 35 kode layanan + test; migrasi 025 indeks (MySQL-8 safe, idempoten); S3 env fix (kanonis NOTARYOS_S3_* menang); backup BERKAS backup_files.sh; USER_MANUAL + panduan uji.
 ## [0.4.2] — 2026-11-24 — Pengerasan + SLA + wasiat + infra rilis (di atas 0.4.0, tanpa ubah skema bisnis)
 - Layanan & Katalog: mapping 35 kode layanan + test (deedTemplateKeyword/serviceDeedKind/corpEntityOf case-insensitive + trim, alias lama PT-PERUBAHAN/YAYASAN-PENDIRIAN/WASIAT-UMUM, 3 bundel BUNDEL-PT-OSS/CV-NIB/AJB-BALIKNAMA); repair kategori PPAT; papan kesiapan jual per layanan + template konsep (dari v0.4.1, dipakai ulang).
 - OCR & DMS: tanpa ubah OCR enterprise 0.4.0 (dipakai ulang); DMS + widget dokumen overdue top-5 di dashboard (OverdueDocs, best-effort, gagal query = widget disembunyikan).

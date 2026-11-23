@@ -379,7 +379,7 @@ func (a *App) dmsUsedIn(officeID, fileID int64, canWill bool) []map[string]any {
 		}
 	}
 	// 4) Spesimen klien memakai berkas ini.
-	if rows, err := a.db.Query(`SELECT client_id FROM client_specimens WHERE file_id=? LIMIT 20`, fileID); err == nil {
+	if rows, err := a.db.Query(`SELECT client_id FROM client_specimens WHERE file_id=? AND office_id=? LIMIT 20`, fileID, officeID); err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var cid int64
