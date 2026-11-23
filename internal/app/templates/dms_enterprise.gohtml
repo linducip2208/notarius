@@ -1,7 +1,7 @@
 {{define "dms_fields"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Field Kustom</li></ol></nav>
 <p class="text-secondary">Skema metadata per kantor. Tipe tervalidasi server; nilai wajib dicek saat isi.</p>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Field baru</h3></div>
+<div class="card mb-3" id="field-baru"><div class="card-header"><h3 class="card-title">Field baru</h3></div>
 <form method="post" action="/dms/fields"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-4 mb-2"><input class="form-control" name="name" placeholder="Nama field" required/></div>
 <div class="col-md-2 mb-2"><select class="form-select" name="ftype"><option value="text">Teks</option><option value="number">Angka</option><option value="date">Tanggal</option><option value="select">Pilihan</option><option value="bool">Ya/Tidak</option></select></div>
@@ -12,7 +12,7 @@
 </div></form></div>
 <div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Tipe</th><th>Opsi</th><th>Wajib</th><th>Urut</th></tr></thead>
 <tbody>{{range .Data.Fields}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td><span class="badge bg-azure-lt">{{.Type}}</span></td><td>{{.Options}}</td><td>{{.Required}}</td><td>{{.Position}}</td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada field kustom.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada field kustom. <a class="btn btn-sm btn-primary ms-2" href="#field-baru">Buat field pertama ↑</a></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "dms_compare"}}{{template "head" .}}{{template "page_open" .}}
@@ -32,8 +32,8 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Rantai Persetujuan</li></ol></nav>
 <p class="text-secondary">Urutan peran yang harus menyetujui sebelum berkas bisa FINAL/APPROVED. Kosong = tanpa gate.</p>
 <div class="card"><div class="card-header"><h3 class="card-title">Rantai aktif</h3></div>
-<div class="card-body">{{range .Data.Chain}}<div class="mb-1">Langkah {{.Order}}: <span class="badge bg-blue-lt">{{.Role}}</span></div>{{else}}<p class="text-secondary">Belum ada rantai — semua pengguna staf dapat memindahkan workflow.</p>{{end}}</div>
-<form method="post" action="/dms/chain"><div class="card-body border-top row">{{template "csrf" .}}
+<div class="card-body">{{range .Data.Chain}}<div class="mb-1">Langkah {{.Order}}: <span class="badge bg-blue-lt">{{.Role}}</span></div>{{else}}<p class="text-secondary">Belum ada rantai — semua pengguna staf dapat memindahkan workflow. <a href="#rantai-baru">Atur rantai ↓</a></p>{{end}}</div>
+<form method="post" action="/dms/chain" id="rantai-baru"><div class="card-body border-top row">{{template "csrf" .}}
 <div class="col-md-2 mb-2"><label class="form-label">Langkah 1</label><select class="form-select" name="role1"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
 <div class="col-md-2 mb-2"><label class="form-label">Langkah 2</label><select class="form-select" name="role2"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>
 <div class="col-md-2 mb-2"><label class="form-label">Langkah 3</label><select class="form-select" name="role3"><option value="">— kosong —</option><option>staff</option><option>doc_operator</option><option>finance</option><option>notary</option><option>substitute_notary</option><option>office_admin</option><option>auditor</option></select></div>

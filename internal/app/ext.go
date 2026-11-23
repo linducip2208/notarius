@@ -2288,6 +2288,9 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	_ = r.ParseForm()
 	if r.FormValue("title") == "" {
 		http.Error(w, "judul tugas wajib diisi", http.StatusBadRequest)
@@ -2327,6 +2330,9 @@ func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) taskDone(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var title, rec, due string
