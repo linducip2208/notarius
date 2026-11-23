@@ -265,7 +265,7 @@
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru (satu baris = satu item)</h3></div>
 <form method="post" action="/dms/checklists"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="service_code"><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</select></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="name" placeholder="Nama template" required/></div>
+<div class="col-md-3 mb-2"><label class="form-label" for="f_cl_name">Nama template</label><input class="form-control" id="f_cl_name" name="name" placeholder="Nama template" required/></div>
 <div class="col-md-4 mb-2"><textarea class="form-control" name="items" rows="2" placeholder="KTP pendiri&#10;NPWP&#10;Susunan direksi"></textarea></div>
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
 </div></form></div>

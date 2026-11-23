@@ -10,7 +10,7 @@
 <div class="col-12"><div id="svc_req" class="alert alert-info py-2 mb-2 d-none"></div></div>
 <div class="col-12 d-none" id="p_corp"><div class="card bg-light mb-2"><div class="card-body row py-2">
 <div class="col-12 small text-secondary mb-1"><strong>Data badan usaha</strong> (langsung tersimpan ke perusahaan)</div>
-<div class="col-md-4 mb-2"><input class="form-control" name="x_coname" placeholder="Nama badan usaha"/></div>
+<div class="col-md-4 mb-2"><label class="form-label" for="f_coname">Nama badan usaha</label><input class="form-control" id="f_coname" name="x_coname" placeholder="Nama badan usaha"/></div>
 <div class="col-md-2 mb-2"><input class="form-control" name="x_cocity" placeholder="Kedudukan/kota"/></div>
 <div class="col-md-3 mb-2"><input class="form-control" name="x_coaddr" placeholder="Alamat"/></div>
 <div class="col-md-1 mb-2"><input class="form-control" name="x_coauth" placeholder="M dasar"/></div>
@@ -35,7 +35,7 @@
 <div class="col-md-6 mb-2"><input class="form-control" name="x_testator" placeholder="Pewasiat"/></div>
 <div class="col-md-6 mb-2"><input class="form-control" name="x_heirs" placeholder="Ahli waris"/></div>
 </div></div></div>
-<div class="col-md-10 mb-2"><input class="form-control" name="notes" placeholder="Catatan (opsional)"/></div>
+<div class="col-md-10 mb-2"><label class="form-label" for="f_notes">Catatan</label><input class="form-control" id="f_notes" name="notes" placeholder="Catatan (opsional)"/></div>
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Buat →</button></div>
 </div></form>
 <script>(function(){
@@ -78,10 +78,10 @@ document.getElementById('f_autotitle').addEventListener('click',function(){
 <div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Workflow Akta</h3><p class="text-secondary mb-0">Draf berversi dari template terapproved hingga pengesahan + repertorium.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-akta.jpg" alt="Pengesahan akta" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="card mb-3" id="buat-draf"><div class="card-header"><h3 class="card-title">Draf Akta Baru (dari template terapproved)</h3></div>
 <form method="post" action="/deeds">{{template "csrf" .}}<div class="card-body row">
-<div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul akta" required/></div>
+<div class="col-md-4 mb-2"><label class="form-label" for="f_deed_title">Judul akta</label><input class="form-control" id="f_deed_title" name="title" placeholder="Judul akta" required/></div>
 <div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Koperasi">Koperasi</option><option value="Yayasan">Yayasan</option><option value="Agreement">Perjanjian</option><option value="Will">Wasiat</option><option value="POA">Kuasa</option><option value="Prenup">Prenup/Postnup</option><option value="Other">Lainnya</option><option value="AJB">AJB (PPAT)</option><option value="Hibah">Hibah (PPAT)</option><option value="TukarMenukar">Tukar Menukar (PPAT)</option><option value="APHB">APHB (PPAT)</option><option value="Inbreng">Inbreng (PPAT)</option><option value="SKMHT">SKMHT (PPAT)</option><option value="APHT">APHT (PPAT)</option></select></div>
 <div class="col-md-3 mb-2"><select class="form-select" name="template_id"><option value="">— Template (opsional) —</option>{{range .Data.Templates}}{{if .Approved}}<option value="{{.ID}}">{{.Name}} (v{{.Version}})</option>{{end}}{{end}}</select></div>
-<div class="col-md-2 mb-2"><input class="form-control" name="request_id" placeholder="ID permohonan"/></div>
+<div class="col-md-2 mb-2"><label class="form-label" for="f_deed_req">ID permohonan</label><input class="form-control" id="f_deed_req" name="request_id" placeholder="ID permohonan"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
 </div></form></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Filter Daftar Akta</h3></div>
@@ -137,10 +137,10 @@ document.getElementById('f_autotitle').addEventListener('click',function(){
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Akta Tanah Baru</h3></div>
 <form method="post" action="/ppat"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-2 mb-2"><select class="form-select" name="jenis"><option value="AJB">AJB</option><option value="Hibah">Hibah</option><option value="TukarMenukar">Tukar Menukar</option><option value="APHB">APHB</option><option value="Inbreng">Inbreng</option><option value="SKMHT">SKMHT</option><option value="APHT">APHT</option></select></div>
-<div class="col-md-2 mb-2"><input class="form-control" name="akta_no" placeholder="No. akta PPAT" required/></div>
+<div class="col-md-2 mb-2"><label class="form-label" for="f_ppat_no">No. akta PPAT</label><input class="form-control" id="f_ppat_no" name="akta_no" placeholder="No. akta PPAT" required/></div>
 <div class="col-md-2 mb-2"><input class="form-control" type="date" name="akta_date"/></div>
 <div class="col-md-3 mb-2"><select class="form-select" name="deed_id"><option value="">Draf akta: —</option>{{range .Data.Deeds}}<option value="{{.ID}}">#{{.ID}} {{.Title}} ({{.Kind}})</option>{{end}}</select></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="penjual" placeholder="Penjual / pemberi"/></div>
+<div class="col-md-3 mb-2"><label class="form-label" for="f_ppat_seller">Penjual / pemberi</label><input class="form-control" id="f_ppat_seller" name="penjual" placeholder="Penjual / pemberi"/></div>
 <div class="col-md-3 mb-2"><input class="form-control" name="pembeli" placeholder="Pembeli / penerima"/></div>
 <div class="col-md-2 mb-2"><input class="form-control" name="objek_sertifikat" placeholder="No. sertifikat"/></div>
 <div class="col-md-2 mb-2"><input class="form-control" name="objek_luas" placeholder="Luas (m²)"/></div>

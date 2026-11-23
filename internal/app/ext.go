@@ -102,9 +102,12 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	var role string
 	_ = a.db.QueryRow(`SELECT r.name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=?`, uid).Scan(&role)
 	if !a.users.VerifyMFA(uid, r.FormValue("code")) {
+		// Audit tanpa kode MFA: hanya uid + IP untuk deteksi brute-force TOTP.
+		a.audit.Record(audit.Entry{ActorID: &uid, Action: "mfa.failed", Entity: "user", EntityID: strconv.FormatInt(uid, 10), Detail: clientIPOf(r)})
 		a.render(w, r, "mfa_verify", "Verifikasi MFA", map[string]string{"Error": "Kode MFA salah."})
 		return
 	}
+	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(uid, 10), Detail: "via MFA"})
 	sess, err := a.sessions.Create(uid, role)
 	if err != nil {
 		http.Error(w, "gagal membuat sesi", http.StatusInternalServerError)

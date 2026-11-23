@@ -6,12 +6,33 @@
 <div class="card-body">
 <h2 class="card-title text-center mb-4">Masuk ke akun Anda</h2>
 {{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
-<div class="mb-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{if .Data}}{{.Data.Email}}{{end}}" required/></div>
-<div class="mb-3"><label class="form-label">Kata sandi</label><input class="form-control" type="password" name="password" required/></div>
+<div class="mb-3"><label class="form-label" for="f_email">Email</label><input class="form-control" type="email" id="f_email" name="email" value="{{if .Data}}{{.Data.Email}}{{end}}" required autocomplete="email"/></div>
+<div class="mb-3"><label class="form-label" for="f_password">Kata sandi</label><input class="form-control" type="password" id="f_password" name="password" required autocomplete="current-password"/></div>
 <button class="btn btn-primary w-100" type="submit">Masuk</button>
 <div class="alert alert-info mt-3 mb-0"><strong>Akun demo:</strong><br/>Email: <code>admin@contoh.id</code><br/>Sandi: <code>Admin123!</code></div>
 </div>
 </form>
 <p class="text-center text-secondary mt-3">Akses dilindungi RBAC &amp; audit log. Sesi kedaluwarsa otomatis.</p>
+</div></div>
+</body></html>{{end}}
+{{define "setup"}}{{template "head" .}}
+<body class="d-flex flex-column">
+<div class="page page-center"><div class="container container-tight py-4">
+<div class="text-center mb-4">{{if .Brand.LogoURL}}<img src="{{.Brand.LogoURL}}" alt="{{.Brand.AppName}}" style="height:72px;width:72px;object-fit:cover;object-position:center;border-radius:16px"/>{{else}}<img src="/assets/brand/saktinotaris-logo-b.png" alt="{{.Brand.AppName}}" style="height:72px;width:72px;object-fit:cover;object-position:center;border-radius:16px"/>{{end}}<h1 class="mt-2">{{.Brand.AppName}}</h1><p class="text-secondary">Pengaturan awal — hanya tersedia bila belum ada pengguna terdaftar</p></div>
+<form class="card card-md" method="post" action="/setup">
+<div class="card-body">
+<h2 class="card-title text-center mb-4">Buat Kantor &amp; Admin Pertama</h2>
+{{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
+{{template "csrf" .}}
+<div class="mb-3"><label class="form-label">Nama kantor</label><input class="form-control" type="text" name="office_name" value="{{if .Data}}{{.Data.OfficeName}}{{end}}" required/></div>
+<div class="mb-3"><label class="form-label">Nama notaris</label><input class="form-control" type="text" name="notary_name" value="{{if .Data}}{{.Data.NotaryName}}{{end}}" required/></div>
+<div class="mb-3"><label class="form-label">Nama admin</label><input class="form-control" type="text" name="admin_name" value="{{if .Data}}{{.Data.AdminName}}{{end}}" required/></div>
+<div class="mb-3"><label class="form-label">Email admin</label><input class="form-control" type="email" name="admin_email" value="{{if .Data}}{{.Data.AdminEmail}}{{end}}" required/></div>
+<div class="mb-3"><label class="form-label">Kata sandi admin (min 12 karakter)</label><input class="form-control" type="password" name="password" minlength="12" required/></div>
+<div class="mb-3"><label class="form-label">Konfirmasi kata sandi</label><input class="form-control" type="password" name="password_confirm" minlength="12" required/></div>
+<button class="btn btn-primary w-100" type="submit">Buat Kantor &amp; Admin</button>
+</div>
+</form>
+<p class="text-center text-secondary mt-3">Setelah selesai, halaman ini nonaktif otomatis dan Anda diarahkan ke halaman masuk.</p>
 </div></div>
 </body></html>{{end}}

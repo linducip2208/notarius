@@ -490,8 +490,11 @@ func (a *App) Router() http.Handler {
 	r.Get("/docs", a.docsIndex)
 	r.Get("/docs/{step}", a.docsStep)
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
+	setupLimiter := mw.NewRateLimiter(10, time.Minute) // /setup: ketat, sekali pakai
 	r.Get("/login", a.loginForm)
 	r.With(loginLimiter.Limit).Post("/login", a.login)
+	r.Get("/setup", a.setupForm)
+	r.With(setupLimiter.Limit, mw.CSRF(a.sessions, a.cfg.SessionName)).Post("/setup", a.setupSubmit)
 	r.Get("/mfa/verify", a.mfaVerifyForm)
 	r.With(loginLimiter.Limit, mw.CSRF(a.sessions, a.cfg.SessionName)).Post("/mfa/verify", a.mfaVerify)
 
@@ -780,6 +783,8 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	u, err := a.users.Authenticate(email, r.FormValue("password"))
 	if err != nil {
 		_, _ = a.db.Exec(`INSERT INTO login_attempts(email, ip, success) VALUES(?,?,0)`, email, ip)
+		// Audit tanpa password/hash: hanya email + IP untuk deteksi brute-force.
+		a.audit.Record(audit.Entry{Action: "login.failed", Entity: "user", EntityID: email, Detail: ip})
 		a.render(w, r, "login", "Masuk — SaktiNotaris", map[string]string{"Error": err.Error(), "Email": email})
 		return
 	}
@@ -819,7 +824,9 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(a.cfg.SessionName); err == nil {
+		uid := a.uid(r)
 		a.sessions.Revoke(c.Value)
+		a.audit.Record(audit.Entry{ActorID: uid, Action: "logout", Entity: "user", EntityID: ""})
 	}
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -1828,7 +1835,7 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if miss > 0 {
-				msg := fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi dulu di checklist bawah.", miss)
+				msg := fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi di checklist bawah.", miss)
 				http.Redirect(w, r, "/requests/"+strconv.FormatInt(id, 10)+"?flash="+url.QueryEscape(msg)+"#checklist", http.StatusSeeOther)
 				return
 			}
