@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Layanan Notaris — Pendirian PT, CV, Yayasan, Perjanjian, Wasiat | SaktiNotaris</title>
+<title>Layanan Notaris & PPAT — Pendirian PT, CV, Yayasan, Perjanjian, Wasiat, AJB, Paket Bundel | SaktiNotaris</title>
 <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>
-<meta name="description" content="Daftar layanan jabatan Notaris yang didukung SaktiNotaris: pendirian & perubahan PT/CV/Firma/Yayasan/Koperasi, perjanjian, kuasa, prenup, wasiat, legalisasi, asistensi AHU/OSS — beserta syarat dan alur."/>
+<meta name="description" content="Daftar layanan Notaris & PPAT yang didukung SaktiNotaris: pendirian & perubahan PT/CV/Firma/Yayasan/Koperasi, perjanjian, kuasa, prenup, wasiat, legalisasi, AJB & layanan tanah PPAT, paket bundel, asistensi AHU/OSS — beserta syarat dan alur."/>
 <link rel="canonical" href="/layanan"/>
-<meta property="og:title" content="Layanan Notaris yang Didukung SaktiNotaris"/>
+<meta property="og:title" content="Layanan Notaris & PPAT yang Didukung SaktiNotaris"/>
 <meta property="og:description" content="Syarat, alur, dan penawaran resmi per layanan kenotariatan."/>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 </head>
@@ -18,12 +18,12 @@
 </div></header>
 <main class="container-xl py-5">
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item active">Layanan ({{.Total}})</li></ol></nav>
-<h2 class="display-6 fw-bold">Layanan Jabatan Notaris</h2>
+<h2 class="display-6 fw-bold">Layanan Notaris & PPAT</h2>
 <p class="text-secondary">Setiap layanan di bawah ini tercatat di katalog resmi aplikasi beserta persyaratan dan alurnya. Klik untuk syarat dokumen, tahapan, dan cara meminta penawaran.</p>
-{{range $cat := .Order}}<h3 class="mt-4 text-capitalize">{{$cat}}</h3>
-<div class="row g-3">{{range index $.Groups $cat}}<div class="col-md-4"><div class="card h-100"><div class="card-body"><h4><a href="/layanan/{{.Code | lower}}">{{.Name}}</a></h4><p class="text-secondary small mb-2">Kode: {{.Code}}</p><a class="btn btn-sm btn-outline-primary" href="/layanan/{{.Code | lower}}">Syarat & Alur →</a></div></div></div>{{end}}</div>
+{{range $cat := .Order}}<h3 class="mt-4">{{if eq $cat "corporate"}}🏢 Korporat — Badan Usaha{{else if eq $cat "agreement"}}🤝 Perjanjian{{else if eq $cat "will"}}📜 Wasiat{{else if eq $cat "legalization"}}✅ Legalisasi & Salinan{{else if eq $cat "deed"}}📄 Akta{{else if eq $cat "other"}}🧰 Asistensi Lainnya{{else if eq $cat "ppat"}}🟫 PPAT / Tanah{{else}}<span class="text-capitalize">{{$cat}}</span>{{end}}</h3>
+<div class="row g-3">{{range index $.Groups $cat}}<div class="col-md-4"><div class="card h-100"><div class="card-body"><h4><a href="/layanan/{{.Code | lower}}">{{.Name}}</a></h4><p class="text-secondary small mb-2">Kode: {{.Code}}{{if .Price}} · Mulai Rp {{printf "%.0f" .Price}}{{end}}</p><a class="btn btn-sm btn-outline-primary" href="/layanan/{{.Code | lower}}">Syarat & Alur →</a></div></div></div>{{end}}</div>
 {{end}}
-<div class="alert alert-info mt-4">Harga final lewat penawaran resmi — <a href="/#harga">minta penawaran</a>. SaktiNotaris hanya untuk jabatan Notaris, bukan PPAT/advokat.</div>
+<div class="alert alert-info mt-4">Harga final lewat penawaran resmi — <a href="/#harga">minta penawaran</a>. <a class="btn btn-sm btn-primary ms-2" href="/booking">Booking konsultasi</a> <a class="btn btn-sm btn-outline-primary ms-1" href="/konsultasi">Kontak / Minta penawaran</a><br/><span class="small">SaktiNotaris mendukung layanan jabatan Notaris & PPAT (bukan advokat).</span></div>
 </main>
 <footer class="py-4 border-top"><div class="container-xl text-secondary small">© 2026 SaktiNotaris · <a href="/">Beranda</a></div></footer>
 <script src="/assets/vendor/tabler.min.js"></script>
@@ -52,7 +52,7 @@
 </div></header>
 <main class="container-xl py-5" style="max-width:820px">
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item"><a href="/layanan">Layanan</a></li><li class="breadcrumb-item active">{{.Name}}</li></ol></nav>
-<p class="text-secondary mb-1">Layanan {{.Category}} · Kode {{.Code}}</p>
+<p class="text-secondary mb-1">{{if eq .Category "corporate"}}🏢 Korporat{{else if eq .Category "agreement"}}🤝 Perjanjian{{else if eq .Category "will"}}📜 Wasiat{{else if eq .Category "legalization"}}✅ Legalisasi{{else if eq .Category "deed"}}📄 Akta{{else if eq .Category "other"}}🧰 Asistensi{{else if eq .Category "ppat"}}🟫 PPAT / Tanah{{else}}{{.Category}}{{end}} · Kode {{.Code}}</p>
 <h2 class="display-6 fw-bold">{{.Name}}</h2>
 <div class="card mt-4"><div class="card-header"><h3 class="card-title">Syarat berkas</h3></div>
 <ul class="list-group list-group-flush">{{range .Reqs}}<li class="list-group-item">✅ {{.}}</li>{{else}}<li class="list-group-item text-secondary">Hubungi kantor untuk daftar persyaratan layanan ini.</li>{{end}}</ul></div>
@@ -64,10 +64,10 @@
 <div class="list-group-item"><span class="badge bg-primary rounded-pill me-2">4</span>Review & pengesahan notaris (final terkunci)</div>
 <div class="list-group-item"><span class="badge bg-primary rounded-pill me-2">5</span>Register & arsip (repertorium/protokol/invoice)</div>
 </div></div>
-<div class="card mt-3"><div class="card-body"><strong>Estimasi harga mulai Rp {{printf "%.0f" .Price}}</strong><p class="text-secondary small mb-2">Harga final lewat penawaran resmi sesuai kebutuhan — tanpa angka mengada-ada. Lihat juga <a href="/kalkulator?code={{.Code}}">estimasi transparan</a>.</p><a class="btn btn-primary" href="/booking">Booking konsultasi</a> <a class="btn btn-outline-primary ms-2" href="/konsultasi">Minta penawaran</a></div></div>
+<div class="card mt-3"><div class="card-body">{{if .Price}}<strong>Estimasi harga mulai Rp {{printf "%.0f" .Price}}</strong>{{else}}<strong>Harga via penawaran resmi</strong>{{end}}<p class="text-secondary small mb-2">Harga final lewat penawaran resmi sesuai kebutuhan — tanpa angka mengada-ada. Lihat juga <a href="/kalkulator?code={{.Code}}">estimasi transparan</a>.</p><a class="btn btn-primary" href="/booking">Booking konsultasi</a> <a class="btn btn-outline-primary ms-2" href="/konsultasi">Minta penawaran</a></div></div>
 <p><a href="/layanan">← Kembali ke semua layanan</a></p>
 </main>
-<footer class="py-4 border-top"><div class="container-xl text-secondary small">© 2026 SaktiNotaris · Bukan PPAT/advokat · Tanpa klaim API pemerintah.</div></footer>
+<footer class="py-4 border-top"><div class="container-xl text-secondary small">© 2026 SaktiNotaris · Notaris & PPAT · Tanpa klaim API pemerintah.</div></footer>
 <script src="/assets/vendor/tabler.min.js"></script>
 </body>
 </html>{{end}}

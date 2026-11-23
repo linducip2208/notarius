@@ -30,6 +30,17 @@ func getenv(key, def string) string {
 	return def
 }
 
+// getenvFirst returns the first non-empty env var (new canonical name wins,
+// legacy alias still honoured so old deploys keep working).
+func getenvFirst(def string, keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return def
+}
+
 func Load() Config {
 	loadDotEnv(".env") // dev convenience; real env vars always win (never committed: .gitignore)
 	port := getenv("PORT", "8080")
@@ -56,8 +67,8 @@ func Load() Config {
 		TLSCookie:      getenv("COOKIE_SECURE", "false") == "true",
 		StorageDir:     getenv("STORAGE_DIR", "./storage"),
 		AppBaseURL:     strings.TrimSuffix(getenv("APP_BASE_URL", ""), "/"),
-		S3Endpoint:     os.Getenv("S3_ENDPOINT"),
-		S3Bucket:       os.Getenv("S3_BUCKET"),
+		S3Endpoint:     getenvFirst("", "NOTARYOS_S3_ENDPOINT", "S3_ENDPOINT"),
+		S3Bucket:       getenvFirst("", "NOTARYOS_S3_BUCKET", "S3_BUCKET"),
 		AIBaseURL:      os.Getenv("AI_BASE_URL"),
 		OCRBinary:      getenv("OCR_BINARY", ""),
 		TrustedProxies: proxies,

@@ -446,6 +446,11 @@ func (a *App) Router() http.Handler {
 	limiter := mw.NewRateLimiter(10, time.Minute)
 	loginLimiter := mw.NewRateLimiter(20, time.Minute) // lockout akun 5x/15mnt tetap jadi perlindungan utama
 	verifyLimiter := mw.NewRateLimiter(30, time.Minute)
+	// Rate-limit longgar agar pemakaian normal tidak terblokir (staf upload batch):
+	// upload 30/menit per IP, OCR 20/menit per IP (OCR berat). POST /login sudah
+	// dibatasi loginLimiter di atas, jadi di sini hanya tambah 2 endpoint sensitif.
+	uploadLimiter := mw.NewRateLimiter(30, time.Minute)
+	ocrLimiter := mw.NewRateLimiter(20, time.Minute)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	r.Get("/readyz", a.readyz)
@@ -515,11 +520,11 @@ func (a *App) Router() http.Handler {
 		p.Post("/identities/{id}/status", a.identityStatus)
 		p.Post("/identities/{id}/flag", a.identityFlag)
 		p.Post("/clients/{id}/reps", a.repAdd)
-		p.Post("/clients/{id}/files", a.fileUpload)
+		p.With(uploadLimiter.Limit).Post("/clients/{id}/files", a.fileUpload)
 		p.Get("/clients/{id}/specimens", a.specimens)
 		p.Post("/clients/{id}/specimens", a.specimenUpload)
 		p.Get("/files/{id}", a.fileDownload)
-		p.Post("/files/{id}/ocr", a.fileOCR)
+		p.With(ocrLimiter.Limit).Post("/files/{id}/ocr", a.fileOCR)
 		p.Get("/requests", a.requestList)
 		p.Post("/requests", a.requestCreate)
 		p.Get("/requests/{id}", a.requestDetail)
@@ -907,7 +912,7 @@ func (a *App) llmsTxt(w http.ResponseWriter, _ *http.Request) {
 - Keuangan: invoice multi-baris anti-overpay, pembayaran, piutang, pengeluaran, tarif.
 - Keamanan: bcrypt-12, sesi server-side, MFA TOTP, RBAC 9 peran/19 izin, NIK AES-256-GCM,
   audit imutabel, HSTS+CSP+CSRF+rate-limit.
-- Bukan PPAT/advokat. Tanpa API resmi AHU/OSS (asistensi manual + bukti).
+- Notaris & PPAT (bukan advokat). Tanpa API resmi AHU/OSS/BPN (asistensi manual + bukti).
 - Harga: konsultasi via penawaran resmi (tidak ada harga publik).
 
 ## Halaman
@@ -1009,7 +1014,7 @@ func docSteps() []docStep {
 			"OCR tidak pernah auto-verify. Tanpa verifikasi manusia, data tidak boleh masuk akta.",
 			"Verifikasi identitas", "/clients"},
 		{"permohonan-layanan", "4. Permohonan & Workflow Layanan", "notarius-doc-permohonan.svg", "Buat permohonan layanan dan gerakkan status workflow",
-			"Pilih klien + katalog 22 layanan → buat permohonan → gerakkan 9 status hingga selesai.",
+			"Pilih klien + katalog 35 layanan → buat permohonan → gerakkan 9 status hingga selesai.",
 			[]string{"Buka /requests → pilih Klien + Layanan + judul → Buat", "Gerakkan status: DRAFT → SUBMITTED → IN_REVIEW → APPROVED → IN_PROGRESS → COMPLETED (transisi legal divalidasi)", "Untuk korporat: isi Data Korporat, Legal AHU/OSS checklist + bukti di tab yang sama; atur Janji/Reminder bila perlu"},
 			"Status tidak bisa loncat. Bukti AHU/OSS hanya checklist asistensi — bukan klaim pengajuan otomatis.",
 			"Buat permohonan", "/requests"},
@@ -1250,6 +1255,27 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status='APPROVED'`, office).Scan(&readySign)
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM service_requests r LEFT JOIN services s ON s.id=r.service_id WHERE r.office_id=? AND r.status IN ('SUBMITTED','IN_REVIEW','NEED_DOCS') AND r.updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL COALESCE(s.sla_days,3) DAY)`, office).Scan(&stuck)
 	}
+	// Widget dashboard "SLA + antrean": 5 permohonan paling mendesak lewat SLA
+	// (remind.ServiceOverdue, tanpa migrasi) + dokumen DMS overdue via
+	// remind.OverdueDocs(db, office) yang signature-nya cocok
+	// (func(db *sql.DB, officeID int64) ([]OverdueDoc, error)), jadi dipakai
+	// langsung. Best-effort: gagal query → widget disembunyikan template.
+	var slaTop []remind.ServiceOverdueItem
+	var docOver []remind.OverdueDoc
+	if a.db != nil {
+		if items, err := remind.ServiceOverdue(a.db, office); err == nil {
+			if len(items) > 5 {
+				items = items[:5]
+			}
+			slaTop = items
+		}
+		if docs, err := remind.OverdueDocs(a.db, office); err == nil {
+			if len(docs) > 5 {
+				docs = docs[:5]
+			}
+			docOver = docs
+		}
+	}
 	a.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed,
 		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
@@ -1259,6 +1285,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Clients": totalClients, "MonthDeeds": monthDeeds, "Range": r.URL.Query().Get("range"),
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
+		"SLAOverdue": slaTop, "DocOverdue": docOver,
 	})
 }
 
@@ -1710,6 +1737,7 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 
 // corpEntityOf memetakan kode layanan ke tipe badan usaha ("" bila bukan korporat).
 func corpEntityOf(code string) string {
+	code = strings.ToUpper(strings.TrimSpace(code))
 	switch {
 	case strings.HasPrefix(code, "PT-"):
 		return "PT"
