@@ -270,7 +270,7 @@
 <div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Simpan</button></div>
 </div></form></div>
 <div class="card"><div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Nama</th><th>Layanan</th><th>Item</th></tr></thead>
-<tbody>{{range .Data.Tpls}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.Service}}</td><td class="small">{{.Items}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada template. Buat per jenis layanan.</td></tr>{{end}}</tbody></table></div></div>
+<tbody>{{range .Data.Tpls}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td>{{.Service}}</td><td class="small">{{.Items}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada template. Buat per jenis layanan. <form method="post" action="/dms/checklists/seed" class="d-inline">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">⚡ Pasang Standar</button></form></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "dms_labels"}}{{template "head" .}}{{template "page_open" .}}

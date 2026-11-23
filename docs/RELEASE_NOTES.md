@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.4.6 (2026-11-23) — AKTIVASI KANTOR + FILTER + AUDIT SCOPE
+Ringkasan: kartu Aktivasi Kantor x/5 di /office (checklist, template + approved, tarif/uji transaksi, 1 permohonan, mode ketat), filter status permohonan + filter status/jenis akta, badge jatuh tempo invoice LEWAT N hari; 8 kebocoran office-scope ditutup (audit feed/ekspor, booking, spesimen DMS, deed detail/timeline, invoice_lines) + template yatim dihapus; dipakai ulang: SEO dinamis + responsif + audit CSV + strict UX flash, timer pengingat 07:00 WIB, CSS print, MFA warning, cookie flags, backup DB+files; .env.example 49 kunci.
+Go-Live: seperti v0.4.5 + verifikasi kartu aktivasi di /office mencapai 5/5 setelah ⚡ Pasang Standar di /dms/checklists → ⚡ Pasang 8 Konsep di /templates → Approve template → uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.4.5 (2026-11-23) — TIMER PENGINGAT + CETAK RAPI + MFA WARNING
 Ringkasan: pengingat otomatis harian 07:00 WIB (systemd timer+service via skrip login-CSRF localhost, akun layanan office_admin tanpa MFA, idempoten dengan ticker + tombol manual), CSS print global + .no-print (akta, kuitansi, docs, blanko PPAT), banner MFA untuk peran berhak wasiat yang belum enroll, cookie flags konsisten (MaxAge + HttpOnly + SameSite + Secure), drill backup DB+files lolos, audit SEO/responsif, sweep TODO.
 Go-Live: seperti v0.4.4 + pasang timer pengingat (langkah 10 docs/DEPLOYMENT_GUIDE.md: akun layanan, /etc/notaryos/reminder.env 0600, enable timer, verifikasi journalctl + /audit memuat reminders.run). Detail: docs/DEPLOYMENT_GUIDE.md.

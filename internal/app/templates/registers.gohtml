@@ -1,7 +1,7 @@
 {{define "requests"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Permohonan Layanan</li></ol></nav>
 {{if .Data.ClientName}}<div class="alert alert-info">Filter klien: <strong>{{.Data.ClientName}}</strong> <a href="/requests">✕ tampilkan semua</a></div>{{end}}
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Baru — pilih layanan, form menyesuaikan</h3></div>
+<div class="card mb-3" id="buat"><div class="card-header"><h3 class="card-title">Permohonan Baru — pilih layanan, form menyesuaikan</h3></div>
 <form method="post" action="/requests" id="reqform"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-4 mb-2"><label class="form-label">Klien</label><select class="form-select" id="f_client" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
 <div class="col-md-4 mb-2"><label class="form-label">Layanan ({{len .Data.Services}})</label><select class="form-select" id="f_svc" name="service_id" required><option value="">— Pilih layanan —</option>{{if .Data.NotarySvcs}}<optgroup label="Notaris">{{range .Data.NotarySvcs}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">[{{.Category}}] {{.Name}}</option>{{end}}</optgroup><optgroup label="PPAT">{{range .Data.PpatSvcs}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">{{.Name}}</option>{{end}}</optgroup>{{else}}{{range .Data.Services}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">[{{.Category}}] {{.Name}}</option>{{end}}{{end}}</select></div>
@@ -70,13 +70,13 @@ document.getElementById('f_autotitle').addEventListener('click',function(){
 <td><form method="post" action="/requests/{{.ID}}/move" class="d-flex gap-1">{{template "csrf" $}}
 <select class="form-select form-select-sm" name="to"><option value="SUBMITTED">SUBMITTED</option><option value="IN_REVIEW">IN_REVIEW</option><option value="NEED_DOCS">NEED_DOCS</option><option value="APPROVED">APPROVED</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="CANCELLED">CANCELLED</option></select>
 <button class="btn btn-sm btn-primary" type="submit">OK</button></form></td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada permohonan.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada permohonan. <a href="#buat">Buat permohonan pertama ↑</a></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "deeds"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Akta</li></ol></nav>
 <div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Workflow Akta</h3><p class="text-secondary mb-0">Draf berversi dari template terapproved hingga pengesahan + repertorium.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-akta.jpg" alt="Pengesahan akta" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Draf Akta Baru (dari template terapproved)</h3></div>
+<div class="card mb-3" id="buat-draf"><div class="card-header"><h3 class="card-title">Draf Akta Baru (dari template terapproved)</h3></div>
 <form method="post" action="/deeds">{{template "csrf" .}}<div class="card-body row">
 <div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul akta" required/></div>
 <div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Koperasi">Koperasi</option><option value="Yayasan">Yayasan</option><option value="Agreement">Perjanjian</option><option value="Will">Wasiat</option><option value="POA">Kuasa</option><option value="Prenup">Prenup/Postnup</option><option value="Other">Lainnya</option><option value="AJB">AJB (PPAT)</option><option value="Hibah">Hibah (PPAT)</option><option value="TukarMenukar">Tukar Menukar (PPAT)</option><option value="APHB">APHB (PPAT)</option><option value="Inbreng">Inbreng (PPAT)</option><option value="SKMHT">SKMHT (PPAT)</option><option value="APHT">APHT (PPAT)</option></select></div>
@@ -97,7 +97,7 @@ document.getElementById('f_autotitle').addEventListener('click',function(){
 <details><summary class="text-primary" style="cursor:pointer">👁 Preview</summary><div class="p-2 bg-light border rounded small mt-1" style="white-space:pre-wrap;max-height:180px;overflow:auto">{{plaintext .Preview}}</div>
 <div class="d-flex gap-1 mt-1"><a class="btn btn-sm btn-outline-primary" href="/deeds/{{.ID}}">Buka</a><a class="btn btn-sm btn-ghost-secondary" href="/deeds/{{.ID}}#deedform">Edit</a></div></details></td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/docx">DOCX</a></div></td>
 <td><div class="d-flex gap-1"><form method="post" action="/deeds/{{.ID}}/review">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" title="Kirim ke review notaris">Review</button></form><form method="post" action="/deeds/{{.ID}}/approve" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="number" placeholder="No. akta" style="width:90px"/><button class="btn btn-sm btn-success" type="submit" title="Setujui (notaris) + repertorium otomatis">Sahkan</button></form></div></td></tr>
-{{else}}<tr><td colspan="9" class="text-center text-secondary py-4">Belum ada akta.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="9" class="text-center text-secondary py-4">Belum ada akta. <a href="#buat-draf">Buat draf di atas ↑</a></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "repertorium"}}{{template "head" .}}{{template "page_open" .}}
@@ -113,7 +113,7 @@ document.getElementById('f_autotitle').addEventListener('click',function(){
 {{if .Data.Gaps}}<div class="alert alert-warning">Nomor lompat terdeteksi: {{range .Data.Gaps}}<span class="badge bg-yellow-lt me-1">{{.}}</span>{{end}}<span class="text-secondary small">— selidiki sebelum tutup tahun buku.</span></div>{{end}}
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Para pihak</th><th class="no-print">Label</th></tr></thead>
 <tbody>{{range .Data.Rows}}<tr><td>{{.No}}</td><td>{{.Date}}</td><td>{{.Desc}}</td><td>{{.Parties}}</td><td class="no-print"><a class="btn btn-sm btn-ghost-primary" href="/qr?d=Repertorium+{{.No}}+{{.Date}}" target="_blank" title="Label QR untuk map fisik">QR</a></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada entri repertorium. Nomor terisi otomatis saat akta disahkan.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada entri repertorium. Nomor terisi otomatis saat akta disahkan. <a href="/deeds">Sahkan akta untuk mengisi →</a></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "protocols"}}{{template "head" .}}{{template "page_open" .}}

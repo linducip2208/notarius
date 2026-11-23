@@ -86,7 +86,7 @@
 <div class="card"><div class="card-header"><h3 class="card-title">Template Dokumen</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Kategori</th><th>Versi</th><th>Disetujui</th><th></th></tr></thead>
 <tbody>{{range .Data.Templates}}<tr><td><a href="/templates/{{.ID}}">{{.Name}}</a></td><td>{{.Category}}</td><td>{{.Version}}</td><td>{{.Approved}}</td><td><a class="btn btn-sm btn-ghost-primary" href="/templates/{{.ID}}">Editor</a></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada template. Template hanya berlaku setelah disetujui notaris.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada template. Template hanya berlaku setelah disetujui notaris. <form method="post" action="/templates/seed" class="d-inline">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">⚡ Pasang 8 Konsep</button></form></td></tr>{{end}}</tbody></table></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Klausul Baku</h3></div>
 <div class="card-body">{{range .Data.Clauses}}<div class="mb-2"><strong>{{.Title}}</strong> <span class="text-secondary">{{.Tags}} · approved={{.Approved}}</span></div>{{else}}<p class="text-secondary">Belum ada klausul.</p>{{end}}
 <form method="post" action="/clauses" class="row">{{template "csrf" .}}
@@ -146,7 +146,7 @@
 
 {{define "wills"}}{{template "head" .}}{{template "page_open" .}}
 <div class="alert alert-warning">Data wasiat bersifat <strong>terbatas</strong> — hanya notaris, notaris pengganti, dan auditor.</div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pendaftaran Wasiat</h3></div>
+<div class="card mb-3" id="daftar-wasiat"><div class="card-header"><h3 class="card-title">Pendaftaran Wasiat</h3></div>
 <form method="post" action="/wills"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-5 mb-2"><select class="form-select" name="client_id" required><option value="">— Pewasiat —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
 <div class="col-md-5 mb-2"><input class="form-control" name="register_no" placeholder="Nomor register wasiat" required/></div>
@@ -158,7 +158,7 @@
 <td>{{if .ReviewDate}}<span class="text-secondary small">{{.ReviewDate}}</span>{{else}}<form method="post" action="/wills/{{.ID}}/review">{{template "csrf" $}}<button class="btn btn-sm btn-ghost-primary" type="submit" title="Catat review tahunan hari ini">Review</button></form>{{end}}</td>
 <td>{{if .OpenedAt}}<span class="badge bg-green-lt">dibuka</span> <span class="text-secondary small">{{.Witness}} · {{.OpenedAt}}</span>{{else}}<form method="post" action="/wills/{{.ID}}/open" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="witness" placeholder="Saksi pembuka" style="width:110px" required/><input class="form-control form-control-sm" name="note" placeholder="Berita acara" style="width:110px"/><button class="btn btn-sm btn-outline-warning" type="submit" onclick="return confirm('Catat pembukaan bersaksi?')">Buka</button></form>{{end}}</td>
 <td><form method="post" action="/wills/{{.ID}}/handover" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="handed_to" placeholder="Diserahkan ke" style="width:100px"/><button class="btn btn-sm btn-outline-primary" type="submit">Serahkan</button></form></td></tr>
-{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada wasiat terdaftar.</td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada wasiat terdaftar. <a href="#daftar-wasiat">Daftarkan di atas ↑</a></td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "portal"}}{{template "head" .}}{{template "page_open" .}}

@@ -490,11 +490,32 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	if waPhone != "" {
 		waLink = deliver.WALink(waPhone, waText)
 	}
+	// PPAT terkait: 1 query JOIN deed_drafts.request_id (kecil, kolom seperlunya).
+	type ppatRef struct {
+		ID           int64
+		No, Jenis   string
+		Status      string
+	}
+	var ppatRefs []ppatRef
+	if a.db != nil {
+		if rs, err := a.db.Query(`SELECT p.id, p.akta_no, p.jenis, p.status
+			FROM ppat_register p JOIN deed_drafts d ON d.id=p.deed_id
+			WHERE d.request_id=? AND p.office_id=? ORDER BY p.id DESC`, id, a.officeOf(r)); err == nil {
+			defer rs.Close()
+			for rs.Next() {
+				var x ppatRef
+				if err := rs.Scan(&x.ID, &x.No, &x.Jenis, &x.Status); err == nil {
+					ppatRefs = append(ppatRefs, x)
+				}
+			}
+		}
+	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 		"SvcCode": a.svcCodeOf(id),
 		"WAPhone": waPhone, "WAText": waText, "WALink": waLink,
+		"Ppat": ppatRefs,
 	})
 }
 
@@ -2101,6 +2122,33 @@ func (a *App) search(w http.ResponseWriter, r *http.Request) {
 				var title, status string
 				_ = rows2.Scan(&id, &title, &status)
 				out = append(out, hit{"Akta", title + " (" + status + ")", "/deeds/" + strconv.FormatInt(id, 10)})
+			}
+		}
+		rows3, _ := a.db.Query(`SELECT akta_no, jenis, COALESCE(penjual,''), COALESCE(pembeli,''), COALESCE(objek_sertifikat,''), status FROM ppat_register WHERE office_id=? AND (akta_no LIKE CONCAT('%',?,'%') OR penjual LIKE CONCAT('%',?,'%') OR pembeli LIKE CONCAT('%',?,'%') OR objek_sertifikat LIKE CONCAT('%',?,'%')) ORDER BY id DESC LIMIT 10`, a.officeOf(r), q, q, q, q)
+		if rows3 != nil {
+			defer rows3.Close()
+			for rows3.Next() {
+				var no, jenis, penjual, pembeli, sert, status string
+				_ = rows3.Scan(&no, &jenis, &penjual, &pembeli, &sert, &status)
+				title := "Akta " + no + " (" + jenis + ")"
+				parties := strings.Trim(penjual+" → "+pembeli, " →")
+				if parties != "" {
+					title += " — " + parties
+				}
+				if sert != "" {
+					title += " [" + sert + "]"
+				}
+				out = append(out, hit{"PPAT", title + " (" + status + ")", "/ppat"})
+			}
+		}
+		rows4, _ := a.db.Query(`SELECT id, title, status FROM tasks WHERE office_id=? AND (title LIKE CONCAT('%',?,'%')) ORDER BY id DESC LIMIT 10`, a.officeOf(r), q)
+		if rows4 != nil {
+			defer rows4.Close()
+			for rows4.Next() {
+				var id int64
+				var title, status string
+				_ = rows4.Scan(&id, &title, &status)
+				out = append(out, hit{"Tugas", title + " (" + status + ")", "/tasks"})
 			}
 		}
 	}
