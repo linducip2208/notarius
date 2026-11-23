@@ -397,7 +397,7 @@ func (s *Store) convertOnce(officeID, id int64, attempt int) (int64, bool, error
 		q.ValidUntil = due.String
 		// Kedaluwarsa otomatis: lewat valid_until => tandai EXPIRED, tolak konversi.
 		var past int
-		_ = tx.QueryRow(`SELECT ? > CURDATE()`, due.String).Scan(&past)
+		_ = tx.QueryRow(`SELECT ? < CURDATE()`, due.String).Scan(&past)
 		if past == 1 {
 			_, _ = tx.Exec(`UPDATE quotations SET status='EXPIRED' WHERE id=?`, id)
 			_ = tx.Commit()

@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.6 (2026-11-24) — PENAWARAN KEDALUWARSA OTOMATIS + TANDA TERIMA SERAH CETAK
+Ringkasan: sejak v0.5.5 ada 1 commit (b07dc16, 2026-11-24): (1) penawaran kedaluwarsa otomatis — lazy-expiry SENT→EXPIRED office-scoped di titik list /quotations (IsExpired + ExpireOverdueQuotations, DRAFT tak tersentuh, audit agregat quotation.expire satu baris) + unit test 10 kasus; (2) tanda terima serah cetak per baris GET /deeds/{id}/handover/{hid} (guard canViewDeed + office-scope, audit deed.handover.receipt, kode verifikasi teks 16 heks SHA-256, tanpa klaim QR — belum dapat dicek via /verify, cocok manual dengan riwayat serah) + tombol Cetak per baris; (3) docs v0.5.5.
+Go-Live: seperti v0.5.5 + buka /quotations untuk picu lazy-expiry (verifikasi SENT lewat tanggal → EXPIRED), cetak 1 tanda terima via tombol Cetak di detail akta, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.5 (2026-11-24) — TUTUP LIFECYCLE AKTA + UJI INTEGRASI LIVE 23/23
 Ringkasan: sejak v0.5.4 ada 1 commit (a325833, 2026-11-24): (1) arsip minuta final POST /deeds/{id}/archive SIGNED→ARCHIVED (guard notaris, anti-race, audit deed.archive, kartu Arsip Minuta Final hanya untuk SIGNED, tanpa hapus data/ubah minuta) — menutup lifecycle IN_REVIEW→APPROVED→IN_PROGRESS→SIGNED→ARCHIVED di atas advance auto-step/rantai status, serah terima, penawaran→invoice, export/import, jadwal baca, dan widget serah dari v0.5.3–v0.5.4; (2) migrasi 026+029+030+031 terverifikasi di test DB + suite integrasi 23 PASS 0 FAIL live; (3) docs v0.5.4.
 Go-Live: seperti v0.5.4 + arsipkan 1 akta SIGNED → ARCHIVED, verifikasi tolak arsip non-SIGNED (400) + arsip ganda (409), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
