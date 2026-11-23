@@ -260,8 +260,8 @@
 
 {{define "dms_checklists"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Template Checklist</li></ol></nav>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Standar Notaris-PPAT</h3><div class="ms-auto"><form method="post" action="/dms/checklists/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 20 paket standar yang belum ada">⚡ Pasang Standar (20 paket)</button></form></div></div>
-<div class="card-body"><p class="text-secondary small mb-0">Sekali klik: PT (dirian+ubah+bubar) · CV (dirian+ubah) · Firma · Yayasan · Koperasi · PPAT (AJB/Hibah/Tukar/APHB/Inbreng/SKMHT/APHT) · Jual-beli · Kuasa · Prenup · Wasiat · AHU · OSS — total 20 paket. Yang sudah ada dilewati. Setelah itu setiap permohonan baru otomatis dapat checklist (paket PRO+).</p></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Standar Notaris-PPAT</h3><div class="ms-auto"><form method="post" action="/dms/checklists/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 27 paket standar yang belum ada">⚡ Pasang Standar (27 paket)</button></form></div></div>
+<div class="card-body"><p class="text-secondary small mb-0">Sekali klik: PT (dirian+ubah+bubar) · CV (dirian+ubah) · Firma · Yayasan · Koperasi · PPAT (AJB/Hibah/Tukar/APHB/Inbreng/SKMHT/APHT) · Jual-beli · Kuasa · Prenup · Wasiat · HUTANG · PK-UMUM · Sewa · AHU · OSS — total 27 paket. Yang sudah ada dilewati. Setelah itu setiap permohonan baru otomatis dapat checklist (paket PRO+).</p></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru (satu baris = satu item)</h3></div>
 <form method="post" action="/dms/checklists"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="service_code"><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</select></div>

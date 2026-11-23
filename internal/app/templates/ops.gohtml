@@ -69,7 +69,7 @@
 {{template "page_close" .}}{{end}}
 
 {{define "templates"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Template Konsep</h3><div class="ms-auto"><form method="post" action="/templates/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 8 template konsep (DRAFT). Wajib direview & Approve notaris sebelum dipakai draf.">⚡ Pasang 8 Konsep</button></form></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Template Konsep</h3><div class="ms-auto"><form method="post" action="/templates/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 9 template konsep (DRAFT). Wajib direview & Approve notaris sebelum dipakai draf.">⚡ Pasang 9 Konsep</button></form></div></div>
 <div class="card-body"><p class="text-secondary small mb-0">Template konsep (PT, CV, AJB, Hibah, Kuasa, Sewa, Prenup, Perjanjian) — agar tombol 📄 Buat Draf Akta langsung menemukan template. Status DRAFT: <strong>tidak bisa</strong> dipakai draf sampai di-Approve.</p></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Kesiapan Jual per Layanan</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Layanan</th><th class="text-end">Skor</th><th>Status</th><th>Checklist</th><th>Template ✓</th><th>Harga</th><th>Dipakai</th></tr></thead>
@@ -86,7 +86,7 @@
 <div class="card"><div class="card-header"><h3 class="card-title">Template Dokumen</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nama</th><th>Kategori</th><th>Versi</th><th>Disetujui</th><th></th></tr></thead>
 <tbody>{{range .Data.Templates}}<tr><td><a href="/templates/{{.ID}}">{{.Name}}</a></td><td>{{.Category}}</td><td>{{.Version}}</td><td>{{.Approved}}</td><td><a class="btn btn-sm btn-ghost-primary" href="/templates/{{.ID}}">Editor</a></td></tr>
-{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada template. Template hanya berlaku setelah disetujui notaris. <form method="post" action="/templates/seed" class="d-inline">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">⚡ Pasang 8 Konsep</button></form></td></tr>{{end}}</tbody></table></div></div>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada template. Template hanya berlaku setelah disetujui notaris. <form method="post" action="/templates/seed" class="d-inline">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">⚡ Pasang 9 Konsep</button></form></td></tr>{{end}}</tbody></table></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Klausul Baku</h3></div>
 <div class="card-body">{{range .Data.Clauses}}<div class="mb-2"><strong>{{.Title}}</strong> <span class="text-secondary">{{.Tags}} · approved={{.Approved}}</span></div>{{else}}<p class="text-secondary">Belum ada klausul.</p>{{end}}
 <form method="post" action="/clauses" class="row">{{template "csrf" .}}
