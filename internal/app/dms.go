@@ -1190,6 +1190,12 @@ func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "checklist.set", Entity: "service_request", EntityID: strconv.FormatInt(reqID, 10), Detail: st})
+	// Tutup loop workflow: bila SEMUA item request itu VERIFIED/RECEIVED →
+	// step kunci "syarat" DONE (best-effort, fail-open).
+	{
+		aid, aname := a.workflowActorName(r)
+		a.autoWorkflowSyarat(a.officeOf(r), reqID, aid, aname)
+	}
 	if st == "NEEDS_REVISION" || st == "REJECTED" {
 		var creator sql.NullInt64
 		var title string

@@ -737,6 +737,8 @@ func (a *App) Router() http.Handler {
 		p.Get("/dms/checklists", a.dmsChecklists)
 		p.Post("/dms/checklists", a.dmsChecklistCreate)
 		p.Post("/dms/checklists/seed", a.dmsChecklistSeed)
+		p.Get("/dms/checklists/export", a.dmsChecklistsExport)
+		p.Post("/dms/checklists/import", a.dmsChecklistsImport)
 		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
 		p.Post("/requests/{id}/workflow/step", a.workflowStep)
 		p.Get("/qr", a.qrText)
@@ -1957,6 +1959,12 @@ func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := a.uid(r)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.draft", Entity: "deed", EntityID: strconv.FormatInt(id, 10)})
+	// Tutup loop workflow: draf dibuat untuk request → step kunci "draf"
+	// DONE (best-effort, fail-open; alur utama tak tersentuh).
+	if reqID != nil {
+		aid, aname := a.workflowActorName(r)
+		a.autoWorkflowStep(a.officeOf(r), *reqID, aid, aname, "draf akta #"+strconv.FormatInt(id, 10), "draf")
+	}
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Draf+akta+dibuat", http.StatusSeeOther)
 }
 
@@ -2445,6 +2453,20 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.advance." + strings.ToLower(next), Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10), OfficeID: officePtr(office)})
+	// Tutup loop workflow: PPAT maju → step kunci "akta"/"lapor" DONE
+	// (best-effort, fail-open; tanpa tautan permohonan = lewati diam-diam).
+	if deedID.Valid && deedID.Int64 > 0 && (next == "AKTA_JADI" || next == "LAPOR_BPN") {
+		var linkedReq sql.NullInt64
+		_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=? AND office_id=?`, deedID.Int64, office).Scan(&linkedReq)
+		if linkedReq.Valid && linkedReq.Int64 > 0 {
+			aid, aname := a.workflowActorName(r)
+			if next == "AKTA_JADI" {
+				a.autoWorkflowStep(office, linkedReq.Int64, aid, aname, "ppat #"+strconv.FormatInt(id, 10)+" AKTA_JADI", "akta")
+			} else {
+				a.autoWorkflowStep(office, linkedReq.Int64, aid, aname, "ppat #"+strconv.FormatInt(id, 10)+" LAPOR_BPN", "lapor")
+			}
+		}
+	}
 	http.Redirect(w, r, "/ppat?flash=Status+PPAT+diperbarui", http.StatusSeeOther)
 }
 

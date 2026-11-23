@@ -1236,6 +1236,12 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	}
 	seal, _ := verifyCode("DEED", id)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number") + " segel:" + seal, OfficeID: officePtr(office)})
+	// Tutup loop workflow: akta disahkan → step kunci "sah" DONE
+	// (best-effort, fail-open).
+	if reqID.Valid {
+		aid, aname := a.workflowActorName(r)
+		a.autoWorkflowStep(office, reqID.Int64, aid, aname, "akta #"+strconv.FormatInt(id, 10)+" disahkan", "sah")
+	}
 	var entryNo int64
 	_ = a.db.QueryRow(`SELECT entry_no FROM repertorium WHERE office_id=? AND deed_id=?`, office, id).Scan(&entryNo)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "repertorium.insert", Entity: "repertorium", EntityID: strconv.FormatInt(entryNo, 10), Detail: "akta#" + strconv.FormatInt(id, 10), OfficeID: officePtr(office)})

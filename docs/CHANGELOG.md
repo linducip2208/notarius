@@ -1,4 +1,10 @@
 # CHANGELOG
+## [0.5.2] — 2026-11-24 — Workflow instances live + docs rilis
+- Cakupan: 1 commit sejak v0.5.1 (29058ed "v0.5.2: workflow instances live + docs rilis", 12 files, +748/-7); tanggal dari git log (2026-11-24).
+- Workflow instances live: seed 3 template workflow (PT/AJB/Kuasa) via tombol seed checklist (internal/app/seed_catalog.go +48); auto-instance saat permohonan dibuat + kartu Alur Kerja + tombol maju (internal/app/workflow_instance.go baru 319 baris + wiring app.go/ext.go/dms.go + pages2.gohtml); RBAC per langkah, audit step, fail-open aman.
+- Test integrasi workflow 23/23 live: internal/app/workflow_instance_test.go baru (unit) + tests/workflow_integration_test.go baru; TERVERIFIKASI LIVE 2026-11-24 `go test ./tests/ -count=1 -v` dengan NOTARYOS_TEST_DSN ke DB notaryos_test (migrasi 001–028): 23/23 PASS, 0 FAIL, cleanup bersih; docs/TEST_STRATEGY.md diperbarui (status CI-vs-lokal + catatan live).
+- Docs & ops: CHANGELOG + RELEASE_NOTES v0.5.1; docs/ops/BACKFILL_AUDIT_OFFICE.sql baru (138 baris, panduan DBA backfill audit_logs.office_id).
+- Go-Live: seperti v0.5.1 + klik seed checklist untuk pasang 3 template workflow, verifikasi kartu Alur Kerja + tombol maju per permohonan (RBAC per langkah), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.1] — 2026-11-24 — NOTARIUS 3.0 tahap 1-4 + workflow engine, audit office_id, CI
 - Cakupan: 3 commit sejak v0.5.0 (75b89f0 tahap 1-3, dc8ee0d tahap 1-4, 68af938 lanjutan; 34 files, +2036/-215); tanggal dari git log (2026-11-24).
 - Fondasi matter + workflow gate (75b89f0): migrasi 026 (matter_parties, service_workflow_rules + seed, wills.register_no unik); internal/app/wf_rules.go baru (workflowGate generik gantikan if ad-hoc, hormati mode ketat); multi-pihak tambah/hapus per matter + tampil di akta; 9 bug audit diperbaiki (counter, link, guard gov/appointment/checklist/booking); deedSign set SIGNED; approve retry bedakan sumber 1062; seed checklist HUTANG/PK/SEWA + template Wasiat + test (seed_catalog_test.go).

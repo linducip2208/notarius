@@ -262,6 +262,12 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Template Checklist</li></ol></nav>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Standar Notaris-PPAT</h3><div class="ms-auto"><form method="post" action="/dms/checklists/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 27 paket standar yang belum ada">⚡ Pasang Standar (27 paket)</button></form></div></div>
 <div class="card-body"><p class="text-secondary small mb-0">Sekali klik: PT (dirian+ubah+bubar) · CV (dirian+ubah) · Firma · Yayasan · Koperasi · PPAT (AJB/Hibah/Tukar/APHB/Inbreng/SKMHT/APHT) · Jual-beli · Kuasa · Prenup · Wasiat · HUTANG · PK-UMUM · Sewa · AHU · OSS — total 27 paket. Yang sudah ada dilewati. Setelah itu setiap permohonan baru otomatis dapat checklist (paket PRO+).</p></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Portabilitas Antar-Kantor</h3><div class="ms-auto"><a class="btn btn-sm btn-outline-primary" href="/dms/checklists/export" title="Unduh seluruh template checklist + alur kerja kantor ini sebagai JSON">⬇ Export JSON</a></div></div>
+<div class="card-body"><form method="post" action="/dms/checklists/import" enctype="multipart/form-data" class="row align-items-end">{{template "csrf" .}}
+<div class="col-md-6 mb-2"><label class="form-label" for="f_port_file">Berkas JSON hasil export kantor lain</label><input class="form-control" id="f_port_file" type="file" name="file" accept=".json,application/json" required/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-secondary w-100" type="submit" title="Impor paket checklist + alur kerja dari JSON">⬆ Import</button></div>
+<div class="col-12"><p class="text-secondary small mb-0">Format: {"checklists":[{"service_code","name","items":[]}], "workflows":[{"service_code","name","steps":[]}]}. Maks 200 item per paket, 100 paket per berkas. Idempoten: paket (service_code + nama) yang sudah ada dilewati.</p></div>
+</form></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru (satu baris = satu item)</h3></div>
 <form method="post" action="/dms/checklists"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="service_code"><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</select></div>
