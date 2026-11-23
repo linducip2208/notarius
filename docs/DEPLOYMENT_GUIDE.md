@@ -27,6 +27,7 @@
   a. Backup DB dulu: `deploy/backup/backup.sh` (wajib sebelum deploy biner).
   b. Deploy biner: `go build -o bin/notaryos ./cmd/notaryos`, lalu `systemctl restart notaryos`.
   c. Pastikan migrasi otomatis sukses: `journalctl -u notaryos | grep -i migrat` + `/readyz` 200.
+   c1. Verifikasi migrasi 025: `mysql $DB -e "SELECT version FROM schema_migrations ORDER BY version"` harus memuat `025`; lalu verifikasi indeks: `SHOW INDEX FROM service_requests` (lihat `idx_req_office_status`), `SHOW INDEX FROM deed_drafts` (`idx_deed_request`, `idx_deed_office_status`), `SHOW INDEX FROM doc_checklist_records` (`idx_checkrec_req_status`), `SHOW INDEX FROM ppat_register` (`idx_ppat_office_status`).
   d. Login staf → buka `/dms/checklists` → klik ⚡ Pasang Standar (seed 23 paket checklist).
   e. Buka `/templates` → klik ⚡ Pasang 8 Konsep → Approve tiap template (DRAFT→APPROVED) sebelum dipakai produksi.
   f. Uji 1 permohonan end-to-end: buat permohonan → draf 1-klik → unggah berkas → verifikasi 2-kolom → invoice DP → portal timeline terlihat.

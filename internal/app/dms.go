@@ -179,9 +179,9 @@ func (a *App) dmsLibrary(w http.ResponseWriter, r *http.Request) {
 	args = append(args, perPage, (page-1)*perPage)
 	rows, _ := a.db.Query(query, args...)
 	type doc struct {
-		ID, Size                 int64
-		Name, MIME, OCR, Ver    string
-		WF, Conf, At            string
+		ID, Size             int64
+		Name, MIME, OCR, Ver string
+		WF, Conf, At         string
 	}
 	var out []doc
 	if rows != nil {
@@ -254,7 +254,7 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	vers, _ := a.dms.Versions(a.officeOf(r), id)
 	rels, _ := a.dms.RelationsOf(a.officeOf(r), id)
-	usedIn := a.dmsUsedIn(a.officeOf(r), id)
+	usedIn := a.dmsUsedIn(a.officeOf(r), id, willReader(mw.RoleOf(r)))
 	tl, _ := a.dms.Timeline(a.officeOf(r), id)
 	holds, _ := a.dms.ActiveHolds(a.officeOf(r), id)
 	hist, _ := a.dms.MoveHistory(a.officeOf(r), id)
@@ -281,7 +281,7 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 // titled deep-links, tasks with ref_type='file', and client specimens.
 // All lookups are best-effort reads; missing tables/rows are skipped so no
 // migration is required.
-func (a *App) dmsUsedIn(officeID, fileID int64) []map[string]any {
+func (a *App) dmsUsedIn(officeID, fileID int64, canWill bool) []map[string]any {
 	var out []map[string]any
 	seen := map[string]bool{}
 	add := func(kind string, id int64, title, url string) {
@@ -334,6 +334,10 @@ func (a *App) dmsUsedIn(officeID, fileID int64) []map[string]any {
 			case "repertorium":
 				add("repertorium", rid, titleOf(`SELECT description FROM repertorium WHERE id=?`, rid), "/repertorium")
 			case "will":
+				if !canWill {
+					add("wasiat", rid, "Wasiat #"+strconv.FormatInt(rid, 10)+" (terbatas)", "/wills")
+					continue
+				}
 				t := titleOf(`SELECT register_no FROM wills WHERE id=?`, rid)
 				if t == "" {
 					t = "wasiat #" + strconv.FormatInt(rid, 10)
@@ -1155,7 +1159,10 @@ func (a *App) dmsChecklistSeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	office := a.officeOf(r)
-	std := []struct{ code, name string; items []string }{
+	std := []struct {
+		code, name string
+		items      []string
+	}{
 		{"PT-DIRIAN", "Standar Pendirian PT", []string{
 			"KTP + NPWP semua pendiri (foto jelas, NIK 16 digit)",
 			"KTP + NPWP Direksi & Komisaris",
@@ -1304,7 +1311,8 @@ func (a *App) dmsChecklistSeed(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dms/checklists?flash="+url.QueryEscape(strconv.Itoa(made)+" paket standar dipasang"), http.StatusSeeOther)
 }
 
-func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {	if !a.requireStaff(w, r) {
+func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
 		return
 	}
 	_ = r.ParseForm()

@@ -20,11 +20,11 @@ import (
 	"notaryos/internal/clients"
 	"notaryos/internal/corp"
 	"notaryos/internal/cryptoxx"
-	"notaryos/internal/diff"
-	"notaryos/internal/doctpl"
-	"notaryos/internal/docengine"
-	"notaryos/internal/docx"
 	"notaryos/internal/deliver"
+	"notaryos/internal/diff"
+	"notaryos/internal/docengine"
+	"notaryos/internal/doctpl"
+	"notaryos/internal/docx"
 	"notaryos/internal/gov"
 	"notaryos/internal/mfa"
 	mw "notaryos/internal/middleware"
@@ -1447,6 +1447,10 @@ func (a *App) willCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
+		http.Error(w, "klien tidak ditemukan di kantor ini", http.StatusBadRequest)
+		return
+	}
 	id, err := a.wills.Register(a.officeOf(r), clientID, nil, r.FormValue("register_no"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1532,13 +1536,13 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 	a.render(w, r, "deed_detail", "Detail Akta #"+strconv.FormatInt(id, 10), map[string]any{
 		"Deed": d, "Body": body, "Versions": vers, "Clauses": clauses, "Props": pr,
 		"CmpA": cmpA, "CmpB": cmpB, "CmpN": cmpN, "DiffOps": diffOps, "DiffAdd": diffAdd, "DiffDel": diffDel,
-		"TplBody": safehtml.ToText(tplBody),
+		"TplBody":    safehtml.ToText(tplBody),
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
-		"Timeline":   a.deedTimeline(id),
-		"Attached":   a.deedFiles(a.officeOf(r), id),
-		"CanEdit":    rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
+		"Timeline": a.deedTimeline(id),
+		"Attached": a.deedFiles(a.officeOf(r), id),
+		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
 	})
 }
 
@@ -1771,15 +1775,15 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, title, due_date, status, recurrence, ref_type, COALESCE(ref_id,0) FROM tasks WHERE office_id=? ORDER BY status, due_date LIMIT 200`, a.officeOf(r))
 	type task struct {
-		ID                   int64
-		Title, Due, Status   string
-		Rec, RefType         string
-		RefID                int64
-		DeedTitle            string
-		DeedStatus           string
-		DeedVersion          int
-		DeedPreview          string
-		DeedLocked           bool
+		ID                 int64
+		Title, Due, Status string
+		Rec, RefType       string
+		RefID              int64
+		DeedTitle          string
+		DeedStatus         string
+		DeedVersion        int
+		DeedPreview        string
+		DeedLocked         bool
 	}
 	var out []task
 	if rows != nil {

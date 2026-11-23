@@ -32,8 +32,8 @@ import (
 	"notaryos/internal/files"
 	"notaryos/internal/finance"
 	"notaryos/internal/gov"
-	"notaryos/internal/money"
 	mw "notaryos/internal/middleware"
+	"notaryos/internal/money"
 	"notaryos/internal/notify"
 	"notaryos/internal/ocr"
 	"notaryos/internal/plan"
@@ -75,27 +75,27 @@ func redactNIKDisp(s string) string {
 
 // App wires the modular monolith: router, stores, templates.
 type App struct {
-	cfg       config.Config
-	db        *sql.DB
-	log       *slog.Logger
-	sessions  auth.SessionStore
-	tmpl      *template.Template
-	audit     *audit.Logger
-	users     *users.Store
-	clients   *clients.Store
-	reqs      *requests.Store
-	deeds     *deeds.Store
-	dms       *dms.Store
-	fin       *finance.Store
-	wills     *deeds.WillStore
-	corp      *corp.Store
-	tpl       *doctpl.Store
-	govs      *gov.Store
-	uploads   *files.Store
-	web       *cms.Store
-	ocr       ocr.Provider
-	files     storage.Store
-	pool      *workers.Pool
+	cfg      config.Config
+	db       *sql.DB
+	log      *slog.Logger
+	sessions auth.SessionStore
+	tmpl     *template.Template
+	audit    *audit.Logger
+	users    *users.Store
+	clients  *clients.Store
+	reqs     *requests.Store
+	deeds    *deeds.Store
+	dms      *dms.Store
+	fin      *finance.Store
+	wills    *deeds.WillStore
+	corp     *corp.Store
+	tpl      *doctpl.Store
+	govs     *gov.Store
+	uploads  *files.Store
+	web      *cms.Store
+	ocr      ocr.Provider
+	files    storage.Store
+	pool     *workers.Pool
 }
 
 // Page is template data for every Tabler page.
@@ -117,20 +117,20 @@ type Page struct {
 
 // BrandingView carries white-label values into every template (safe, validated).
 type BrandingView struct {
-	AppName, ShortName, Tagline string
-	Primary, Secondary, Accent  string
+	AppName, ShortName, Tagline  string
+	Primary, Secondary, Accent   string
 	SidebarBG, HeaderBG          string
-	ButtonRadius, FontStack     string
+	ButtonRadius, FontStack      string
 	LogoURL, FaviconURL, LoginBG string
-	FooterText, CopyrightText   string
+	FooterText, CopyrightText    string
 }
 
 // New builds the app. db may be nil only in tests that never hit handlers.
 func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
-		"can":       func(role, perm string) bool { return rbac.Has(role, perm) },
-		"wib":       func(t time.Time) string { return wib.Format(t) },
-		"wibdate":   func(t time.Time) string { return wib.Date(t) },
+		"can":     func(role, perm string) bool { return rbac.Has(role, perm) },
+		"wib":     func(t time.Time) string { return wib.Format(t) },
+		"wibdate": func(t time.Time) string { return wib.Date(t) },
 		"css": func(s string) template.CSS {
 			// Allowlist ketat: hanya karakter aman font-stack (huruf, koma, spasi, kutip, strip).
 			var b strings.Builder
@@ -149,7 +149,7 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"safeHTML":  func(s string) template.HTML { return template.HTML(safehtml.Sanitize(s)) },
 		"cmsHTML":   func(s string) template.HTML { return template.HTML(cms.SanitizeHTML(s)) },
 		"plaintext": func(s string) string { return safehtml.ToText(s) },
-		"sub": func(a, b int64) int64 { return a - b },
+		"sub":       func(a, b int64) int64 { return a - b },
 		// refLink renders a safe deep-link for task context references.
 		"refLink": func(typ string, id int64) template.HTML {
 			if id <= 0 {
@@ -1215,6 +1215,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	var feed []activity
 	if a.db != nil {
+		canWill := willReader(mw.RoleOf(r))
 		rows, _ := a.db.Query(`SELECT a.action, COALESCE(u.name,'sistem'), a.created_at, a.entity, a.entity_id
 			FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 10`)
 		if rows != nil {
@@ -1223,6 +1224,9 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			for rows.Next() {
 				var x activity
 				_ = rows.Scan(&x.Action, &x.Actor, &x.At, &x.Entity, &x.EntityID)
+				if !canWill && (x.Entity == "will" || strings.HasPrefix(x.Action, "will.")) {
+					continue
+				}
 				if base, ok := link[x.Entity]; ok {
 					x.URL = base
 					if x.Entity == "client" || x.Entity == "service_request" || x.Entity == "deed" {
@@ -1630,10 +1634,10 @@ func (a *App) clientDetail(w http.ResponseWriter, r *http.Request) {
 	a.render(w, r, "client_detail", "Detail Klien", map[string]any{
 		"Client": c, "Duplicates": dups, "Identities": ids, "VerHist": verHist, "Reps": reps, "Files": docs,
 		"Services": svcs, "Trail": trail, "Notes": notes, "Timeline": timeline,
-		"Fin": map[string]int64{"Invoices": fin.Invoices, "Paid": fin.Paid, "Outstanding": fin.Outstanding, "Overdue": fin.Overdue},
+		"Fin":       map[string]int64{"Invoices": fin.Invoices, "Paid": fin.Paid, "Outstanding": fin.Outstanding, "Overdue": fin.Overdue},
 		"CanVerify": rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity),
 		"CanEdit":   rbac.Has(mw.RoleOf(r), rbac.PermEditClient),
-		"Complete": completeness, "Missing": missing,
+		"Complete":  completeness, "Missing": missing,
 	})
 }
 
@@ -2121,12 +2125,12 @@ func (a *App) protocols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		ID            int64
-		Bundle        string
-		Year          int
-		Ref           string
-		Status        string
-		Loc, Hold     string
+		ID        int64
+		Bundle    string
+		Year      int
+		Ref       string
+		Status    string
+		Loc, Hold string
 	}
 	var rows []row
 	if a.db != nil {
@@ -2225,14 +2229,14 @@ func (a *App) ppatRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		ID                                            int64
-		No, Date, Jenis                                string
-		Penjual, Pembeli                              string
-		Objek                                         string
-		Status, BPN                                   string
-		DeedID                                        int64
-		Days                                          int
-		Overdue                                       bool
+		ID               int64
+		No, Date, Jenis  string
+		Penjual, Pembeli string
+		Objek            string
+		Status, BPN      string
+		DeedID           int64
+		Days             int
+		Overdue          bool
 	}
 	var rows []row
 	if a.db != nil {
@@ -2337,8 +2341,8 @@ func (a *App) ppatBlanko(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	type data struct {
 		No, Date, Jenis, Penjual, Pembeli, Objek, Status, BPN string
-		DeedTitle, DeedBody                                    string
-		Office, OfficeAddr                                     string
+		DeedTitle, DeedBody                                   string
+		Office, OfficeAddr                                    string
 	}
 	var d data
 	var deedID sql.NullInt64
@@ -2622,8 +2626,8 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 	}
 	// Anggaran vs realisasi bulan berjalan per kategori.
 	type brow struct {
-		Category         string
-		Budget, Spent    int64
+		Category      string
+		Budget, Spent int64
 	}
 	var budgets []brow
 	month := time.Now().Format("2006-01-01")
@@ -2643,7 +2647,7 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 	}
 	// Laba per layanan: hanya invoice yang tertaut permohonan (jujur; sisanya "tanpa tautan").
 	type prow struct {
-		Service       string
+		Service      string
 		Count, Total int64
 	}
 	var profits []prow
@@ -2711,7 +2715,7 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 	// Top 5 layanan bulan berjalan: nama layanan + jumlah invoice + total dibayar,
 	// filter bulan berjalan, office-scoped.
 	type topRow struct {
-		Service    string
+		Service     string
 		Count, Paid int64
 	}
 	var topSvc []topRow
