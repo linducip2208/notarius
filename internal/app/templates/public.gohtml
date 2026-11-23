@@ -9,6 +9,13 @@
 {{if .Data.OG}}<meta property="og:image" content="{{.Data.OG}}"/>{{end}}
 {{if .Data.Office.Name}}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Notary","name":"{{.Data.Office.Name}}","address":"{{.Data.Office.Addr}}","telephone":"{{.Data.Office.Phone}}","email":"{{.Data.Office.Email}}"}</script>{{end}}
 <link rel="icon" type="image/png" href="{{if .Data.Brand.FaviconURL}}{{.Data.Brand.FaviconURL}}{{else}}/assets/brand/favicon.svg{{end}}"/>
+<meta name="theme-color" content="#0a1428"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<script>if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 <style>
 :root{--pri:{{.Data.Brand.Primary}};--sec:{{.Data.Brand.Secondary}};--acc:{{.Data.Brand.Accent}};--rad:{{.Data.Brand.ButtonRadius}}}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:{{css .Data.Brand.FontStack}};color:#1c2533;line-height:1.7;background:#fff;-webkit-font-smoothing:antialiased}

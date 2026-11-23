@@ -512,6 +512,9 @@ func (a *App) Router() http.Handler {
 	r.Get("/layanan/{code}", a.layananDetail)
 	r.Get("/docs", a.docsIndex)
 	r.Get("/docs/{step}", a.docsStep)
+	r.Get("/sw.js", a.pwaSW)
+	r.Get("/manifest.webmanifest", a.pwaManifest)
+	r.Get("/offline", a.offlinePage)
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("web/assets"))))
 	setupLimiter := mw.NewRateLimiter(10, time.Minute) // /setup: ketat, sekali pakai
 	r.Get("/login", a.loginForm)
@@ -787,6 +790,28 @@ func (a *App) readyz(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.Write([]byte("ready"))
+}
+
+// pwaManifest serves the install manifest with the correct MIME type
+// (FileServer would also work, but explicit type avoids proxy sniffing).
+func (a *App) pwaManifest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	http.ServeFile(w, r, "web/assets/manifest.webmanifest")
+}
+
+// pwaSW serves the service worker from root scope (covers the whole origin).
+// Must not be cached aggressively or updates get stuck on devices.
+func (a *App) pwaSW(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "web/assets/sw.js")
+}
+
+// offlinePage is the honest fallback shown by the service worker when the
+// device has no connection and nothing cached: explains, doesn't fake data.
+func (a *App) offlinePage(w http.ResponseWriter, r *http.Request) {
+	a.render(w, r, "offline", "Luring — SaktiNotaris", nil)
 }
 
 // ---- auth handlers ----
