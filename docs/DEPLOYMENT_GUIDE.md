@@ -62,3 +62,12 @@
   d. Login staf → buka `/dms/checklists` → klik ⚡ Pasang Standar (seed 23 paket checklist).
   e. Buka `/templates` → klik ⚡ Pasang 8 Konsep → Approve tiap template (DRAFT→APPROVED) sebelum dipakai produksi.
   f. Uji 1 permohonan end-to-end: buat permohonan → draf 1-klik → unggah berkas → verifikasi 2-kolom → invoice DP → portal timeline terlihat.
+12. PWA produksi (installable, aman).
+    a. Wajib HTTPS di produksi: service worker hanya jalan di secure context; `http://localhost` dikecualikan untuk dev.
+    b. Verifikasi instalabilitas: `curl -sI https://DOMAIN/manifest.webmanifest` harus 200 + MIME `application/manifest+json`; ikon 192/512 + maskable ada; `start_url` `/app`, `scope` `/`.
+    c. Di Chrome: DevTools → Application → Manifest/Service Workers hijau + tombol Install muncul; bila tidak, periksa field (b) di atas.
+    d. Update SW: `/sw.js` diserve `Cache-Control: no-cache` (sudah di `internal/app/app.go` `pwaSW`); versioning via nama cache `saktinotaris-vN` di `web/assets/sw.js` (naikkan tiap rilis aset agar cache lama dibersihkan saat activate).
+13. Workflow engine operasional (migrasi 027).
+    a. Pasang template: login staf → `/dms/checklists` → ⚡ Pasang Standar (sekaligus seed 3 template PT-DIRIAN/PPAT-AJB/KUASA, idempoten per office+service_code+version=1); instance dibuat otomatis saat permohonan dibuat.
+    b. Status instance: `ACTIVE` = berjalan (`current_step` = langkah aktif); `COMPLETED` = semua langkah DONE (`current_step` NULL). Status step: `PENDING` → `DONE` (tombol maju / auto-step kejadian nyata, diaudit `workflow.step`).
+    c. Backup: full-dump `deploy/backup/backup.sh` sudah mencakup `workflow_templates`, `workflow_steps`, `workflow_instances`, `workflow_step_states` (+ `service_workflow_rules`); tanpa cron tambahan.
