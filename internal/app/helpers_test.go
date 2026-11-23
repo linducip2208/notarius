@@ -12,15 +12,40 @@ func TestDeedTemplateKeyword(t *testing.T) {
 		want string
 	}{
 		{"PT-DIRIAN", "PT"},
+		{"PT-UBAH", "PT"},
+		{"PT-BUBAR", "PT"},
+		{"PT-PERUBAHAN", "PT"}, // alias lama -> PT
 		{"CV-DIRIAN", "CV"},
-		{"PPAT-AJB", "AJB"},
-		{"PPAT-HIBAH", "Hibah"},
+		{"CV-UBAH", "CV"},
+		{"FIRMA", "Firma"},
+		{"YAYASAN-DIRIAN", "Yayasan"},
+		{"YAYASAN-PENDIRIAN", "Yayasan"}, // alias lama -> Yayasan
+		{"KOPERASI", "Koperasi"},
+		{"PK-UMUM", "Perjanjian"},
+		{"HUTANG", "Perjanjian"},
+		{"SEWA", "Perjanjian"},
+		{"JUALBELI-NONPPAT", "Perjanjian"},
 		{"KUASA", "Kuasa"},
 		{"PRENUP", "Kawin"},
 		{"WASIAT", "wasiat"},
-		{"WASIAT-UMUM", "wasiat"},
-		{"PK-UMUM", "Perjanjian"},
-		{"LEGALISASI", ""},       // tak ada kata kunci khusus -> fallback kind/kosong
+		{"WASIAT-DAFTAR", "wasiat"},
+		{"WASIAT-UMUM", "wasiat"}, // alias lama -> wasiat
+		{"LEGALISASI", ""},
+		{"WAARMERKING", ""},
+		{"SALINAN", ""},
+		{"KUTIPAN", ""},
+		{"AHU-BANTU", ""},
+		{"OSS-BANTU", ""},
+		{"PPAT-AJB", "AJB"},
+		{"PPAT-HIBAH", "Hibah"},
+		{"PPAT-TUKAR", "Tukar"},
+		{"PPAT-APHB", "APHB"},
+		{"PPAT-INBRENG", "Inbreng"},
+		{"PPAT-SKMHT", "SKMHT"},
+		{"PPAT-APHT", "APHT"},
+		{"BUNDEL-PT-OSS", "PT"},
+		{"BUNDEL-CV-NIB", "CV"},
+		{"BUNDEL-AJB-BALIKNAMA", "AJB"},
 		{"KODE-TAK-KENAL", ""},   // kode tak dikenal -> ""
 		{"", ""},                 // kosong aman -> ""
 		{"  ppat-ajb  ", "AJB"},  // normalisasi case+spasi
@@ -39,25 +64,43 @@ func TestServiceDeedKind(t *testing.T) {
 		want string
 	}{
 		{"PT-DIRIAN", "PT"},
-		{"PT-PERUBAHAN", "PT"},
+		{"PT-UBAH", "PT"},
+		{"PT-BUBAR", "PT"},
+		{"PT-PERUBAHAN", "PT"}, // alias lama -> PT
 		{"CV-DIRIAN", "CV"},
+		{"CV-UBAH", "CV"},
 		{"FIRMA", "Firma"},
-		{"YAYASAN-PENDIRIAN", "Yayasan"},
+		{"YAYASAN-DIRIAN", "Yayasan"},
+		{"YAYASAN-PENDIRIAN", "Yayasan"}, // alias lama -> Yayasan
 		{"KOPERASI", "Koperasi"},
+		{"PK-UMUM", "Agreement"},
+		{"HUTANG", "Agreement"},
+		{"SEWA", "Agreement"},
+		{"JUALBELI-NONPPAT", "Agreement"},
+		{"KUASA", "POA"},
+		{"PRENUP", "Prenup"},
+		{"WASIAT", "Will"},
+		{"WASIAT-DAFTAR", "Will"},
+		{"WASIAT-UMUM", "Will"}, // alias lama -> Will
+		{"LEGALISASI", "Other"},
+		{"WAARMERKING", "Other"},
+		{"SALINAN", "Other"},
+		{"KUTIPAN", "Other"},
+		{"AHU-BANTU", "Other"},
+		{"OSS-BANTU", "Other"},
 		{"PPAT-AJB", "AJB"},
 		{"PPAT-HIBAH", "Hibah"},
 		{"PPAT-TUKAR", "TukarMenukar"},
 		{"PPAT-APHB", "APHB"},
-		{"WASIAT", "Will"},
-		{"WASIAT-UMUM", "Will"},
-		{"KUASA", "POA"},
-		{"PRENUP", "Prenup"},
-		{"HUTANG", "Agreement"},
-		{"LEGALISASI", "Other"},
-		{"WAARMERKING", "Other"},
-		{"AHU-BANTU", "Other"},
+		{"PPAT-INBRENG", "Inbreng"},
+		{"PPAT-SKMHT", "SKMHT"},
+		{"PPAT-APHT", "APHT"},
+		{"BUNDEL-PT-OSS", "PT"},
+		{"BUNDEL-CV-NIB", "CV"},
+		{"BUNDEL-AJB-BALIKNAMA", "AJB"},
 		{"KODE-TAK-KENAL", ""}, // default tak dikenal -> ""
 		{"", ""},               // kosong aman -> ""
+		{"  ppat-ajb  ", "AJB"}, // normalisasi case+spasi
 	}
 	for _, c := range cases {
 		if got := serviceDeedKind(c.code); got != c.want {
@@ -73,15 +116,41 @@ func TestCorpEntityOf(t *testing.T) {
 		want string
 	}{
 		{"PT-DIRIAN", "PT"},
-		{"PT-PERUBAHAN", "PT"},
+		{"PT-UBAH", "PT"},
+		{"PT-BUBAR", "PT"},
+		{"PT-PERUBAHAN", "PT"}, // alias lama -> PT
 		{"CV-DIRIAN", "CV"},
+		{"CV-UBAH", "CV"},
 		{"FIRMA", "Firma"},
-		{"YAYASAN-PENDIRIAN", "Yayasan"},
+		{"YAYASAN-DIRIAN", "Yayasan"},
+		{"YAYASAN-PENDIRIAN", "Yayasan"}, // alias lama -> Yayasan
 		{"YAYASAN", "Yayasan"},
 		{"KOPERASI", "Koperasi"},
-		{"PPAT-AJB", ""},       // non-korporat -> ""
-		{"WASIAT", ""},         // non-korporat -> ""
-		{"KUASA", ""},          // non-korporat -> ""
+		{"PK-UMUM", ""},          // non-korporat -> ""
+		{"HUTANG", ""},           // non-korporat -> ""
+		{"SEWA", ""},             // non-korporat -> ""
+		{"JUALBELI-NONPPAT", ""}, // non-korporat -> ""
+		{"KUASA", ""},            // non-korporat -> ""
+		{"PRENUP", ""},           // non-korporat -> ""
+		{"WASIAT", ""},           // non-korporat -> ""
+		{"WASIAT-DAFTAR", ""},    // non-korporat -> ""
+		{"WASIAT-UMUM", ""},      // non-korporat -> ""
+		{"LEGALISASI", ""},       // non-korporat -> ""
+		{"WAARMERKING", ""},      // non-korporat -> ""
+		{"SALINAN", ""},          // non-korporat -> ""
+		{"KUTIPAN", ""},          // non-korporat -> ""
+		{"AHU-BANTU", ""},        // non-korporat -> ""
+		{"OSS-BANTU", ""},        // non-korporat -> ""
+		{"PPAT-AJB", ""},         // non-korporat -> ""
+		{"PPAT-HIBAH", ""},       // non-korporat -> ""
+		{"PPAT-TUKAR", ""},       // non-korporat -> ""
+		{"PPAT-APHB", ""},        // non-korporat -> ""
+		{"PPAT-INBRENG", ""},     // non-korporat -> ""
+		{"PPAT-SKMHT", ""},       // non-korporat -> ""
+		{"PPAT-APHT", ""},        // non-korporat -> ""
+		{"BUNDEL-PT-OSS", "PT"},
+		{"BUNDEL-CV-NIB", "CV"},
+		{"BUNDEL-AJB-BALIKNAMA", ""}, // paket PPAT -> bukan badan usaha
 		{"KODE-TAK-KENAL", ""}, // tak dikenal -> ""
 		{"", ""},               // kosong aman -> ""
 	}

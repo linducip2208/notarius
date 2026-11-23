@@ -229,6 +229,15 @@ func (a *App) cmsBookingDecide(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _ = a.db.Exec(`UPDATE website_bookings SET status='DISETUJUI', appointment_id=? WHERE id=?`, apptID, id)
+		// Tugas persiapan office-scoped agar kunjungan tidak menggantung (best-effort:
+		// kegagalan insert tidak menggagalkan approval; tanpa ubah skema/status flow).
+		need := strings.TrimSpace(bpurpose)
+		if need == "" {
+			need = "umum"
+		}
+		taskTitle := fmt.Sprintf("Siapkan kunjungan booking: %s — %s (%s %s)", need, bname, bdate, bstart)
+		_, _ = a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,?,?)`,
+			a.officeOf(r), taskTitle, bdate, a.uid(r))
 		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "cms.booking.approve", Entity: "booking", EntityID: strconv.FormatInt(id, 10), Detail: fmt.Sprintf("appt#%d", apptID)})
 	} else {
 		_, _ = a.db.Exec(`UPDATE website_bookings SET status=? WHERE id=?`, to, id)

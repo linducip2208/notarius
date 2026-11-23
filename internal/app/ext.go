@@ -33,6 +33,7 @@ import (
 	"notaryos/internal/ocr"
 	"notaryos/internal/pdf"
 	"notaryos/internal/rbac"
+	"notaryos/internal/remind"
 	"notaryos/internal/safehtml"
 )
 
@@ -1480,6 +1481,12 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Wasiat terbatas: isi akta berjenis wasiat hanya untuk peran notaris
+	// (+auditor baca), meniru gerbang willsPage. Akta non-wasiat tidak berubah.
+	if d.Kind == "Will" && !willReader(mw.RoleOf(r)) {
+		a.forbidden(w, r)
+		return
+	}
 	vers, _ := a.deeds.Versions(a.officeOf(r), id)
 	clauses, _ := a.tpl.Clauses(a.officeOf(r))
 	// Panel properti: pembuat, tanggal, pengesah, hash, template.
@@ -1655,9 +1662,11 @@ func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
 		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email, &plan)
 	var strictInt int
 	_ = a.db.QueryRow(`SELECT strict_checklist FROM office_flags WHERE office_id=?`, a.officeOf(r)).Scan(&strictInt)
+	var slaJSON sql.NullString
+	_ = a.db.QueryRow(`SELECT sla_days_json FROM office_flags WHERE office_id=?`, a.officeOf(r)).Scan(&slaJSON)
 	a.render(w, r, "office", "Profil Kantor", map[string]any{
 		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email, "Plan": plan,
-		"Strict": strictInt == 1,
+		"Strict": strictInt == 1, "SLAJSON": slaJSON.String,
 	})
 }
 
@@ -1687,15 +1696,33 @@ func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Toggle mode ketat checklist — hanya kolom ini yang ditulis ke office_flags.
+	// Toggle mode ketat checklist + override SLA per layanan — keduanya
+	// ditulis ke office_flags. sla_days_json harus objek JSON valid
+	// (mis. {"PPAT-AJB": 5, "default": 10}); JSON rusak ditolak 400.
 	strict := 0
 	if v := r.FormValue("strict_checklist"); v == "1" || v == "on" {
 		strict = 1
 	}
-	// Best-effort: abaikan error (mis. tabel belum termigrasi) agar simpan
-	// profil kantor tidak pernah rusak oleh flag ini.
-	_, _ = a.db.Exec(`INSERT INTO office_flags(office_id, strict_checklist) VALUES(?,?)
+	slaRaw := strings.TrimSpace(r.FormValue("sla_days_json"))
+	if _, err := remind.ParseSLAOverrides(slaRaw); err != nil {
+		http.Error(w, "sla_days_json tidak valid: "+err.Error()+` — contoh valid: {"PPAT-AJB": 5, "default": 10}`, http.StatusBadRequest)
+		return
+	}
+	var slaVal any
+	if slaRaw == "" {
+		slaVal = nil
+	} else {
+		slaVal = slaRaw
+	}
+	// Best-effort untuk tabel yang belum termigrasi: bila INSERT ... SELECT
+	// sla_days_json gagal (kolom/tabel belum ada), fallback ke pernyataan
+	// lama yang hanya menulis strict_checklist agar simpan profil kantor
+	// tidak pernah rusak oleh flag ini.
+	if _, err := a.db.Exec(`INSERT INTO office_flags(office_id, strict_checklist, sla_days_json) VALUES(?,?,?)
+		ON DUPLICATE KEY UPDATE strict_checklist=VALUES(strict_checklist), sla_days_json=VALUES(sla_days_json)`, a.officeOf(r), strict, slaVal); err != nil {
+		_, _ = a.db.Exec(`INSERT INTO office_flags(office_id, strict_checklist) VALUES(?,?)
 		ON DUPLICATE KEY UPDATE strict_checklist=VALUES(strict_checklist)`, a.officeOf(r), strict)
+	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.update", Entity: "office", EntityID: "self"})
 	http.Redirect(w, r, "/office?flash=Profil+kantor+disimpan", http.StatusSeeOther)
 }

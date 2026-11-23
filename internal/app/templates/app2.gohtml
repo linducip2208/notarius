@@ -145,6 +145,7 @@ apply();
 <div class="col-md-4 mb-2"><label class="form-label">Email</label><input class="form-control" name="email" value="{{.Data.Email}}"/></div>
 <div class="col-12 mb-2"><label class="form-label">Alamat</label><textarea class="form-control" name="address" rows="2">{{.Data.Address}}</textarea></div>
 <div class="col-12 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="strict_checklist" value="1" {{if .Data.Strict}}checked{{end}}/><span class="form-check-label"><strong>Mode ketat checklist</strong> — bila aktif, permohonan tidak bisa ke IN_REVIEW/APPROVED selama masih ada item MISSING.</span></label></div>
+<div class="col-12 mb-2"><label class="form-label">Override SLA per layanan (JSON)</label><textarea class="form-control font-monospace" name="sla_days_json" rows="3" placeholder='cth. {"PPAT-AJB": 5, "default": 10}' spellcheck="false">{{.Data.SLAJSON}}</textarea><div class="form-text">Kunci = kode layanan persis (cth. PPAT-AJB) atau <code>default</code> untuk semua kode lain; nilai = hari (&gt; 0). Kosongkan = pakai bawaan. Berlaku di dashboard &amp; laporan.</div></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
 </div></form></div>
 {{template "page_close" .}}{{end}}

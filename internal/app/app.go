@@ -1749,6 +1749,10 @@ func corpEntityOf(code string) string {
 		return "Yayasan"
 	case code == "KOPERASI":
 		return "Koperasi"
+	case code == "BUNDEL-PT-OSS":
+		return "PT"
+	case code == "BUNDEL-CV-NIB":
+		return "CV"
 	default:
 		return ""
 	}
@@ -1902,6 +1906,12 @@ func serviceDeedKind(code string) string {
 	case c == "LEGALISASI", c == "WAARMERKING", c == "SALINAN", c == "KUTIPAN",
 		c == "AHU-BANTU", c == "OSS-BANTU":
 		return "Other"
+	case c == "BUNDEL-PT-OSS":
+		return "PT"
+	case c == "BUNDEL-CV-NIB":
+		return "CV"
+	case c == "BUNDEL-AJB-BALIKNAMA":
+		return "AJB"
 	default:
 		return ""
 	}
@@ -1943,6 +1953,12 @@ func deedTemplateKeyword(code string) string {
 		return "wasiat"
 	case c == "PK-UMUM", c == "HUTANG", c == "SEWA", c == "JUALBELI-NONPPAT":
 		return "Perjanjian"
+	case c == "BUNDEL-PT-OSS":
+		return "PT"
+	case c == "BUNDEL-CV-NIB":
+		return "CV"
+	case c == "BUNDEL-AJB-BALIKNAMA":
+		return "AJB"
 	default:
 		return ""
 	}
@@ -2806,9 +2822,10 @@ func (a *App) portalTimeline(requestID int64) []map[string]any {
 }
 
 // portalDeedID finds one downloadable deed for the request (0 when none).
+// Wasiat (kind 'Will') dikecualikan: isinya notaris-only via /wills + /deeds guard.
 func (a *App) portalDeedID(requestID int64, r *http.Request) int64 {
 	var id int64
-	_ = a.db.QueryRow(`SELECT d.id FROM deed_drafts d WHERE d.request_id=? AND d.office_id=? ORDER BY d.id DESC LIMIT 1`, requestID, a.officeOf(r)).Scan(&id)
+	_ = a.db.QueryRow(`SELECT d.id FROM deed_drafts d WHERE d.request_id=? AND d.office_id=? AND d.kind<>'Will' ORDER BY d.id DESC LIMIT 1`, requestID, a.officeOf(r)).Scan(&id)
 	return id
 }
 
@@ -2843,9 +2860,10 @@ func (a *App) portal(w http.ResponseWriter, r *http.Request) {
 				"Timeline": a.portalTimeline(id), "DeedID": a.portalDeedID(id, r)})
 		}
 		// Akta milik klien (unduh PDF diizinkan via canViewDeed server-side).
+		// Wasiat (kind 'Will') dikecualikan: terbatas notaris, tidak tampil di portal.
 		drows, _ := a.db.Query(`SELECT d.id, d.title, d.number, d.status FROM deed_drafts d
 			JOIN service_requests r ON r.id=d.request_id
-			WHERE r.client_id=? AND d.office_id=? ORDER BY d.id DESC`, clientID, a.officeOf(r))
+			WHERE r.client_id=? AND d.office_id=? AND d.kind<>'Will' ORDER BY d.id DESC`, clientID, a.officeOf(r))
 		var deeds []map[string]any
 		if drows != nil {
 			defer drows.Close()

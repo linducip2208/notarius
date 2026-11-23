@@ -8,6 +8,8 @@ package remind
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -80,14 +82,23 @@ func OverdueDocs(db *sql.DB, officeID int64) ([]OverdueDoc, error) {
 
 // ---- SLA per layanan (permohonan) ----
 //
-// Cara pakai (dashboard sengaja tidak diubah): panggil ServiceOverdue(db,
-// officeID) dari handler/laporan baru bila ingin menampilkan permohonan yang
-// melewati target umur layanannya, mis. badge "SLA terlewati (N)" di dashboard
-// atau baris per permohonan dengan link /requests/{ID}. Ambang per layanan
-// berasal dari ServiceSLA(kodeLayanan); override per kantor dapat disimpan di
-// office_flags.sla_days_json (format bebas, mis. {"PPAT-AJB":10}) dan
-// diterapkan oleh pemanggil — fungsi di bawah tidak membacanya agar perilaku
-// default tetap deterministik.
+// Format override per kantor (office_flags.sla_days_json, TEXT NULL):
+//
+//	{"PPAT-AJB": 5, "LEGALISASI": 3, "default": 10}
+//
+//   - Kunci = kode layanan persis seperti di services.code (case-insensitive,
+//     spasi diabaikan). Contoh "ppat-ajb" cocok dengan "PPAT-AJB".
+//   - Kunci khusus "default" (case-insensitive) mengganti angka fallback 7
+//     untuk kode yang tidak tercantum.
+//   - Nilai = target umur dalam hari, bilangan bulat > 0 dan <= 365.
+//   - Kosong/NULL = tidak ada override, semua kode memakai ServiceSLA.
+//   - JSON rusak / bukan objek / nilai tak valid -> seluruh override
+//     diabaikan (fallback ke default lama), tidak pernah error ke pemanggil.
+//
+// Cara pakai: ServiceSLA(code) untuk default deterministik (tidak menyentuh
+// DB); ServiceSLAFor(db, officeID, code) bila ingin override kantor berlaku
+// (dashboard & laporan); ServiceOverdue(db, officeID) sudah memakai
+// ServiceSLAFor sehingga override otomatis berlaku di laporan & dashboard.
 
 // ServiceSLA returns the target age in days for a service code:
 // LEGALISASI/WAARMERKING 2, AJB/SKMHT/APHT 7, PT-DIRIAN/YAYASAN/KOPERASI 14,
@@ -124,7 +135,10 @@ type ServiceOverdueItem struct {
 
 // ServiceOverdue lists OPEN requests (any status outside
 // COMPLETED/REJECTED/CANCELLED) whose age in days exceeds the per-service
-// target from ServiceSLA. Rows are oldest first, capped at 100.
+// target. The target honors the per-office override in
+// office_flags.sla_days_json via ServiceSLAFor (tolerant: missing
+// table/broken JSON falls back to ServiceSLA). Rows are oldest first,
+// capped at 100.
 func ServiceOverdue(db *sql.DB, officeID int64) ([]ServiceOverdueItem, error) {
 	rows, err := db.Query(`
 		SELECT r.id, r.title, s.code, s.name, r.status, DATEDIFF(NOW(), r.created_at)
@@ -136,12 +150,13 @@ func ServiceOverdue(db *sql.DB, officeID int64) ([]ServiceOverdueItem, error) {
 	}
 	defer rows.Close()
 	var out []ServiceOverdueItem
+	overrides := loadSLAOverrides(db, officeID)
 	for rows.Next() {
 		var it ServiceOverdueItem
 		if err := rows.Scan(&it.ID, &it.Title, &it.Code, &it.Service, &it.Status, &it.AgeDays); err != nil {
 			continue
 		}
-		it.SLADays = ServiceSLA(it.Code)
+		it.SLADays = ResolveSLA(it.Code, overrides)
 		if it.AgeDays > it.SLADays {
 			out = append(out, it)
 		}
@@ -150,4 +165,91 @@ func ServiceOverdue(db *sql.DB, officeID int64) ([]ServiceOverdueItem, error) {
 		}
 	}
 	return out, rows.Err()
+}
+
+// ---- Override SLA per kantor (office_flags.sla_days_json) ----
+
+// ParseSLAOverrides parses the raw sla_days_json value into a normalized
+// override map (keys upper-cased/trimmed, including "DEFAULT").
+//
+// Valid input: JSON object mapping service code (or "default") to a positive
+// integer number of days, e.g. `{"PPAT-AJB": 5, "default": 10}`.
+// Empty/whitespace-only input yields (nil, nil) — no overrides.
+// Any invalid input (broken JSON, non-object, empty key, non-numeric or
+// out-of-range value) yields a non-nil error; callers that must fail open
+// should ignore the map on error and fall back to ServiceSLA.
+func ParseSLAOverrides(raw string) (map[string]int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "null" {
+		return nil, nil
+	}
+	var decoded map[string]json.Number
+	dec := json.NewDecoder(strings.NewReader(trimmed))
+	dec.UseNumber()
+	if err := dec.Decode(&decoded); err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(decoded))
+	for k, v := range decoded {
+		key := strings.ToUpper(strings.TrimSpace(k))
+		if key == "" {
+			return nil, fmt.Errorf("sla_days_json: empty service code key")
+		}
+		n, err := v.Int64()
+		if err != nil {
+			return nil, fmt.Errorf("sla_days_json: value for %q must be an integer number of days", k)
+		}
+		if n <= 0 || n > 365 {
+			return nil, fmt.Errorf("sla_days_json: value for %q must be 1..365 days", k)
+		}
+		out[key] = int(n)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+// ResolveSLA returns the effective SLA in days for a service code given an
+// already-parsed override map (nil map = no overrides):
+// exact code match first, then "DEFAULT" key, else ServiceSLA(code).
+func ResolveSLA(code string, overrides map[string]int) int {
+	if len(overrides) > 0 {
+		if v, ok := overrides[strings.ToUpper(strings.TrimSpace(code))]; ok {
+			return v
+		}
+		if v, ok := overrides["DEFAULT"]; ok {
+			return v
+		}
+	}
+	return ServiceSLA(code)
+}
+
+// loadSLAOverrides reads office_flags.sla_days_json for one office.
+// Fail-open: nil DB, missing table/row, NULL/empty value, or broken JSON
+// all yield nil (caller falls back to ServiceSLA defaults).
+func loadSLAOverrides(db *sql.DB, officeID int64) map[string]int {
+	if db == nil {
+		return nil
+	}
+	var raw sql.NullString
+	if err := db.QueryRow(`SELECT sla_days_json FROM office_flags WHERE office_id=?`, officeID).Scan(&raw); err != nil {
+		return nil
+	}
+	if !raw.Valid {
+		return nil
+	}
+	m, err := ParseSLAOverrides(raw.String)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+// ServiceSLAFor returns the effective SLA in days for a service code in one
+// office: exact-code override, else "default" override, else ServiceSLA.
+// Fail-open: nil DB, missing table/row, or broken JSON falls back to
+// ServiceSLA(code) so behavior matches the old default.
+func ServiceSLAFor(db *sql.DB, officeID int64, code string) int {
+	return ResolveSLA(code, loadSLAOverrides(db, officeID))
 }

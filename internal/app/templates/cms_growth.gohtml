@@ -37,9 +37,9 @@
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Tanggal</th><th>Nama / Kontak</th><th>Keperluan</th><th>Status</th><th></th></tr></thead>
 <tbody>{{range .Data.Rows}}<tr><td><strong>{{.Date}}</strong> {{.Start}}</td><td>{{.Name}}<br/><span class="text-secondary">{{.Contact}}</span></td><td>{{.Purpose}}</td>
 <td><span class="badge {{if eq .Status "MENUNGGU"}}bg-yellow-lt{{else if eq .Status "DISETUJUI"}}bg-green-lt{{else}}bg-azure-lt{{end}}">{{.Status}}</span>{{if .Appt}} <a href="/appointments">appt#{{.Appt}}</a>{{end}}</td>
-<td>{{if eq .Status "MENUNGGU"}}<form method="post" action="/cms/bookings/{{.ID}}/decide" class="d-flex gap-1">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit" name="to" value="DISETUJUI" onclick="return confirm('Setujui? Klien tamu + janji temu akan dibuat.')">Setujui</button><button class="btn btn-sm btn-outline-danger" type="submit" name="to" value="DITOLAK">Tolak</button></form>{{end}}</td></tr>
+<td>{{if eq .Status "MENUNGGU"}}<form method="post" action="/cms/bookings/{{.ID}}/decide" class="d-flex gap-1">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit" name="to" value="DISETUJUI" onclick="return confirm('Setujui? Klien tamu + janji temu + tugas persiapan akan dibuat.')">Setujui</button><button class="btn btn-sm btn-outline-danger" type="submit" name="to" value="DITOLAK">Tolak</button></form>{{end}}</td></tr>
 {{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Belum ada booking. Bagikan tautan <code>/booking</code> di website.</td></tr>{{end}}</tbody></table></div>
-<p class="text-secondary small mx-3 mb-3">Menyetujui membuat klien tamu + janji temu resmi (tercatat di Penghadap & pengingat H-1).</p></div>
+<p class="text-secondary small mx-3 mb-3">Menyetujui membuat klien tamu + janji temu resmi (tercatat di Penghadap & pengingat H-1) + tugas persiapan di /tasks.</p></div>
 {{template "page_close" .}}{{end}}
 
 {{define "cms_team"}}{{template "head" .}}{{template "page_open" .}}
