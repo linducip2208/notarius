@@ -538,6 +538,8 @@ func (a *App) Router() http.Handler {
 		p.Post("/requests/{id}/shareholders/{sid}/link", a.shareholderLink)
 		p.Post("/requests/{id}/officers", a.officerAdd)
 		p.Post("/requests/{id}/bo", a.boAdd)
+		p.Post("/requests/{id}/parties", a.partyAdd)
+		p.Post("/requests/{id}/parties/{pid}/delete", a.partyRemove)
 		p.Get("/requests/{id}/wizard", a.corpWizard)
 		p.Get("/requests/{id}/wizard-ajb", a.ajbWizard)
 		p.Get("/requests/{id}/wizard-wasiat", a.willWizard)
@@ -707,7 +709,6 @@ func (a *App) Router() http.Handler {
 		p.Post("/dms/fields", a.dmsFieldSave)
 		p.Get("/dms/chain", a.dmsChain)
 		p.Post("/dms/chain", a.dmsChainSave)
-		p.Get("/dms/categories", a.dmsCategories)
 		p.Get("/dms/categories", a.dmsCategories)
 		p.Post("/dms/categories", a.dmsCategoryCreate)
 		p.Get("/dms/checklists", a.dmsChecklists)
@@ -1309,7 +1310,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	// Kartu notaris: menunggu persetujuan, siap TTE, macet SLA.
 	var toApprove, readySign, stuck int
 	if a.db != nil {
-		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status IN ('REVIEW','REVISION')`, office).Scan(&toApprove)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status IN ('IN_REVIEW')`, office).Scan(&toApprove)
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND status='APPROVED'`, office).Scan(&readySign)
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM service_requests r LEFT JOIN services s ON s.id=r.service_id WHERE r.office_id=? AND r.status IN ('SUBMITTED','IN_REVIEW','NEED_DOCS') AND r.updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL COALESCE(s.sla_days,3) DAY)`, office).Scan(&stuck)
 	}
@@ -1824,22 +1825,16 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	target := strings.ToUpper(strings.TrimSpace(r.FormValue("to")))
-	// Gate mode ketat checklist: ke IN_REVIEW/APPROVED ditolak selama masih
-	// ada item checklist berstatus MISSING. Bila strict mati (atau tabel flag
-	// belum ada), perilaku lama dipertahankan.
-	if (target == "IN_REVIEW" || target == "APPROVED") && a.strictChecklistEnabled(a.officeOf(r)) && a.dms != nil {
-		if items, err := a.dms.ChecklistForRequest(a.officeOf(r), id); err == nil {
-			miss := 0
-			for _, it := range items {
-				if it.Status == "MISSING" {
-					miss++
-				}
-			}
-			if miss > 0 {
-				msg := fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi di checklist bawah.", miss)
-				http.Redirect(w, r, "/requests/"+strconv.FormatInt(id, 10)+"?flash="+url.QueryEscape(msg)+"#checklist", http.StatusSeeOther)
-				return
-			}
+	// Aturan workflow per layanan (menggantikan if ad-hoc): ke IN_REVIEW/APPROVED
+	// ditolak selama masih ada blokir dari service_workflow_rules
+	// (checklist MISSING, identitas belum VERIFIED, pihak kurang, dst).
+	// Format pesan lama dipertahankan ("Mode ketat checklist aktif: …")
+	// dengan tambahan alasan lain di belakangnya.
+	if target == "IN_REVIEW" || target == "APPROVED" {
+		if blocks := workflowGate(a.db, a.officeOf(r), id, "", "move"); len(blocks) > 0 {
+			msg := fmt.Sprintf("Mode ketat checklist aktif: %s.", strings.Join(blocks, "; "))
+			http.Redirect(w, r, "/requests/"+strconv.FormatInt(id, 10)+"?flash="+url.QueryEscape(msg)+"#checklist", http.StatusSeeOther)
+			return
 		}
 	}
 	if err := a.reqs.Move(a.officeOf(r), id, r.FormValue("to"), a.uid(r), r.FormValue("note")); err != nil {
@@ -2387,32 +2382,31 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "status sudah final", http.StatusBadRequest)
 		return
 	}
-	// Gate checklist mode ketat (tiru requestMove/deedApprove): PPAT yang
-	// tertaut ke permohonan via deed_drafts.request_id wajib VERIFIED/
-	// RECEIVED semua sebelum boleh maju ke AKTA_JADI/LAPOR_BPN. Tanpa
-	// tautan permohonan, gate dilewati (resi asli tetap wajib di bawah).
-	if (next == "AKTA_JADI" || next == "LAPOR_BPN") && deedID.Valid && deedID.Int64 > 0 &&
-		a.strictChecklistEnabled(office) && a.dms != nil {
+	// Aturan workflow per layanan (menggantikan if ad-hoc): PPAT yang
+	// tertaut ke permohonan via deed_drafts.request_id dinilai engine
+	// (checklist, identitas, pihak, jenis akta, resi BPN). Tanpa tautan
+	// permohonan, gate dilewati (resi asli tetap wajib di bawah).
+	// Catatan filter: blok "resi BPN" engine hanya relevan untuk target
+	// LAPOR_BPN dan diabaikan bila resi susulan yang valid dikirim via form
+	// (agar resi baru tetap bisa disimpan dalam request yang sama);
+	// penolakan resi fiktif eksplisit di bawah tidak berubah.
+	bpn := strings.TrimSpace(r.FormValue("bpn_receipt"))
+	if (next == "AKTA_JADI" || next == "LAPOR_BPN") && deedID.Valid && deedID.Int64 > 0 {
 		var reqID sql.NullInt64
 		_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=? AND office_id=?`, deedID.Int64, office).Scan(&reqID)
 		if reqID.Valid {
-			if items, err := a.dms.ChecklistForRequest(office, reqID.Int64); err == nil {
-				bad := 0
-				for _, it := range items {
-					if it.Status != "VERIFIED" && it.Status != "RECEIVED" {
-						bad++
-					}
-				}
-				if bad > 0 {
-					http.Error(w, fmt.Sprintf("mode ketat checklist aktif: masih ada %d syarat permohonan #%d belum terverifikasi (wajib VERIFIED/RECEIVED) — selesaikan checklist dulu", bad, reqID.Int64), http.StatusConflict)
-					return
-				}
+			blocks := workflowGate(a.db, office, reqID.Int64, "", "ppat")
+			if next != "LAPOR_BPN" || (bpn != "" && bpn != "-") {
+				blocks = dropWorkflowBlocks(blocks, "resi BPN")
+			}
+			if len(blocks) > 0 {
+				http.Error(w, "aturan workflow permohonan #"+strconv.FormatInt(reqID.Int64, 10)+": "+strings.Join(blocks, "; "), http.StatusConflict)
+				return
 			}
 		}
 	}
 	// Larang resi fiktif: naik ke LAPOR_BPN wajib nomor resi BPN asli.
 	// Kosong maupun tanda "-" (perilaku lama) ditolak 400.
-	bpn := strings.TrimSpace(r.FormValue("bpn_receipt"))
 	if next == "LAPOR_BPN" && (bpn == "" || bpn == "-") {
 		http.Error(w, `nomor resi BPN asli wajib diisi sebelum lapor BPN — tanda "-" tidak diterima sebagai resi`, http.StatusBadRequest)
 		return
@@ -2480,6 +2474,18 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invs, _ := a.fin.List(a.officeOf(r))
+	// Filter opsional ?client=: tampilkan hanya invoice klien tersebut.
+	// Kosong/tidak valid = semua (perilaku lama dipertahankan).
+	clientFilter, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("client")), 10, 64)
+	if clientFilter > 0 {
+		kept := invs[:0]
+		for _, iv := range invs {
+			if iv.ClientID == clientFilter {
+				kept = append(kept, iv)
+			}
+		}
+		invs = kept
+	}
 	out, _ := a.fin.Outstanding(a.officeOf(r))
 	month := time.Now().Format("2006-01")
 	rev, _ := a.fin.Revenue(a.officeOf(r), month)
@@ -2561,7 +2567,7 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 	}
 	views = ordered
 	a.render(w, r, "finance", "Keuangan", map[string]any{
-		"Invoices": views, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID, "Suggest": suggestVal,
+		"Invoices": views, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID, "Suggest": suggestVal, "ClientFilter": clientFilter,
 	})
 }
 

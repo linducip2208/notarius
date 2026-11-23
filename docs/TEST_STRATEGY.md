@@ -6,6 +6,7 @@
 - E2E: login → klien → permohonan → akta → invoice → bayar via HTTP test — Sprint 3.
 - Keamanan: RBAC handler test, XSS template (auto-escape), traversal storage — Sprint 3.
 - Perintah: `go fmt ./... && go vet ./... && go test ./... && go test -race ./... && go build ./...`.
+- Seed katalog: `standardChecklistSeeds`/`standardTemplateSeeds` diuji murni tanpa DB (`internal/app/seed_catalog_test.go`: HUTANG/PK-UMUM/SEWA + Wasiat/Will).
 - Bukti: `docs/TEST_RESULTS.md` + `project/progress.json`. Mock bukan bukti integrasi MySQL.
 
 ## Status jujur CI-vs-lokal (PR #5, 2026-11-23)

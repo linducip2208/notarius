@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.0 (2026-11-23) — PRODUKSI PERDANA, 5 PENAHAN GO-LIVE TERTUTUP
+Ringkasan: RILIS PRODUKSI PERDANA — 5 penahan go-live tertutup: (1) backup GPG streaming tanpa plaintext + purge file lama + kredensial via env; (2) PPAT gate checklist strict + larang resi fiktif; (3) payment office-scope + test isolasi; (4) race booking serial + versi terkunci + approve bedakan 1062; (5) test jujur — fixture dummy KTP palsu, 22 uji nyata, skip eksplisit + docs CI-vs-lokal.
+Go-Live: seperti v0.4.8 + pastikan backup .sql.gz.gpg terbaru bisa di-restore (gpg --decrypt | gunzip | mysql) lalu purge plaintext lama via tombol /office, verifikasi gate PPAT strict + payment scope, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.4.8 (2026-11-23) — SETUP WIZARD + AUDIT LOGIN + LABEL FORM
 Ringkasan: wizard /setup sekali-pakai (kantor + super_admin pertama, aktif hanya bila users kosong, redirect /login selebihnya, rate-limit + transaksi anti-race, fail-closed); audit login gagal / MFA gagal / logout / MFA-sukses + lockout terverifikasi; 12 label form + autocomplete; strict redirect + anchor checklist.
 Go-Live: seperti v0.4.6 + untuk instalasi baru buka /setup sekali untuk buat kantor + admin pertama (setelah ada ≥1 user endpoint terkunci otomatis ke /login). Detail: docs/DEPLOYMENT_GUIDE.md.

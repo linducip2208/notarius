@@ -110,11 +110,19 @@ func (s *Store) Schedule(officeID, clientID int64, requestID *int64, at time.Tim
 }
 
 // SetAppointmentStatus moves SCHEDULED → DONE/CANCELLED/NOSHOW (office-scoped).
+// Backward moves out of terminal states (e.g. DONE → SCHEDULED) are rejected.
 func (s *Store) SetAppointmentStatus(officeID, id int64, to string) error {
 	switch to {
 	case "DONE", "CANCELLED", "NOSHOW", "SCHEDULED":
 	default:
 		return errors.New("status janji tidak dikenal")
+	}
+	var cur string
+	if err := s.db.QueryRow(`SELECT status FROM appointments WHERE id=? AND office_id=?`, id, officeID).Scan(&cur); err != nil {
+		return errors.New("janji tidak ditemukan")
+	}
+	if cur != "SCHEDULED" && to == "SCHEDULED" {
+		return errors.New("janji yang sudah selesai/batal tidak dapat dijadwalkan ulang — buat janji baru")
 	}
 	res, err := s.db.Exec(`UPDATE appointments SET status=? WHERE id=? AND office_id=?`, to, id, officeID)
 	if err != nil {

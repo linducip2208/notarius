@@ -78,13 +78,24 @@ func NewSubmission(ch Channel, ref string) Submission {
 }
 
 // Advance moves status forward; backward moves are rejected to keep
-// an honest evidence trail.
+// an honest evidence trail. Only adjacent forward steps are allowed:
+// DRAFT->READY->SUBMITTED->ACCEPTED, plus SUBMITTED->REJECTED as the
+// terminal rejection branch. Skips (e.g. DRAFT->ACCEPTED) and moves out
+// of terminal states (ACCEPTED/REJECTED) are rejected.
 func (s *Submission) Advance(to Status) error {
 	order := map[Status]int{
 		StatusDraft: 0, StatusReady: 1, StatusSubmitted: 2, StatusAccepted: 3, StatusRejected: 3,
 	}
-	if order[to] < order[s.Status] {
+	fromOrd, ok1 := order[s.Status]
+	toOrd, ok2 := order[to]
+	if !ok1 || !ok2 {
+		return errors.New("status pengajuan tidak dikenal")
+	}
+	if toOrd <= fromOrd {
 		return errors.New("cannot move submission backwards; create a new revision instead")
+	}
+	if toOrd != fromOrd+1 {
+		return errors.New("transisi pengajuan harus bertahap ke status tetangga berikutnya")
 	}
 	s.Status = to
 	s.UpdatedAt = time.Now().UTC()

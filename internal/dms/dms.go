@@ -821,6 +821,34 @@ func (s *Store) SetChecklistItem(officeID, requestID, itemID int64, status strin
 	default:
 		return errors.New("status checklist tidak dikenal")
 	}
+	// Transition map: MISSING->RECEIVED->VERIFIED, plus
+	// RECEIVED/VERIFIED->REJECTED atau NEEDS_REVISION. Lompatan lain
+	// (mis. MISSING->VERIFIED langsung, atau mundur VERIFIED->MISSING)
+	// ditolak. Status sama = idempotent, diizinkan.
+	var cur string
+	if err := s.db.QueryRow(`SELECT status FROM doc_checklist_records WHERE office_id=? AND request_id=? AND item_id=?`,
+		officeID, requestID, itemID).Scan(&cur); err != nil {
+		cur = "MISSING"
+	}
+	if cur != status {
+		allowed := map[string][]string{
+			"MISSING":        {"RECEIVED"},
+			"RECEIVED":       {"VERIFIED", "REJECTED", "NEEDS_REVISION"},
+			"VERIFIED":       {"REJECTED", "NEEDS_REVISION"},
+			"REJECTED":       {},
+			"NEEDS_REVISION": {},
+		}
+		ok := false
+		for _, nxt := range allowed[cur] {
+			if nxt == status {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return errors.New("transisi checklist tidak valid dari " + cur + " ke " + status)
+		}
+	}
 	_, err := s.db.Exec(`INSERT INTO doc_checklist_records(office_id, request_id, item_id, status, verified_by, verified_at, note)
 		VALUES(?,?,?,?,?,IF(? IN ('VERIFIED','REJECTED'),UTC_TIMESTAMP(),NULL),?)
 		ON DUPLICATE KEY UPDATE status=VALUES(status), verified_by=VALUES(verified_by),

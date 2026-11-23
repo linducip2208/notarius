@@ -202,8 +202,8 @@ func (a *App) cmsBookingDecide(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if bstatus != "MENUNGGU" && to == "DISETUJUI" {
-		http.Error(w, "hanya booking MENUNGGU yang bisa disetujui", http.StatusConflict)
+	if bstatus != "MENUNGGU" {
+		http.Error(w, "hanya booking MENUNGGU yang bisa diputuskan (DISETUJUI/DITOLAK/BATAL)", http.StatusConflict)
 		return
 	}
 	if to == "DISETUJUI" {

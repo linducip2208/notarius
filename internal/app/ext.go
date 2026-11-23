@@ -404,6 +404,14 @@ func firstWord(s string) string {
 	return s
 }
 
+// partyView adalah satu baris matter_parties + nama klien (migrasi 026).
+type partyView struct {
+	ID         int64
+	ClientID   int64
+	ClientName string
+	Role       string
+}
+
 func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	d, err := a.reqs.Get(a.officeOf(r), id)
@@ -495,7 +503,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	// PPAT terkait: 1 query JOIN deed_drafts.request_id (kecil, kolom seperlunya).
 	type ppatRef struct {
-		ID           int64
+		ID          int64
 		No, Jenis   string
 		Status      string
 	}
@@ -513,12 +521,29 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Para pihak matter (migrasi 026): JOIN clients, office-scoped via request.
+	var parties []partyView
+	if a.db != nil {
+		if rs, err := a.db.Query(`SELECT mp.id, mp.client_id, c.full_name, mp.role
+			FROM matter_parties mp JOIN clients c ON c.id=mp.client_id
+			WHERE mp.office_id=? AND mp.request_id=? ORDER BY mp.id`, a.officeOf(r), id); err == nil {
+			defer rs.Close()
+			for rs.Next() {
+				var p partyView
+				if err := rs.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Role); err == nil {
+					parties = append(parties, p)
+				}
+			}
+		}
+	}
+	partyClients, _ := a.clients.List(a.officeOf(r), "", 200)
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 		"SvcCode": a.svcCodeOf(id),
 		"WAPhone": waPhone, "WAText": waText, "WALink": waLink,
 		"Ppat": ppatRefs,
+		"Parties": parties, "PartyClients": partyClients, "PartyRoles": partyRoles,
 	})
 }
 
@@ -750,6 +775,76 @@ func (a *App) boAdd(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Beneficial+owner+dicatat", http.StatusSeeOther)
 }
 
+// partyRoles adalah daftar peran baku para pihak (allowlist tunggal).
+var partyRoles = []string{"PENGHADAP", "PENJUAL", "PEMBELI", "KREDITUR", "DEBITUR", "PENJAMIN", "PEMBERI_KUASA", "PENERIMA_KUASA", "SAKSI", "PIHAK"}
+
+func validPartyRole(s string) bool {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	for _, r := range partyRoles {
+		if s == r {
+			return true
+		}
+	}
+	return false
+}
+
+// partyAdd menautkan klien existing sebagai pihak matter (office-scoped + audit).
+func (a *App) partyAdd(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
+	role := strings.ToUpper(strings.TrimSpace(r.FormValue("role")))
+	if clientID <= 0 || !validPartyRole(role) {
+		http.Error(w, "klien dan peran baku wajib diisi", http.StatusBadRequest)
+		return
+	}
+	if _, err := a.clients.Get(a.officeOf(r), clientID); err != nil {
+		http.Error(w, "klien tidak ditemukan di kantor ini", http.StatusNotFound)
+		return
+	}
+	if _, err := a.db.Exec(`INSERT INTO matter_parties(office_id, request_id, client_id, role) VALUES(?,?,?,?)`,
+		a.officeOf(r), reqID, clientID, role); err != nil {
+		http.Error(w, "gagal menambah pihak (kemungkinan duplikat klien+peran)", http.StatusConflict)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "party.add", Entity: "service_request", EntityID: strconv.FormatInt(reqID, 10), Detail: fmt.Sprintf("c#%d:%s", clientID, role)})
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pihak+ditambahkan", http.StatusSeeOther)
+}
+
+// partyRemove melepas satu pihak matter (office-scoped + audit).
+func (a *App) partyRemove(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermEditClient) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	reqID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	pid, _ := strconv.ParseInt(chi.URLParam(r, "pid"), 10, 64)
+	if _, err := a.reqs.Get(a.officeOf(r), reqID); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	res, err := a.db.Exec(`DELETE FROM matter_parties WHERE id=? AND request_id=? AND office_id=?`, pid, reqID, a.officeOf(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "party.remove", Entity: "service_request", EntityID: strconv.FormatInt(reqID, 10), Detail: "party#" + strconv.FormatInt(pid, 10)})
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(reqID, 10)+"?flash=Pihak+dihapus", http.StatusSeeOther)
+}
+
 // ---- appointments ----
 
 func (a *App) appointments(w http.ResponseWriter, r *http.Request) {
@@ -893,16 +988,7 @@ func (a *App) templateSeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	office := a.officeOf(r)
-	std := []struct{ name, cat, body string }{
-		{"Standar Pendirian PT", "PT", tplPT},
-		{"Standar Pendirian CV", "CV", tplCV},
-		{"Standar AJB", "AJB", tplAJB},
-		{"Standar Hibah", "Hibah", tplHibah},
-		{"Standar Surat Kuasa", "Kuasa", tplKuasa},
-		{"Standar Sewa Menyewa", "Sewa", tplSewa},
-		{"Standar Prenup", "Prenup", tplPrenup},
-		{"Standar Perjanjian Kerjasama", "Perjanjian", tplPK},
-	}
+	std := standardTemplateSeeds()
 	made := 0
 	for _, s := range std {
 		var n int
@@ -965,6 +1051,16 @@ const tplPK = tplHead + `<h3>PERJANJIAN KERJASAMA</h3>
 <p>PIHAK PERTAMA: {{client_name}} ({{company_name}}, {{company_address}}).<br/>PIHAK KEDUA: ______________________.</p>
 <p>Maksud dan tujuan: ______________________. Hak dan kewajiban, jangka waktu, serta penyelesaian perselisihan diuraikan dalam pasal-pasal berikut.</p>
 <p><em>Lengkapi pasal tujuan, kontribusi, keuntungan, dan penutup — lalu kirim Review.</em></p>`
+
+// tplWasiat adalah template KONSEP wasiat (DRAFT, belum approved).
+// Akses terbatas (hanya peran notaris/auditor, lihat willsPage & deedDetail);
+// pengesahan wajib mencatat 2 saksi.
+const tplWasiat = tplHead + `<h3>SURAT WASIAT / TESTAMEN</h3>
+<p>Pewasiat: {{client_name}}, NIK {{client_nik}}, beralamat di ______________________.</p>
+<p>Ahli waris / penerima wasiat: ______________________ (hubungan: ______________________).</p>
+<p>Objek wasiat: ______________________ (uraikan harta + bukti kepemilikan).</p>
+<p>Dibuat di hadapan {{notary_name}}, Notaris di {{notary_office}}, dengan dihadiri 2 (dua) orang saksi yang dicatat saat pengesahan.</p>
+<p><em>Catatan: data wasiat akses terbatas — hanya notaris & auditor yang dapat melihat; staf/portal diblokir. Lengkapi daftar harta, saksi, dan penutup — lalu kirim Review.</em></p>`
 
 func (a *App) templateEdit(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
@@ -1109,15 +1205,15 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _ = a.db.Exec(`UPDATE deed_drafts SET witness1_name=?, witness1_id=?, witness2_name=?, witness2_id=?, read_at=NOW(), read_place=?, renvoi_note=? WHERE id=?`,
 		w1, nullStrOpt(r.FormValue("witness1_id")), w2, nullStrOpt(r.FormValue("witness2_id")), rdPlace, nullStrOpt(r.FormValue("renvoi_note")), id)
-	// Checklist permohonan tertaut harus VERIFIED semua (bila ada item).
+	// Aturan workflow per layanan (menggantikan cek checklist manual):
+	// checklist, identitas pihak, jumlah pihak, dan kesesuaian jenis akta
+	// dinilai engine dari service_workflow_rules. Syarat saksi + tempat
+	// pembacaan + isi + hash + mandat di sekitar blok ini TETAP berlaku.
 	var reqID sql.NullInt64
 	_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=?`, id).Scan(&reqID)
 	if reqID.Valid {
-		var bad int
-		_ = a.db.QueryRow(`SELECT COUNT(*) FROM doc_checklist_records WHERE office_id=? AND request_id=? AND status NOT IN ('VERIFIED','RECEIVED')`,
-			office, reqID.Int64).Scan(&bad)
-		if bad > 0 {
-			http.Error(w, "masih ada syarat permohonan belum terverifikasi — selesaikan checklist dulu", http.StatusConflict)
+		if blocks := workflowGate(a.db, office, reqID.Int64, "", "approve"); len(blocks) > 0 {
+			http.Error(w, "aturan workflow permohonan #"+strconv.FormatInt(reqID.Int64, 10)+": "+strings.Join(blocks, "; "), http.StatusConflict)
 			return
 		}
 	}
@@ -1185,6 +1281,16 @@ func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := a.db.Exec(`INSERT INTO deed_signatures(office_id, deed_id, signer_user_id, signer_name, content_hash, seal_code, note)
 		VALUES(?,?,?,?,?,?,?)`, office, id, signerID, signerName, hash, seal, r.FormValue("note")); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Transisi status APPROVED → SIGNED (office-scoped; hanya dari APPROVED).
+	// SIGNED bersifat terminal laporannya: rekap dasbor sudah menghitung
+	// SIGNED (app.go monthly query IN APPROVED/SIGNED/ARCHIVED), tombol
+	// tanda tangan hanya tampil untuk APPROVED, dan penandatangan kedua
+	// otomatis ditolak gate status di atas. SIGNED → ARCHIVED TIDAK dibuatkan
+	// endpoint di sini (arsip via protokol yang sudah ada).
+	if _, err := a.db.Exec(`UPDATE deed_drafts SET status='SIGNED' WHERE id=? AND office_id=? AND status='APPROVED'`, id, office); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -1567,7 +1673,43 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"Timeline": a.deedTimeline(a.officeOf(r), id),
 		"Attached": a.deedFiles(a.officeOf(r), id),
 		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
+		"Parties":  a.matterParties(a.officeOf(r), deedRequestID(a.db, id)),
 	})
+}
+
+// deedRequestID mengambil request_id draf (0 bila tanpa tautan permohonan).
+func deedRequestID(db *sql.DB, deedID int64) int64 {
+	if db == nil {
+		return 0
+	}
+	var req sql.NullInt64
+	_ = db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=?`, deedID).Scan(&req)
+	if req.Valid {
+		return req.Int64
+	}
+	return 0
+}
+
+// matterParties memuat daftar pihak matter (read-only untuk deedDetail).
+func (a *App) matterParties(officeID, reqID int64) []partyView {
+	var out []partyView
+	if a.db == nil || reqID == 0 {
+		return out
+	}
+	rs, err := a.db.Query(`SELECT mp.id, mp.client_id, c.full_name, mp.role
+		FROM matter_parties mp JOIN clients c ON c.id=mp.client_id
+		WHERE mp.office_id=? AND mp.request_id=? ORDER BY mp.id`, officeID, reqID)
+	if err != nil {
+		return out
+	}
+	defer rs.Close()
+	for rs.Next() {
+		var p partyView
+		if err := rs.Scan(&p.ID, &p.ClientID, &p.ClientName, &p.Role); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // deedFiles lists DMS files linked to a deed (lampiran dua arah).

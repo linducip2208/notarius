@@ -76,6 +76,8 @@ window.insertClause=insertClause;
 <tr><td class="text-secondary">Hash isi</td><td><code>{{.Data.Props.Hash}}</code></td></tr>
 <tr><td class="text-secondary">TTE internal</td><td>{{range .Data.Sigs}}<div class="small mb-1">{{.Signer}} · <code>{{.Hash}}</code><br/><span class="text-secondary">{{.At}} {{.Note}}</span></div>{{else}}<span class="text-secondary">Belum ditandatangani.</span>{{end}}</td></tr>
 </tbody></table></div></div>
+{{if .Data.Parties}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Para Pihak (dari permohonan)</h3></div>
+<div class="list-group list-group-flush">{{range .Data.Parties}}<div class="list-group-item"><a href="/clients/{{.ClientID}}">{{.ClientName}}</a> <span class="badge bg-azure-lt ms-1">{{.Role}}</span></div>{{end}}</div></div>{{end}}
 {{if .Data.CanSign}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Tanda Tangan Elektronik Internal</h3></div>
 <div class="card-body"><p class="text-secondary small">Hash SHA-256 atas isi + identitas + segel tercatat permanen. Bukan PSrE.</p>
 <form method="post" action="/deeds/{{.Data.Deed.ID}}/sign" class="d-flex gap-1">{{template "csrf" .}}<input class="form-control" name="note" placeholder="Catatan tanda tangan"/><button class="btn btn-dark" type="submit" data-confirm="Tandatangani isi saat ini? Hash tercatat permanen.">Tandatangani</button></form></div></div>{{end}}
