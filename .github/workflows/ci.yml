@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: build+vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go build
+        run: go build ./...
+      - name: go vet
+        run: go vet ./...
+
+  unit:
+    name: unit (tanpa DB/Tesseract)
+    runs-on: ubuntu-latest
+    env:
+      NOTARYOS_TEST_DSN: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Tanpa NOTARYOS_TEST_DSN dan tanpa NOTARYOS_TEST_TESSERACT:
+      # - tests/ SKIP eksplisit via TestMain (exit 0, BUKAN bukti hijau)
+      # - internal/ocr TestTesseractExtract_Fixture SKIP eksplisit (opt-in lokal)
+      # Ekspektasi: 0 FAIL; SKIP eksplisit OK.
+      - name: go test internal (0 FAIL, SKIP eksplisit OK)
+        run: go test ./internal/... -count=1
+
+  integration:
+    name: integration MySQL (non-blocking)
+    runs-on: ubuntu-latest
+    # NON-BLOCKING sementara: job ini opsional/informatif sampai
+    # integrasi MySQL stabil di CI. Lihat docs/TEST_STRATEGY.md
+    # tabel CI-vs-lokal: SKIP tanpa DSN = BUKAN bukti hijau.
+    continue-on-error: true
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: notaryos_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: notaryos_test
+      NOTARYOS_TEST_DSN: root:root@tcp(127.0.0.1:3306)/notaryos_test?parseTime=true&loc=UTC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Tunggu MySQL healthy
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_USER" -p"$DB_PASS" --silent; then
+              echo "MySQL siap."
+              exit 0
+            fi
+            echo "menunggu MySQL... ($i/30)"
+            sleep 3
+          done
+          echo "MySQL tidak siap tepat waktu."
+          exit 1
+      # tests/integration_test.go TestMain TIDAK menjalankan migrasi:
+      # ia hanya sql.Open+Ping lalu m.Run(). Tabel diasumsikan sudah ada
+      # (clean() = DELETE FROM ...), dan sebagian test butuh seed services
+      # (mis. code PT-DIRIAN dari 005_seed.sql). Jadi CI harus menerapkan
+      # semua migrasi berurutan sebelum go test ./tests/.
+      - name: Terapkan migrasi berurutan
+        run: |
+          for f in $(ls migrations/*.sql | sort); do
+            echo "== $f =="
+            mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$f"
+          done
+      - name: go test integrasi MySQL
+        run: go test ./tests/ -count=1 -v

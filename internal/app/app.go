@@ -294,6 +294,29 @@ func (a *App) officeOf(r *http.Request) int64 {
 	return office.Int64
 }
 
+// officePtr maps 0 (unknown/system) to nil so audit keeps NULL for
+// legacy/system rows. Non-zero offices return a fresh pointer.
+func officePtr(oid int64) *int64 {
+	if oid == 0 {
+		return nil
+	}
+	return &oid
+}
+
+// officeOfUser resolves the office of a user id without a session
+// (login/MFA path: no session cookie exists yet). Nil when unknown.
+func (a *App) officeOfUser(uid int64) *int64 {
+	if a.db == nil {
+		return nil
+	}
+	var office sql.NullInt64
+	_ = a.db.QueryRow(`SELECT office_id FROM users WHERE id=?`, uid).Scan(&office)
+	if !office.Valid || office.Int64 == 0 {
+		return nil
+	}
+	return officePtr(office.Int64)
+}
+
 // actingCookieName is the signed cross-office scope cookie (super_admin only).
 func (a *App) actingCookieName() string { return a.cfg.SessionName + "_act" }
 
@@ -820,7 +843,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		Expires: sess.ExpiresAt, MaxAge: 43200, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie,
 	})
 	uid := u.ID
-	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(u.ID, 10)})
+	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(u.ID, 10), OfficeID: u.OfficeID})
 	http.Redirect(w, r, "/app", http.StatusSeeOther)
 }
 
@@ -828,7 +851,7 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(a.cfg.SessionName); err == nil {
 		uid := a.uid(r)
 		a.sessions.Revoke(c.Value)
-		a.audit.Record(audit.Entry{ActorID: uid, Action: "logout", Entity: "user", EntityID: ""})
+		a.audit.Record(audit.Entry{ActorID: uid, Action: "logout", Entity: "user", EntityID: "", OfficeID: officePtr(a.officeOf(r))})
 	}
 	http.SetCookie(w, &http.Cookie{Name: a.cfg.SessionName, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: a.cfg.TLSCookie})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -2360,7 +2383,7 @@ func (a *App) ppatCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.create", Entity: "ppat_register", EntityID: r.FormValue("akta_no")})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.create", Entity: "ppat_register", EntityID: r.FormValue("akta_no"), OfficeID: officePtr(a.officeOf(r))})
 	http.Redirect(w, r, "/ppat?flash=Register+PPAT+tersimpan", http.StatusSeeOther)
 }
 
@@ -2417,7 +2440,7 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.advance." + strings.ToLower(next), Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10)})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.advance." + strings.ToLower(next), Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10), OfficeID: officePtr(office)})
 	http.Redirect(w, r, "/ppat?flash=Status+PPAT+diperbarui", http.StatusSeeOther)
 }
 
@@ -2642,7 +2665,7 @@ func (a *App) paymentCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "payment.create", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10)})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "payment.create", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10), OfficeID: officePtr(a.officeOf(r))})
 	http.Redirect(w, r, "/finance?flash=Pembayaran+dicatat", http.StatusSeeOther)
 }
 
@@ -2657,7 +2680,7 @@ func (a *App) invoiceVoid(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "invoice.void", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10), Detail: r.FormValue("reason")})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "invoice.void", Entity: "invoice", EntityID: strconv.FormatInt(invID, 10), Detail: r.FormValue("reason"), OfficeID: officePtr(a.officeOf(r))})
 	http.Redirect(w, r, "/finance?flash=Invoice+di-void", http.StatusSeeOther)
 }
 

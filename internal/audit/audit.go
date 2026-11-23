@@ -29,6 +29,10 @@ type Entry struct {
 	Entity   string
 	EntityID string
 	Detail   string
+	// OfficeID is optional: owning office of the event. Pointer (not plain
+	// int64) so Record's signature stays unchanged; nil writes NULL =
+	// legacy/system rows whose office is unknown.
+	OfficeID *int64
 }
 
 // Logger writes audit events to MySQL (best effort) and structured logs.
@@ -69,8 +73,8 @@ func (l *Logger) Record(e Entry) {
 	mac := hmac.New(sha256.New, chainKey())
 	_, _ = mac.Write([]byte(prev + "|" + payload))
 	chain := fmt.Sprintf("%x", mac.Sum(nil))
-	if _, err := tx.Exec(`INSERT INTO audit_logs(actor_id, action, entity, entity_id, detail, created_at, prev_hash, chain_hash)
-		VALUES(?,?,?,?,?,?,?,?)`, e.ActorID, e.Action, e.Entity, e.EntityID, e.Detail, now, prev, chain); err != nil {
+	if _, err := tx.Exec(`INSERT INTO audit_logs(actor_id, action, entity, entity_id, detail, office_id, created_at, prev_hash, chain_hash)
+		VALUES(?,?,?,?,?,?,?,?,?)`, e.ActorID, e.Action, e.Entity, e.EntityID, e.Detail, e.OfficeID, now, prev, chain); err != nil {
 		l.log.Error("audit persist failed", "err", err)
 		return
 	}

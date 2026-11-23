@@ -107,7 +107,7 @@ func (a *App) mfaVerify(w http.ResponseWriter, r *http.Request) {
 		a.render(w, r, "mfa_verify", "Verifikasi MFA", map[string]string{"Error": "Kode MFA salah."})
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(uid, 10), Detail: "via MFA"})
+	a.audit.Record(audit.Entry{ActorID: &uid, Action: "login", Entity: "user", EntityID: strconv.FormatInt(uid, 10), Detail: "via MFA", OfficeID: a.officeOfUser(uid)})
 	sess, err := a.sessions.Create(uid, role)
 	if err != nil {
 		http.Error(w, "gagal membuat sesi", http.StatusInternalServerError)
@@ -1233,10 +1233,10 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seal, _ := verifyCode("DEED", id)
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number") + " segel:" + seal})
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.approve", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("number") + " segel:" + seal, OfficeID: officePtr(office)})
 	var entryNo int64
 	_ = a.db.QueryRow(`SELECT entry_no FROM repertorium WHERE office_id=? AND deed_id=?`, office, id).Scan(&entryNo)
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "repertorium.insert", Entity: "repertorium", EntityID: strconv.FormatInt(entryNo, 10), Detail: "akta#" + strconv.FormatInt(id, 10)})
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "repertorium.insert", Entity: "repertorium", EntityID: strconv.FormatInt(entryNo, 10), Detail: "akta#" + strconv.FormatInt(id, 10), OfficeID: officePtr(office)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Akta+disahkan+segel:"+seal, http.StatusSeeOther)
 }
 
@@ -1294,7 +1294,7 @@ func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.sign", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: "hash:" + hash[:16] + " segel:" + seal})
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.sign", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: "hash:" + hash[:16] + " segel:" + seal, OfficeID: officePtr(office)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Tanda+tangan+internal+tercatat", http.StatusSeeOther)
 }
 
@@ -1586,7 +1586,7 @@ func (a *App) willCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.register", Entity: "will", EntityID: strconv.FormatInt(id, 10)})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.register", Entity: "will", EntityID: strconv.FormatInt(id, 10), OfficeID: officePtr(a.officeOf(r))})
 	http.Redirect(w, r, "/wills?flash=Wasiat+terdaftar", http.StatusSeeOther)
 }
 
@@ -1602,7 +1602,7 @@ func (a *App) willHandover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.handover", Entity: "will", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("handed_to")})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "will.handover", Entity: "will", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("handed_to"), OfficeID: officePtr(a.officeOf(r))})
 	http.Redirect(w, r, "/wills?flash=Serah-terima+wasiat+dicatat", http.StatusSeeOther)
 }
 
