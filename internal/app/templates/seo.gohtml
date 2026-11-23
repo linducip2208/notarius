@@ -54,7 +54,7 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item"><a href="/layanan">Layanan</a></li><li class="breadcrumb-item active">{{.Name}}</li></ol></nav>
 <p class="text-secondary mb-1">Layanan {{.Category}} · Kode {{.Code}}</p>
 <h2 class="display-6 fw-bold">{{.Name}}</h2>
-<div class="card mt-4"><div class="card-header"><h3 class="card-title">Persyaratan Dokumen</h3></div>
+<div class="card mt-4"><div class="card-header"><h3 class="card-title">Syarat berkas</h3></div>
 <ul class="list-group list-group-flush">{{range .Reqs}}<li class="list-group-item">✅ {{.}}</li>{{else}}<li class="list-group-item text-secondary">Hubungi kantor untuk daftar persyaratan layanan ini.</li>{{end}}</ul></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Tahapan di SaktiNotaris</h3></div>
 <div class="list-group list-group-flush">
@@ -64,7 +64,7 @@
 <div class="list-group-item"><span class="badge bg-primary rounded-pill me-2">4</span>Review & pengesahan notaris (final terkunci)</div>
 <div class="list-group-item"><span class="badge bg-primary rounded-pill me-2">5</span>Register & arsip (repertorium/protokol/invoice)</div>
 </div></div>
-<div class="alert alert-warning mt-3"><strong>Harga:</strong> lewat penawaran resmi sesuai kebutuhan — <a href="/konsultasi">konsultasi sekarang</a> atau <a href="/kalkulator?code={{.Code}}">hitung estimasi transparan</a>. Tanpa angka mengada-ada.</div>
+<div class="card mt-3"><div class="card-body"><strong>Estimasi harga mulai Rp {{printf "%.0f" .Price}}</strong><p class="text-secondary small mb-2">Harga final lewat penawaran resmi sesuai kebutuhan — tanpa angka mengada-ada. Lihat juga <a href="/kalkulator?code={{.Code}}">estimasi transparan</a>.</p><a class="btn btn-primary" href="/booking">Booking konsultasi</a> <a class="btn btn-outline-primary ms-2" href="/konsultasi">Minta penawaran</a></div></div>
 <p><a href="/layanan">← Kembali ke semua layanan</a></p>
 </main>
 <footer class="py-4 border-top"><div class="container-xl text-secondary small">© 2026 SaktiNotaris · Bukan PPAT/advokat · Tanpa klaim API pemerintah.</div></footer>

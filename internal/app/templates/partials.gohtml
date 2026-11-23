@@ -48,6 +48,7 @@
 {{if can .Role "legalization.process"}}<li class="nav-item"><a class="nav-link" href="/legalisasi">✅ Legalisasi</a></li>{{end}}
 <li class="nav-item"><a class="nav-link" href="/wills">🕊 Wasiat</a></li>
 <li class="nav-item"><a class="nav-link" href="/gov">🏛 AHU &amp; OSS</a></li>
+{{if can .Role "repertorium.manage"}}<li class="nav-item"><a class="nav-link" href="/ppat">🏠 Register PPAT</a></li>{{end}}
 {{if can .Role "finance.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Keuangan</span></li>
 <li class="nav-item"><a class="nav-link" href="/finance">💰 Invoice</a></li>
 <li class="nav-item"><a class="nav-link" href="/expenses">💸 Pengeluaran</a></li>

@@ -10,9 +10,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/skip2/go-qrcode"
@@ -25,6 +27,7 @@ import (
 	"notaryos/internal/officex"
 	"notaryos/internal/plan"
 	"notaryos/internal/rbac"
+	"notaryos/internal/remind"
 )
 
 func clientIPOf(r *http.Request) string {
@@ -251,22 +254,167 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	vers, _ := a.dms.Versions(a.officeOf(r), id)
 	rels, _ := a.dms.RelationsOf(a.officeOf(r), id)
+	usedIn := a.dmsUsedIn(a.officeOf(r), id)
 	tl, _ := a.dms.Timeline(a.officeOf(r), id)
 	holds, _ := a.dms.ActiveHolds(a.officeOf(r), id)
 	hist, _ := a.dms.MoveHistory(a.officeOf(r), id)
 	alog, _ := a.dms.AccessLog(a.officeOf(r), id)
 	ocrs, _ := a.uploads.OCRResults(id)
+	kkMembers := make([][]map[string]string, len(ocrs))
+	for i := range ocrs {
+		kkMembers[i] = parseKKMembers(ocrs[i].Fields)
+	}
 	cats, _ := a.dms.Categories(a.officeOf(r))
 	locs, _ := a.dms.Locations(a.officeOf(r))
 	fields, _ := a.dms.CustomFields(a.officeOf(r))
 	fvals, _ := a.dms.FieldValues(id)
 	pendingAppr, totalAppr := a.dms.ApprovalState(id)
 	a.render(w, r, "dms_detail", "Dokumen #"+strconv.FormatInt(id, 10), map[string]any{
-		"M": m, "Vers": vers, "Rels": rels, "Timeline": tl, "Holds": holds,
-		"Hist": hist, "Access": alog, "OCRs": ocrs, "Cats": cats, "Locs": locs,
+		"M": m, "Vers": vers, "Rels": rels, "UsedIn": usedIn, "Timeline": tl, "Holds": holds,
+		"Hist": hist, "Access": alog, "OCRs": ocrs, "KKMembers": kkMembers, "Cats": cats, "Locs": locs,
 		"Fields": fields, "FieldVals": fvals, "CanSee": dmsCanSee(mw.RoleOf(r), m.Conf),
 		"ApprPending": pendingAppr, "ApprTotal": totalAppr,
 	})
+}
+
+// dmsUsedIn collects reverse references to a file: doc_relations resolved to
+// titled deep-links, tasks with ref_type='file', and client specimens.
+// All lookups are best-effort reads; missing tables/rows are skipped so no
+// migration is required.
+func (a *App) dmsUsedIn(officeID, fileID int64) []map[string]any {
+	var out []map[string]any
+	seen := map[string]bool{}
+	add := func(kind string, id int64, title, url string) {
+		if id <= 0 {
+			return
+		}
+		k := kind + "/" + strconv.FormatInt(id, 10)
+		if seen[k] {
+			return
+		}
+		seen[k] = true
+		if title == "" {
+			title = kind + " #" + strconv.FormatInt(id, 10)
+		}
+		out = append(out, map[string]any{"Kind": kind, "ID": id, "Title": title, "URL": url})
+	}
+	titleOf := func(query string, id int64, args ...any) string {
+		var t sql.NullString
+		aargs := append([]any{}, args...)
+		aargs = append(aargs, id)
+		_ = a.db.QueryRow(query, aargs...).Scan(&t)
+		if t.Valid {
+			return t.String
+		}
+		return ""
+	}
+	// 1) Forward relations file -> entity (deed attach / link form).
+	if rows, err := a.db.Query(`SELECT related_type, related_id FROM doc_relations WHERE file_id=? ORDER BY id`, fileID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var rtype string
+			var rid int64
+			if err := rows.Scan(&rtype, &rid); err != nil {
+				continue
+			}
+			switch rtype {
+			case "client":
+				add("klien", rid, titleOf(`SELECT full_name FROM clients WHERE id=?`, rid), "/clients/"+strconv.FormatInt(rid, 10))
+			case "request":
+				add("permohonan", rid, titleOf(`SELECT title FROM service_requests WHERE id=?`, rid), "/requests/"+strconv.FormatInt(rid, 10))
+			case "deed":
+				add("akta", rid, titleOf(`SELECT title FROM deed_drafts WHERE id=?`, rid), "/deeds/"+strconv.FormatInt(rid, 10))
+			case "invoice":
+				t := titleOf(`SELECT number FROM invoices WHERE id=?`, rid)
+				add("invoice", rid, t, "/invoices/"+strconv.FormatInt(rid, 10)+"/receipt")
+			case "service":
+				add("layanan", rid, titleOf(`SELECT name FROM services WHERE id=?`, rid), "/layanan")
+			case "company":
+				add("perusahaan", rid, titleOf(`SELECT name FROM companies WHERE id=?`, rid), "/requests")
+			case "repertorium":
+				add("repertorium", rid, titleOf(`SELECT description FROM repertorium WHERE id=?`, rid), "/repertorium")
+			case "will":
+				t := titleOf(`SELECT register_no FROM wills WHERE id=?`, rid)
+				if t == "" {
+					t = "wasiat #" + strconv.FormatInt(rid, 10)
+				}
+				add("wasiat", rid, t, "/wills")
+			case "legalization":
+				add("legalisasi", rid, titleOf(`SELECT doc_title FROM legalizations WHERE id=?`, rid), "/legalisasi")
+			case "file":
+				add("berkas", rid, titleOf(`SELECT COALESCE(display_name,original_name) FROM files WHERE id=?`, rid), "/documents/"+strconv.FormatInt(rid, 10))
+			default:
+				add(rtype, rid, "", "#")
+			}
+		}
+	}
+	// 2) Owner upload context (files.owner_type/owner_id) — pre-relasi.
+	var otype string
+	var oid int64
+	if err := a.db.QueryRow(`SELECT owner_type, owner_id FROM files WHERE id=?`, fileID).Scan(&otype, &oid); err == nil && oid > 0 {
+		switch otype {
+		case "client":
+			add("klien", oid, titleOf(`SELECT full_name FROM clients WHERE id=?`, oid), "/clients/"+strconv.FormatInt(oid, 10))
+		case "request":
+			add("permohonan", oid, titleOf(`SELECT title FROM service_requests WHERE id=?`, oid), "/requests/"+strconv.FormatInt(oid, 10))
+		case "deed":
+			add("akta", oid, titleOf(`SELECT title FROM deed_drafts WHERE id=?`, oid), "/deeds/"+strconv.FormatInt(oid, 10))
+		}
+	}
+	// 3) Tasks tertaut ke berkas (tasks.ref_type='file'). Tabel/kolom mungkin
+	// belum ada di skema lama — gagal diam-diam = dilewati.
+	if rows, err := a.db.Query(`SELECT id, title FROM tasks WHERE office_id=? AND ref_type='file' AND ref_id=? ORDER BY id DESC LIMIT 20`, officeID, fileID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var tid int64
+			var t string
+			if err := rows.Scan(&tid, &t); err != nil {
+				continue
+			}
+			add("tugas", tid, t, "/tasks")
+		}
+	}
+	// 4) Spesimen klien memakai berkas ini.
+	if rows, err := a.db.Query(`SELECT client_id FROM client_specimens WHERE file_id=? LIMIT 20`, fileID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var cid int64
+			if err := rows.Scan(&cid); err != nil {
+				continue
+			}
+			add("spesimen", cid, titleOf(`SELECT full_name FROM clients WHERE id=?`, cid), "/clients/"+strconv.FormatInt(cid, 10)+"/specimens")
+		}
+	}
+	return out
+}
+
+// parseKKMembers extracts KK table rows from OCR fields. Supports several
+// key conventions (kk_nama_1/kk_nik_1, kk_member_1_name, kk_1_nama, ...)
+// because the OCR layer stores whatever was extracted. Empty => nil.
+func parseKKMembers(fields map[string]string) []map[string]string {
+	if len(fields) == 0 {
+		return nil
+	}
+	get := func(keys ...string) string {
+		for _, k := range keys {
+			if v := strings.TrimSpace(fields[k]); v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+	var out []map[string]string
+	for i := 1; i <= 20; i++ {
+		n := strconv.Itoa(i)
+		name := get("kk_nama_"+n, "kk_name_"+n, "kk_anggota_"+n, "kk_member_"+n, "kk_member_"+n+"_name",
+			"kk_"+n+"_nama", "kk_"+n+"_name", "kk_nama"+n)
+		nik := get("kk_nik_"+n, "kk_member_"+n+"_nik", "kk_"+n+"_nik", "kk_nik"+n)
+		if name == "" && nik == "" {
+			continue
+		}
+		out = append(out, map[string]string{"Name": name, "NIK": nik})
+	}
+	return out
 }
 
 func (a *App) dmsSaveMeta(w http.ResponseWriter, r *http.Request) {
@@ -558,6 +706,25 @@ func (a *App) dmsMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "doc.workflow", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: to})
+	// SLA otomatis: status terminal menutup tugas SLA yang masih OPEN;
+	// status lain membuat task bertipe file bila belum ada yang OPEN untuk ref ini.
+	switch to {
+	case "APPROVED", "FINALIZED", "ARCHIVED", "REJECTED":
+		_, _ = a.db.Exec(`UPDATE tasks SET status='DONE' WHERE office_id=? AND status='OPEN' AND ref_type='file' AND ref_id=?`,
+			a.officeOf(r), id)
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "dms.sla", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "SLA " + to + " selesai"})
+	default:
+		dueDays, _ := remind.SLAForWorkflow(to)
+		var n int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN' AND ref_type='file' AND ref_id=?`,
+			a.officeOf(r), id).Scan(&n)
+		if n == 0 {
+			due := time.Now().AddDate(0, 0, dueDays).Format("2006-01-02")
+			_, _ = a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by, ref_type, ref_id) VALUES(?,?,?,?, 'file', ?)`,
+				a.officeOf(r), fmt.Sprintf("SLA %s: dok #%d", to, id), due, a.uid(r), id)
+		}
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "dms.sla", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "SLA " + to})
+	}
 	http.Redirect(w, r, "/documents/"+strconv.FormatInt(id, 10)+"?flash=Workflow+berpindah+ke+"+to, http.StatusSeeOther)
 }
 
@@ -977,8 +1144,167 @@ func (a *App) dmsChecklistCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dms/checklists?flash=Template+checklist+disimpan", http.StatusSeeOther)
 }
 
-func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+// dmsChecklistSeed memasang 5 paket standar badan usaha bila belum ada.
+// Idempoten per service_code: template yang sudah ada dilewati.
+func (a *App) dmsChecklistSeed(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
+		a.forbidden(w, r)
+		return
+	}
+	if !a.requirePlan(w, r, plan.FeatChecklist) {
+		return
+	}
+	office := a.officeOf(r)
+	std := []struct{ code, name string; items []string }{
+		{"PT-DIRIAN", "Standar Pendirian PT", []string{
+			"KTP + NPWP semua pendiri (foto jelas, NIK 16 digit)",
+			"KTP + NPWP Direksi & Komisaris",
+			"3 opsi nama PT (urutan prioritas)",
+			"Modal dasar / ditempatkan / disetor + bukti setoran",
+			"Komposisi saham (nama — lembar — nominal)",
+			"Domisili + alamat lengkap PT (+ bukti sewa/kepemilikan)",
+			"KBLI usaha + email & HP aktif PT",
+			"Data BO: nama, % saham, PEP/non-PEP",
+		}},
+		{"CV-DIRIAN", "Standar Pendirian CV", []string{
+			"KTP + NPWP semua sekutu (aktif & pasif)",
+			"Nama CV + domisili usaha",
+			"Porsi modal tiap sekutu + siapa sekutu aktif",
+			"Alamat lengkap + email & HP aktif",
+		}},
+		{"FIRMA", "Standar Pendirian Firma", []string{
+			"KTP + NPWP semua sekutu firma",
+			"Nama firma + domisili usaha",
+			"Perjanjian penyertaan modal + pembagian laba",
+			"Alamat lengkap + email & HP aktif",
+		}},
+		{"YAYASAN-DIRIAN", "Standar Pendirian Yayasan", []string{
+			"KTP + NPWP pendiri, pengurus & pengawas",
+			"Nama yayasan + maksud & tujuan (AD)",
+			"Kekayaan awal dipisahkan + bukti setoran",
+			"Susunan organ (pembina/pengurus/pengawas)",
+			"Domisili + alamat lengkap sekretariat",
+		}},
+		{"KOPERASI", "Standar Akta Koperasi", []string{
+			"KTP minimal 9 pendiri (+ NPWP bila ada)",
+			"Nama koperasi + AD/ART konsep",
+			"Susunan pengurus & pengawas",
+			"Rencana usaha + domisili + modal awal",
+		}},
+		{"PPAT-AJB", "Standar AJB", []string{
+			"Sertifikat asli + cek bersih BPN (tidak sengketa/blokir)",
+			"KTP + KK + NPWP penjual & pembeli + pasangan (persetujuan suami/istri)",
+			"PBB lunas 10 tahun + NOP sesuai sertifikat",
+			"PPh penjual lunas + BPHTB pembeli lunas (validasi)",
+			"Surat belum sengketa + kuasa bila dikuasakan",
+		}},
+		{"PPAT-HIBAH", "Standar Hibah", []string{
+			"Sertifikat asli + cek bersih BPN",
+			"KTP pemberi & penerima hibah (+ pasangan pemberi)",
+			"PBB lunas + BPHTB hibah",
+			"Hubungan keluarga / alasan hibah tercatat",
+		}},
+		{"PPAT-APHB", "Standar APHB", []string{
+			"Sertifikat waris + SKW (surat keterangan waris)",
+			"KTP semua ahli waris + kesepakatan pembagian",
+			"PBB lunas + BPHTB waris/bagi",
+		}},
+		{"PPAT-APHT", "Standar APHT/SKMHT", []string{
+			"Sertifikat + SKMHT bila dikuasakan",
+			"KTP pemberi & penerima HT + data kredit bank",
+			"Peringkat HT + nilai tanggungan disepakati",
+		}},
+		{"PPAT-TUKAR", "Standar Tukar Menukar", []string{
+			"Dua sertifikat asli + cek bersih BPN keduanya",
+			"KTP + KK + NPWP kedua belah pihak (+ pasangan)",
+			"PBB lunas 10 tahun kedua objek + nilai tukar disepakati",
+		}},
+		{"PPAT-SKMHT", "Standar SKMHT", []string{
+			"Sertifikat + KTP pemberi & penerima kuasa",
+			"Data kredit bank + batas waktu SKMHT dicatat",
+		}},
+		{"PPAT-INBRENG", "Standar Inbreng", []string{
+			"Sertifikat + KTP pemilik tanah",
+			"Akta pendirian/perubahan PT + RUPS persetujuan inbreng",
+			"Nilai inbreng + penyesuaian modal disetor",
+		}},
+		{"PT-UBAH", "Standar Perubahan PT", []string{
+			"Akta terakhir + SK AHU terakhir",
+			"Data perubahan (AD/komposisi/pengurus/modal)",
+			"Persetujuan pemegang saham / keputusan RUPS",
+		}},
+		{"PT-BUBAR", "Standar Pembubaran PT", []string{
+			"Akta terakhir + SK AHU terakhir",
+			"Keputusan RUPS pembubaran + penunjukan likuidator",
+			"KTP likuidator + neraca penutup",
+		}},
+		{"CV-UBAH", "Standar Perubahan CV", []string{
+			"Akta terakhir + SKT terakhir",
+			"Data perubahan + kesepakatan sekutu",
+		}},
+		{"JUALBELI-NONPPAT", "Standar Jual-Beli non-PPAT", []string{
+			"KTP para pihak + objek & harga disepakati",
+			"Bukti kepemilikan objek (bukan sertifikat tanah)",
+			"Cara & jadwal pembayaran",
+		}},
+		{"KUASA", "Standar Surat Kuasa", []string{
+			"KTP pemberi & penerima kuasa",
+			"Ruang lingkup kuasa + batas waktu",
+		}},
+		{"PRENUP", "Standar Prenup/Postnup", []string{
+			"KTP calon/pasangan + KK",
+			"Daftar harta bawaan + pemisahan disepakati",
+		}},
+		{"WASIAT", "Standar Akta Wasiat", []string{
+			"KTP pewasiat + daftar ahli waris",
+			"Objek wasiat + 2 saksi (dicatat saat pengesahan)",
+		}},
+		{"AHU-BANTU", "Standar Asistensi AHU", []string{
+			"Data perseroan lengkap + akta terakhir",
+			"Akun AHU + draft pengajuan diperiksa notaris",
+		}},
+		{"OSS-BANTU", "Standar Asistensi OSS", []string{
+			"Data perusahaan + KBLI + NIB eksisting bila ada",
+			"Akun OSS + alamat email aktif perusahaan",
+		}},
+		{"BUNDEL-PT-OSS", "Paket Pendirian PT + NIB + NPWP", []string{
+			"KTP + NPWP semua pendiri, direksi & komisaris",
+			"3 opsi nama PT + komposisi saham (nama — lembar — nominal)",
+			"Modal dasar / ditempatkan / disetor + bukti setoran",
+			"Domisili + KBLI usaha + email & HP aktif PT",
+			"Data BO: nama, % saham, PEP/non-PEP",
+			"Akun AHU/OSS + NPWP perusahaan (diurus paralel pasca-akta)",
+		}},
+		{"BUNDEL-AJB-BALIKNAMA", "Paket AJB + Balik Nama", []string{
+			"Sertifikat asli + cek bersih BPN (tidak sengketa/blokir)",
+			"KTP + KK + NPWP penjual & pembeli (+ persetujuan pasangan)",
+			"PBB lunas 10 tahun + NOP sesuai sertifikat",
+			"PPh penjual lunas + BPHTB pembeli lunas (validasi)",
+			"AJB ditandatangani + resi lapor balik nama BPN",
+		}},
+		{"BUNDEL-CV-NIB", "Paket CV + NIB", []string{
+			"KTP + NPWP semua sekutu (aktif & pasif)",
+			"Nama CV + porsi modal tiap sekutu + siapa sekutu aktif",
+			"Domisili usaha + KBLI + alamat lengkap",
+			"Email & HP aktif CV + akun OSS untuk penerbitan NIB",
+		}},
+	}
+	made := 0
+	for _, s := range std {
+		var n int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM doc_checklist_templates WHERE office_id=? AND service_code=?`, office, s.code).Scan(&n)
+		if n > 0 {
+			continue
+		}
+		if _, err := a.dms.CreateChecklistTemplate(office, s.code, s.name, s.items); err == nil {
+			made++
+		}
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "checklist.seed", Entity: "office", EntityID: strconv.FormatInt(office, 10), Detail: strconv.Itoa(made) + " paket"})
+	http.Redirect(w, r, "/dms/checklists?flash="+url.QueryEscape(strconv.Itoa(made)+" paket standar dipasang"), http.StatusSeeOther)
+}
+
+func (a *App) dmsChecklistSet(w http.ResponseWriter, r *http.Request) {	if !a.requireStaff(w, r) {
 		return
 	}
 	_ = r.ParseForm()

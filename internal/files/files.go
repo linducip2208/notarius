@@ -224,6 +224,36 @@ func (s *Store) RunOCRWithContext(ctx context.Context, fileID int64) (ocr.Result
 	if _, ok := res.Fields["text"]; !ok {
 		res.Fields["text"] = ""
 	}
+	// Profesional: auto-parse KTP/KK menjadi saran prefill (review-only,
+	// tidak pernah auto-verify). Disimpan dengan prefix ktp_ di JSON yang sama.
+	if res.DocType == ocr.DocKTP || res.DocType == ocr.DocOther || strings.Contains(strings.ToUpper(orig), "KTP") || strings.Contains(res.Fields["text"], "NIK") {
+		sug := ocr.ParseKTP(res.Fields["text"])
+		for k, v := range sug.ToMap() {
+			res.Fields[k] = v
+		}
+		// OCR-1: cek konsistensi silang NIK vs TTL vs gender (saran saja).
+		if cons := ocr.CheckConsistency(sug); len(cons) > 0 {
+			res.Fields["ktp_consistency"] = strings.Join(cons, " | ")
+		} else {
+			res.Fields["ktp_consistency"] = ""
+		}
+	}
+	// OCR-4: parser KK/NPWP bila tipe dokumen cocok atau teks mengandung penanda.
+	// Saran prefill saja — tidak pernah auto-verify.
+	upperText := strings.ToUpper(res.Fields["text"])
+	upperOrig := strings.ToUpper(orig)
+	if res.DocType == ocr.DocKK || strings.Contains(upperText, "KARTU KELUARGA") || strings.Contains(upperOrig, "KK") {
+		kk := ocr.ParseKK(res.Fields["text"])
+		for k, v := range kk.ToMap() {
+			res.Fields[k] = v
+		}
+	}
+	if res.DocType == ocr.DocNPWP || strings.Contains(upperText, "NPWP") || strings.Contains(upperOrig, "NPWP") {
+		np := ocr.ParseNPWP(res.Fields["text"])
+		for k, v := range np.ToMap() {
+			res.Fields[k] = v
+		}
+	}
 	// Truncate stored text to 64KB (FULLTEXT-friendly, bukan BLOB PDF).
 	if len(res.Fields["text"]) > 65535 {
 		res.Fields["text"] = res.Fields["text"][:65535]
@@ -253,6 +283,26 @@ func (s *Store) Get(officeID, fileID int64) (Meta, io.ReadCloser, error) {
 		return Meta{}, nil, err
 	}
 	return m, rc, nil
+}
+
+// AssessBytes menilai kualitas gambar dari stream tanpa menduplikasi logika:
+// tulis ke temp file lalu panggil ocr.AssessImage. Dipakai untuk menilai
+// sebelum/sesudah simpan. PDF / format non-gambar mengembalikan error
+// dari AssessImage (pemanggil wajib abaikan gate, bukan gagalkan upload).
+func AssessBytes(r io.Reader) (ocr.QualityReport, error) {
+	tmp, err := os.CreateTemp("", "quality-*")
+	if err != nil {
+		return ocr.QualityReport{}, err
+	}
+	name := tmp.Name()
+	if _, err := io.Copy(tmp, io.LimitReader(r, maxUploadBytes+1)); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return ocr.QualityReport{}, err
+	}
+	tmp.Close()
+	defer os.Remove(name)
+	return ocr.AssessImage(name)
 }
 
 func stamp() string { return time.Now().UTC().Format("20060102T150405Z0700") }

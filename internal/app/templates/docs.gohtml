@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Tutorial: KTP Masuk → Dokumen Legalitas Sah | SaktiNotaris Docs</title>
+<title>Tutorial SaktiNotaris: Klien → Akta Sah → Keuangan | Docs</title>
 <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg"/>
-<meta name="description" content="Tutorial lengkap: unggah KTP & dokumen, OCR Tesseract, review verifikasi manusia, hingga menjadi dokumen legalitas yang sah di SaktiNotaris."/>
+<meta name="description" content="Tutorial bergambar 8 langkah sesuai fitur asli: tambah klien, upload & OCR, verifikasi manusia, permohonan, draf akta template, repertorium/protokol/legalisasi, invoice & bank, portal & dashboard."/>
 <link rel="canonical" href="/docs"/>
-<meta property="og:title" content="Tutorial SaktiNotaris: KTP Masuk → Dokumen Sah"/>
+<meta property="og:title" content="Tutorial SaktiNotaris: 8 Langkah Sesuai Fitur Asli"/>
 <meta property="og:image" content="/assets/docs/notarius-doc-legal.jpg"/>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Dari KTP masuk menjadi dokumen legalitas yang sah","step":[{{range $i, $s := .Steps}}{{if $i}},{{end}}{"@type":"HowToStep","name":"{{$s.Title}}","text":"{{$s.Intro}}"}}{{end}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Tutorial SaktiNotaris sesuai fitur aplikasi","step":[{{range $i, $s := .Steps}}{{if $i}},{{end}}{"@type":"HowToStep","name":"{{$s.Title}}","text":"{{$s.Intro}}"}}{{end}}]}</script>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 </head>
 <body>
@@ -17,17 +17,166 @@
 <h1 class="navbar-brand"><a href="/" class="text-decoration-none text-body"><img src="/assets/brand/saktinotaris-logo-b.png" alt="SaktiNotaris" style="height:30px;width:30px;object-fit:cover;object-position:center;border-radius:7px;vertical-align:middle"/> SaktiNotaris <span class="text-secondary small">Docs</span></a></h1>
 <nav class="navbar-nav ms-auto flex-row gap-1 align-items-center" aria-label="Navigasi"><a class="nav-link" href="/">Beranda</a><a class="nav-link" href="/layanan">Layanan</a><a class="btn btn-warning ms-1" href="/login">Coba Aplikasi</a></nav>
 </div></header>
-<main class="container-xl py-5" style="max-width:900px">
+<main class="container-xl py-5" style="max-width:960px">
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item active">Tutorial</li></ol></nav>
-<h2 class="display-6 fw-bold">KTP Masuk → Dokumen Legalitas yang Sah</h2>
-<p class="text-secondary fs-3">Empat langkah nyata di dalam aplikasi — dengan gambar sesungguhnya dari tiap tahap. Prinsipnya: OCR membantu membaca, <strong>manusia yang mengesahkan</strong>.</p>
+<span class="badge bg-blue-lt">8 langkah • sesuai menu asli aplikasi • bergambar</span>
+<h2 class="display-6 fw-bold mt-2">Klien Masuk → Akta Sah → Uang Tercatat</h2>
+<p class="text-secondary fs-3">Urutan kerja nyata di SaktiNotaris — klik tiap kartu untuk panduan per layar. Prinsipnya: OCR membantu membaca, <strong>manusia &amp; notaris yang mengesahkan</strong>.</p>
+<div class="row g-3">
+<div class="col-md-6"><div class="card h-100"><div class="card-body"><strong>Alur kerja:</strong><ol class="mb-0 mt-2"><li>/clients → /documents → verifikasi</li><li>/requests → /deeds → /repertorium</li><li>/finance → /portal → /app</li></ol></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-body"><strong>Cara pakai halaman ini:</strong><p class="mb-0 mt-2 text-secondary">Setiap langkah menampilkan tombol kuning <em>Coba di aplikasi</em> yang mengarah ke menu aslinya (mis. <code>/deeds</code>, <code>/finance</code>). Login dulu untuk mencoba.</p></div></div></div>
+</div>
+<div class="mt-3">
 {{range $i, $s := .Steps}}
 <div class="card mb-3"><div class="row g-0 align-items-center">
-<div class="col-md-4"><img class="w-100 h-100" style="object-fit:cover;min-height:180px" src="/assets/docs/{{$s.Img}}" alt="{{$s.Alt}}" loading="lazy"/></div>
-<div class="col-md-8"><div class="card-body"><h3>{{$s.Title}}</h3><p class="text-secondary">{{$s.Intro}}</p><a class="btn btn-outline-primary" href="/docs/{{$s.Slug}}">Baca langkah →</a></div></div>
+<div class="col-md-4"><img class="w-100 h-100" style="object-fit:cover;min-height:190px;max-height:240px;background:#f1f5f9" src="/assets/docs/{{$s.Img}}" alt="{{$s.Alt}}" loading="lazy"/></div>
+<div class="col-md-8"><div class="card-body"><h3 class="mt-0">{{$s.Title}}</h3><p class="text-secondary">{{$s.Intro}}</p><div class="d-flex gap-2 flex-wrap"><a class="btn btn-outline-primary" href="/docs/{{$s.Slug}}">Baca langkah →</a><a class="btn btn-ghost-secondary" href="{{$s.CTAURL}}"><code>{{$s.CTAURL}}</code></a></div></div></div>
 </div></div>
 {{end}}
+</div>
+<h3 class="mt-4 mb-1">Yang baru (enterprise)</h3>
+<p class="text-secondary small">Peningkatan mutu baca dokumen &amp; alur kerja — tetap dengan prinsip verifikasi manusia.</p>
+<div class="row g-3 mt-1">
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">Quality Gate upload</h4><p class="text-secondary small mb-2">Foto buram / terpotong ditolak sejak unggah dengan pesan jelas, bukan gagal diam-diam.</p><a class="btn btn-sm btn-outline-primary" href="/docs/ocr-proses">Lihat di OCR →</a></div></div></div>
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">Konsistensi NIK</h4><p class="text-secondary small mb-2">NIK yang beda antar-berkas satu klien ditandai otomatis sebelum masuk akta.</p><a class="btn btn-sm btn-outline-primary" href="/docs/review-verifikasi">Lihat di Verifikasi →</a></div></div></div>
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">Parser KK / NPWP</h4><p class="text-secondary small mb-2">KK &amp; NPWP ikut terbaca terstruktur (anggota keluarga, NPWP 16 digit) + prefill.</p><a class="btn btn-sm btn-outline-primary" href="/docs/ktp-masuk">Lihat di Klien Baru →</a></div></div></div>
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">SLA workflow</h4><p class="text-secondary small mb-2">Permohonan yang macet melewati SLA ditandai + pengingat harian otomatis.</p><a class="btn btn-sm btn-outline-primary" href="/docs/permohonan-layanan">Lihat di Permohonan →</a></div></div></div>
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">Dipakai-di-mana</h4><p class="text-secondary small mb-2">Setiap berkas menampilkan daftar akta / permohonan yang menautkannya.</p><a class="btn btn-sm btn-outline-primary" href="/docs/dokumen-sah">Lihat di Register →</a></div></div></div>
+<div class="col-md-4"><div class="card h-100"><div class="card-body"><span class="badge bg-green-lt mb-2">Baru</span><h4 class="mt-0">Preview + Todo-edit</h4><p class="text-secondary small mb-2">Dari /tasks langsung preview draft tertaut &amp; simpan revisi tanpa pindah halaman.</p><a class="btn btn-sm btn-outline-primary" href="/docs/akta-template">Lihat di Draf Akta →</a></div></div></div>
+</div>
+<h3 class="mt-4 mb-1">Checklist berkas badan usaha (siap cetak)</h3>
+<p class="text-secondary small">Bawa ini saat ke notaris. Centang + tulis tanggal terima. Di aplikasi, paket yang sama terpasang otomatis per permohonan via <code>/dms/checklists → ⚡ Pasang Standar</code> (PRO+).</p>
+<div class="no-print mb-2"><button class="btn btn-primary" onclick="window.print()">🖨 Cetak checklist</button></div>
+<div class="row g-3 mt-1">
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">PT — Pendirian</h3><span class="badge bg-blue-lt ms-auto">8 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> KTP + NPWP semua pendiri</label> <span class="text-secondary small">→ upload /clients → verifikasi</span></li>
+<li><label><input type="checkbox"/> KTP + NPWP Direksi &amp; Komisaris</label></li>
+<li><label><input type="checkbox"/> 3 opsi nama PT</label> <span class="text-secondary small">→ wizard /requests</span></li>
+<li><label><input type="checkbox"/> Modal dasar / ditempatkan / disetor + bukti setoran</label></li>
+<li><label><input type="checkbox"/> Komposisi saham (nama — lembar — nominal)</label> <span class="text-secondary small">→ Shareholders</span></li>
+<li><label><input type="checkbox"/> Domisili + alamat + bukti sewa/milik</label></li>
+<li><label><input type="checkbox"/> KBLI + email &amp; HP aktif PT</label> <span class="text-secondary small">→ Legal NIB</span></li>
+<li><label><input type="checkbox"/> Data BO (nama, %, PEP)</label> <span class="text-secondary small">→ Beneficial Owner</span></li>
+</ol></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">CV / Firma</h3><span class="badge bg-blue-lt ms-auto">4 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> KTP + NPWP semua sekutu</label> <span class="text-secondary small">→ upload + verifikasi</span></li>
+<li><label><input type="checkbox"/> Nama + domisili usaha</label> <span class="text-secondary small">→ wizard</span></li>
+<li><label><input type="checkbox"/> Porsi modal + sekutu aktif/pasif (firma: pembagian laba)</label></li>
+<li><label><input type="checkbox"/> Alamat + email &amp; HP aktif</label> <span class="text-secondary small">→ Legal SKT+NIB</span></li>
+</ol></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">Yayasan</h3><span class="badge bg-blue-lt ms-auto">5 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> KTP + NPWP pendiri, pengurus &amp; pengawas</label></li>
+<li><label><input type="checkbox"/> Nama + maksud &amp; tujuan (AD)</label></li>
+<li><label><input type="checkbox"/> Kekayaan awal dipisahkan + bukti setoran</label></li>
+<li><label><input type="checkbox"/> Susunan organ (pembina/pengurus/pengawas)</label> <span class="text-secondary small">→ Officers</span></li>
+<li><label><input type="checkbox"/> Domisili + alamat sekretariat</label></li>
+</ol></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">Koperasi</h3><span class="badge bg-blue-lt ms-auto">4 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> KTP min. 9 pendiri (+ NPWP)</label></li>
+<li><label><input type="checkbox"/> Nama + AD/ART konsep</label></li>
+<li><label><input type="checkbox"/> Susunan pengurus &amp; pengawas</label></li>
+<li><label><input type="checkbox"/> Rencana usaha + domisili + modal awal</label></li>
+</ol><p class="text-secondary small mt-2 mb-0">Setelah akta: SK AHU + NPWP badan + NIB — dicatat di tab Legal, bukti diunggah per item.</p></div></div></div>
+</div>
+<h3 class="mt-4 mb-1">Checklist PPAT (siap cetak)</h3>
+<p class="text-secondary small">Buku PPAT terpisah dari Repertorium — di aplikasi tercatat di <code>/ppat</code> dengan alur DRAFT_AKTA → AKTA_JADI → LAPOR_BPN → SERTIFIKAT_TERBIT. Paket yang sama terpasang otomatis via <code>/dms/checklists → ⚡ Pasang Standar</code>.</p>
+<div class="row g-3 mt-1">
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">AJB — Jual Beli</h3><span class="badge bg-green-lt ms-auto">5 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> Sertifikat asli + cek bersih BPN</label> <span class="text-secondary small">→ register /ppat</span></li>
+<li><label><input type="checkbox"/> KTP+KK+NPWP penjual &amp; pembeli + pasangan</label> <span class="text-secondary small">→ verifikasi identitas</span></li>
+<li><label><input type="checkbox"/> PBB lunas 10 tahun (NOP = sertifikat)</label></li>
+<li><label><input type="checkbox"/> PPh penjual + BPHTB pembeli lunas</label></li>
+<li><label><input type="checkbox"/> Srt belum sengketa + kuasa bila dikuasakan</label></li>
+</ol></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">Hibah / APHB / APHT</h3><span class="badge bg-green-lt ms-auto">3–4 item</span></div><div class="card-body"><ol class="mb-0">
+<li><label><input type="checkbox"/> Hibah: sertifikat + KTP pemberi/penerima (+ pasangan) + BPHTB</label></li>
+<li><label><input type="checkbox"/> APHB: sertifikat waris + SKW + KTP semua ahli waris + kesepakatan</label></li>
+<li><label><input type="checkbox"/> APHT/SKMHT: sertifikat + SKMHT + data kredit + peringkat HT</label></li>
+<li><label><input type="checkbox"/> Resi lapor BPN dicatat</label> <span class="text-secondary small">→ Maju → LAPOR_BPN di /ppat</span></li>
+</ol></div></div></div>
+</div>
+<h3 class="mt-4 mb-1">Uji Jual per Layanan (klik-demi-klik)</h3>
+<p class="text-secondary small">Uji tiap layanan dari menu asli: <code>/requests → /requests/{id}</code> (checklist + wizard + draf 1-klik) <code>→ /deeds → /repertorium</code> atau <code>/ppat → /finance → /portal</code>. Klik tiap layanan untuk 5–7 langkah konkret + kriteria lolos. Ikut tercetak saat tombol 🖨 Cetak checklist dipakai.</p>
+<div class="row g-3 mt-1"><div class="col-12">
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>1. PT-DIRIAN — Pendirian PT</strong> <span class="badge bg-blue-lt ms-2">/requests → wizard → /deeds → /repertorium</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → klik <strong>+ Permohonan</strong> → pilih layanan <strong>PT-DIRIAN</strong> → isi judul + klien → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → bagian checklist → klik <strong>⚡ Pasang Standar</strong> via <code>/dms/checklists</code> (paket PT-DIRIAN, 8 item).</li>
+<li>Klik <strong>Wizard Korporat →</strong> (<code>/requests/{id}/wizard</code>) → isi 5 langkah (nama, modal, saham, domisili/KBLI, BO) → Simpan tiap langkah.</li>
+<li>Tandai tiap item checklist <strong>RECEIVED → VERIFIED</strong>; sisakan 1 item <strong>MISSING</strong> untuk verifikasi.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> (POST /deeds) → buka <code>/deeds</code> → Preview draf PT terisi.</li>
+<li>Sahkan akta → cek <code>/repertorium</code> nomor baru muncul → <code>/finance?req={id}</code> → <strong>+ Buat Invoice</strong> → cek <code>/portal</code> tagihan tampil.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf terbuat + badge checklist MISSING muncul + nomor repertorium terbit + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>2. CV-DIRIAN — Pendirian CV</strong> <span class="badge bg-blue-lt ms-2">/requests → wizard → /deeds</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>CV-DIRIAN</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket standar <strong>CV-DIRIAN</strong> (4 item) via <code>/dms/checklists</code>.</li>
+<li>Klik <strong>Wizard Korporat →</strong> → isi sekutu aktif/pasif + porsi modal + domisili + email/HP → Simpan.</li>
+<li>Verifikasi checklist sekutu (KTP+NPWP) → tandai VERIFIED.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → buka <code>/deeds</code> → Preview template CV terisi.</li>
+<li>Sahkan → <code>/repertorium</code> → <code>/finance?req={id}</code> buat invoice → cek <code>/portal</code>.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf CV terbuat + progress wizard 5/5 + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>3. PPAT-AJB — Akta Jual Beli</strong> <span class="badge bg-green-lt ms-2">/requests → wizard-AJB → /ppat</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>PPAT-AJB</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>PPAT-AJB</strong> (sertifikat, KTP/KK/NPWP, PBB, PPh+BPHTB).</li>
+<li>Klik <strong>Wizard AJB →</strong> (<code>/requests/{id}/wizard-ajb</code>) → isi 4 langkah (penjual → pembeli → objek+pajak → register) → Simpan.</li>
+<li>Tandai checklist AJB VERIFIED; pastikan NOP PBB = nomor sertifikat.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → <code>/deeds</code> Preview AJB → sahkan → entri muncul di <code>/ppat</code> status DRAFT_AKTA.</li>
+<li>Di <code>/ppat</code> klik <strong>Maju → AKTA_JADI → LAPOR_BPN</strong> → catat resi → <code>/finance</code> invoice → <code>/portal</code>.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> register /ppat terisi + status maju sampai LAPOR_BPN + resi tercatat + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>4. KUASA — Surat Kuasa Notariil</strong> <span class="badge bg-blue-lt ms-2">/requests → /deeds → /repertorium</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>KUASA</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>KUASA</strong> (identitas pemberi+penerima, ruang lingkup).</li>
+<li>Isi ruang lingkup kuasa di catatan/wizard → tandai checklist VERIFIED.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → <code>/deeds</code> Preview template Kuasa terisi (pemberi, penerima, kewenangan).</li>
+<li>Sahkan → cek <code>/repertorium</code> nomor baru → <code>/finance?req={id}</code> invoice.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf kuasa terbuat + template kuasa terisi + nomor repertorium + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>5. PRENUP — Perjanjian Kawin</strong> <span class="badge bg-blue-lt ms-2">/requests → /deeds → /repertorium</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>PRENUP</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>PRENUP</strong> (KTP calon/pasangan, daftar harta).</li>
+<li>Isi daftar harta + pemisahan/persatuan → tandai checklist VERIFIED.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → <code>/deeds</code> Preview template Prenup terisi.</li>
+<li>Sahkan → <code>/repertorium</code> → <code>/finance?req={id}</code> invoice → <code>/portal</code>.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf prenup terbuat + daftar harta tampil di preview + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>6. WASIAT — Akta Wasiat</strong> <span class="badge bg-blue-lt ms-2">/requests → /deeds → /wills</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>WASIAT</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>WASIAT</strong> (KTP pewasiat, ahli waris, objek wasiat).</li>
+<li>Isi pewasiat + ahli waris + objek → tandai checklist VERIFIED (serah-terima hanya notaris).</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → <code>/deeds</code> Preview wasiat → sahkan.</li>
+<li>Cek <code>/wills</code> entri wasiat muncul → <code>/finance?req={id}</code> invoice.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf wasiat terbuat + entri /wills tercatat + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>7. LEGALISASI — Legalisasi Tanda Tangan</strong> <span class="badge bg-green-lt ms-2">/requests → /legalisasi</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>LEGALISASI</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → checklist: dokumen asli + KTP penghadap → VERIFIED.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> atau catat langsung di <code>/legalisasi</code> → pilih kind LEGALISASI → Simpan.</li>
+<li>Di <code>/legalisasi</code> maju status REGISTERED → COMPLETED → HANDED_OVER.</li>
+<li>Buka <code>/finance?req={id}</code> → invoice biaya legalisasi → cek <code>/portal</code> status bayar.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> register legalisasi COMPLETED + serah terima HANDED_OVER + invoice lunas.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>8. SEWA — Perjanjian Sewa-Menyewa</strong> <span class="badge bg-blue-lt ms-2">/requests → /deeds → /repertorium</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>SEWA</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → checklist: identitas para pihak, objek sewa, jangka waktu → VERIFIED.</li>
+<li>Isi objek + jangka waktu + harga sewa di catatan → Simpan.</li>
+<li>Klik <strong>📄 Buat Draf Akta</strong> → <code>/deeds</code> Preview template Sewa terisi.</li>
+<li>Sahkan → <code>/repertorium</code> → <code>/finance?req={id}</code> invoice → <code>/portal</code>.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> draf sewa terbuat + objek &amp; jangka waktu tampil + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>9. AHU-BANTU — Asistensi Pengajuan AHU</strong> <span class="badge bg-blue-lt ms-2">/requests → wizard → /finance</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>AHU-BANTU</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>AHU-BANTU</strong> (data perseroan lengkap).</li>
+<li>Lengkapi tab Legal di wizard/detail: SK AHU konsep + NPWP badan + NIB → unggah bukti per item.</li>
+<li>Tandai checklist VERIFIED; ubah status permohonan maju (workflow 9 status) sampai mendekati COMPLETED.</li>
+<li>Buka <code>/finance?req={id}</code> → invoice jasa asistensi → cek <code>/portal</code> &amp; <code>/tasks</code> tidak ada SLA merah.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> tab Legal terisi + status maju tanpa SLA merah + invoice terbit.</p></div></details>
+<details class="card mb-2"><summary class="card-header" style="cursor:pointer"><strong>10. OSS-BANTU — Asistensi Perizinan OSS</strong> <span class="badge bg-blue-lt ms-2">/requests → wizard → /finance</span></summary><div class="card-body"><ol class="mb-2">
+<li>Buka <code>/requests</code> → <strong>+ Permohonan</strong> → layanan <strong>OSS-BANTU</strong> → Simpan.</li>
+<li>Buka <code>/requests/{id}</code> → pasang paket <strong>OSS-BANTU</strong> (data perusahaan + KBLI).</li>
+<li>Isi KBLI + email &amp; HP aktif perusahaan di wizard → Simpan.</li>
+<li>Tandai checklist VERIFIED; catat NIB di tab Legal + unggah bukti.</li>
+<li>Buka <code>/finance?req={id}</code> → invoice → cek <code>/portal</code> klien bisa pantau.</li>
+</ol><p class="mb-0"><strong>Kriteria lolos:</strong> KBLI+NIB tercatat + checklist VERIFIED + invoice terbit + tampil di portal.</p></div></details>
+</div></div>
 <div class="alert alert-warning"><strong>Catatan kejujuran:</strong> keabsahan dokumen berasal dari pengesahan notaris sesuai UUJN — bukan dari OCR maupun aplikasi ini.</div>
+<div class="row g-3 mt-1">
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">Standar foto KTP (agar OCR akurat)</h3></div><div class="card-body"><ul class="mb-0"><li>Cahaya terang merata, tanpa flash memantul</li><li>Fokus tajam, seluruh kartu masuk bingkai, tidak miring &gt;10°</li><li>Resolusi ≥ 150 DPI (foto HP modern cukup), format JPG/PNG</li><li>Contoh sampel: NIK 16 digit harus terbaca utuh — 1 digit salah = verifikasi ulang</li></ul></div></div></div>
+<div class="col-md-6"><div class="card h-100"><div class="card-header"><h3 class="card-title">Troubleshooting OCR</h3></div><div class="card-body"><ul class="mb-0"><li><code>NIK ? / 1DEBBY / M-2-1990</code> → foto buram; ulangi foto lalu Jalankan OCR ulang (otomatis coba PSM 6→4→3)</li><li>RT/RW hilang → kartu terpotong; pastikan tepi kartu terlihat</li><li>Skor baca &lt; 0,65 → panel Saran Prefill menampilkan ⚠ — salin manual, jangan asal simpan</li><li>OCR DONE tapi field kosong → isi manual di Identitas → Verifikasi manusia tetap wajib</li></ul></div></div></div>
+</div>
 </main>
 <footer class="py-4 border-top"><div class="container-xl text-secondary small d-flex justify-content-between"><span>© 2026 SaktiNotaris Docs</span><span><a href="/">Beranda</a> · <a href="/layanan">Layanan</a></span></div></footer>
 <script src="/assets/vendor/tabler.min.js"></script>
@@ -44,7 +193,7 @@
 <meta name="description" content="{{.Step.Title}}: {{.Step.Intro}}"/>
 <link rel="canonical" href="/docs/{{.Step.Slug}}"/>
 <meta property="og:title" content="{{.Step.Title}}"/>
-<meta property="og:image" content="/assets/docs/notarius-{{.Step.Img}}"/>
+<meta property="og:image" content="/assets/docs/{{.Step.Img}}"/>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 </head>
 <body>
@@ -54,15 +203,27 @@
 </div></header>
 <main class="container-xl py-5" style="max-width:820px">
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/">Beranda</a></li><li class="breadcrumb-item"><a href="/docs">Tutorial ({{.Idx}}/{{.Total}})</a></li><li class="breadcrumb-item active">{{.Step.Title}}</li></ol></nav>
-<h2 class="display-6 fw-bold">{{.Step.Title}}</h2>
+<span class="badge bg-blue-lt">Langkah {{.Idx}} dari {{.Total}}</span>
+<h2 class="display-6 fw-bold mt-2">{{.Step.Title}}</h2>
 <p class="text-secondary fs-3">{{.Step.Intro}}</p>
-<img class="img-fluid rounded shadow my-3" style="width:100%;max-height:420px;object-fit:cover" src="/assets/docs/{{.Step.Img}}" alt="{{.Step.Alt}}"/>
-<div class="card"><div class="card-header"><h3 class="card-title">Langkah di aplikasi</h3></div>
-<div class="list-group list-group-flush">{{range .Step.Points}}<div class="list-group-item">✅ {{.}}</div>{{end}}</div></div>
+<img class="img-fluid rounded shadow my-3 border" style="width:100%;max-height:420px;object-fit:cover;background:#f1f5f9" src="/assets/docs/{{.Step.Img}}" alt="{{.Step.Alt}}"/>
+<div class="card"><div class="card-header"><h3 class="card-title">Langkah di aplikasi — <code>{{.Step.CTAURL}}</code></h3></div>
+<div class="list-group list-group-flush">{{range $n, $p := .Step.Points}}<div class="list-group-item"><span class="badge bg-green-lt me-2">{{$n}}</span>{{$p}}</div>{{end}}</div></div>
 <div class="alert alert-info mt-3"><strong>Perhatian:</strong> {{.Step.Honest}}</div>
-<div class="d-flex gap-2 mt-3">
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Kaitan fitur</h3></div>
+<div class="card-body d-flex gap-2 flex-wrap">
+{{if eq .Step.Slug "ktp-masuk"}}<a class="btn btn-sm btn-outline-primary" href="/clients">/clients — data klien</a><a class="btn btn-sm btn-outline-primary" href="/documents">/documents — berkas</a><a class="btn btn-sm btn-outline-primary" href="/requests">/requests — permohonan</a>{{end}}
+{{if eq .Step.Slug "ocr-proses"}}<a class="btn btn-sm btn-outline-primary" href="/documents">/documents — antrean OCR</a><a class="btn btn-sm btn-outline-primary" href="/tasks">/tasks — tindak lanjut gagal baca</a><a class="btn btn-sm btn-outline-primary" href="/clients">/clients — identitas</a>{{end}}
+{{if eq .Step.Slug "review-verifikasi"}}<a class="btn btn-sm btn-outline-primary" href="/clients">/clients — verifikasi identitas</a><a class="btn btn-sm btn-outline-primary" href="/deeds">/deeds — tarik ke akta</a><a class="btn btn-sm btn-outline-primary" href="/audit">/audit — jejak verifikasi</a>{{end}}
+{{if eq .Step.Slug "permohonan-layanan"}}<a class="btn btn-sm btn-outline-primary" href="/requests">/requests — workflow 9 status</a><a class="btn btn-sm btn-outline-primary" href="/tasks">/tasks — SLA &amp; pengingat</a><a class="btn btn-sm btn-outline-primary" href="/deeds">/deeds — lanjut ke draf</a>{{end}}
+{{if eq .Step.Slug "akta-template"}}<a class="btn btn-sm btn-outline-primary" href="/deeds">/deeds — draf &amp; preview</a><a class="btn btn-sm btn-outline-primary" href="/tasks">/tasks — preview + todo-edit</a><a class="btn btn-sm btn-outline-primary" href="/documents">/documents — berkas tertaut</a>{{end}}
+{{if eq .Step.Slug "dokumen-sah"}}<a class="btn btn-sm btn-outline-primary" href="/repertorium">/repertorium — register akta</a><a class="btn btn-sm btn-outline-primary" href="/deeds">/deeds — akta disahkan</a><a class="btn btn-sm btn-outline-primary" href="/documents">/documents — dipakai-di-mana</a>{{end}}
+{{if eq .Step.Slug "keuangan-invoice"}}<a class="btn btn-sm btn-outline-primary" href="/finance">/finance — invoice &amp; bank</a><a class="btn btn-sm btn-outline-primary" href="/portal">/portal — bayar klien</a><a class="btn btn-sm btn-outline-primary" href="/requests">/requests — sumber tagihan</a>{{end}}
+{{if eq .Step.Slug "portal-pantau"}}<a class="btn btn-sm btn-outline-primary" href="/portal">/portal — akses klien</a><a class="btn btn-sm btn-outline-primary" href="/app">/app — dashboard</a><a class="btn btn-sm btn-outline-primary" href="/reports">/reports — laporan</a>{{end}}
+</div><p class="text-secondary small px-3 pb-2 mb-1">Lompat ke menu asli aplikasi — login dulu untuk mencoba.</p></div>
+<div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
 {{if .Prev}}<a class="btn btn-outline-primary" href="/docs/{{.Prev.Slug}}">← {{.Prev.Title}}</a>{{end}}
-<a class="btn btn-warning" href="{{.Step.CTAURL}}">{{.Step.CTA}}</a>
+<a class="btn btn-warning" href="{{.Step.CTAURL}}">{{.Step.CTA}} ({{.Step.CTAURL}}) →</a>
 {{if .Next}}<a class="btn btn-outline-primary ms-auto" href="/docs/{{.Next.Slug}}">{{.Next.Title}} →</a>{{end}}
 </div>
 </main>

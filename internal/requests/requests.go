@@ -52,6 +52,8 @@ type Service struct {
 	Category  string
 	Name      string
 	BasePrice float64
+	// Requirements is the raw JSON array of required documents (may be empty).
+	Requirements string
 }
 
 type Store struct{ db *sql.DB }
@@ -60,7 +62,7 @@ func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
 // Services lists active catalog entries.
 func (s *Store) Services() ([]Service, error) {
-	rows, err := s.db.Query(`SELECT id, code, category, name, base_price FROM services WHERE is_active=1 ORDER BY category, name`)
+	rows, err := s.db.Query(`SELECT id, code, category, name, base_price, COALESCE(requirements,'[]') FROM services WHERE is_active=1 ORDER BY category, name`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,7 @@ func (s *Store) Services() ([]Service, error) {
 	for rows.Next() {
 		var sv Service
 		var price string
-		if err := rows.Scan(&sv.ID, &sv.Code, &sv.Category, &sv.Name, &price); err != nil {
+		if err := rows.Scan(&sv.ID, &sv.Code, &sv.Category, &sv.Name, &price, &sv.Requirements); err != nil {
 			return nil, err
 		}
 		fmt.Sscanf(price, "%f", &sv.BasePrice)

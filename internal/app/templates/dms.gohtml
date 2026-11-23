@@ -67,6 +67,28 @@
 {{define "dms_detail"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item"><a href="/dms/library">Library</a></li><li class="breadcrumb-item active">#{{.Data.M.ID}}</li></ol></nav>
 {{range .Data.Rels}}{{if eq .Relation "DIGABUNG_KE"}}<div class="alert alert-info">Berkas ini digabung ke kanonis <a href="/documents/{{.RelatedID}}">#{{.RelatedID}}</a>. Berkas tetap tersimpan & dapat diunduh.</div>{{end}}{{end}}
+<div class="card mb-3 border-primary"><div class="card-header"><h3 class="card-title">⚡ Verifikasi Cepat 2-Kolom</h3><span class="ms-auto badge bg-yellow-lt">wajib verifikasi manusia</span></div>
+<div class="card-body"><div class="row">
+<div class="col-md-6 text-center">
+{{if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau cepat dokumen" style="max-height:320px"/>{{else}}<p class="text-secondary">Pratinjau cepat untuk gambar — buka penuh untuk PDF/format lain.</p>{{end}}
+<div class="d-flex gap-2 justify-content-center mt-2 flex-wrap"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a><a class="btn btn-sm btn-ghost-secondary" href="/documents/{{.Data.M.ID}}/previewwm" target="_blank" title="Overlay nama pengguna + ID (audit tercatat)">Watermark</a></div>
+<p class="text-secondary small mt-1">Bandingkan pratinjau dengan fisik &amp; hasil OCR di bawah sebelum mencentang.</p>
+</div>
+<div class="col-md-6">
+<form method="post" action="/documents/{{.Data.M.ID}}/verify" id="qv-form">{{template "csrf" .}}
+<label class="form-check"><input class="form-check-input qv2" type="checkbox" value="1"/> 1. Gambar jelas</label>
+<label class="form-check"><input class="form-check-input qv2" type="checkbox" value="1"/> 2. NIK cocok fisik</label>
+<label class="form-check"><input class="form-check-input qv2" type="checkbox" value="1"/> 3. Nama+TTL cocok</label>
+<label class="form-check"><input class="form-check-input qv2" type="checkbox" value="1"/> 4. Alamat+RT/RW cocok</label>
+<label class="form-check"><input class="form-check-input qv2" type="checkbox" value="1"/> 5. Saran prefill dicek</label>
+<div class="row g-2 mt-2"><div class="col-4"><select class="form-select" name="to" id="qv-to"><option value="VERIFIED">VERIFIED</option><option value="REJECTED">REJECTED</option></select></div>
+<div class="col-8"><input class="form-control" name="note" id="qv-note" placeholder="Catatan (wajib bila tolak)"/></div></div>
+<div class="d-flex gap-2 mt-2"><button class="btn btn-success" id="qv-approve" type="submit" onclick="document.getElementById('qv-to').value='VERIFIED';return confirm('Tandai hasil verifikasi manusia?')">Sahkan</button><button class="btn btn-outline-danger" id="qv-reject" type="submit" onclick="document.getElementById('qv-to').value='REJECTED';if(!document.getElementById('qv-note').value.trim()){alert('Catatan wajib diisi bila menolak.');document.getElementById('qv-note').focus();return false;}return confirm('Tolak dokumen ini?')">Tolak</button></div>
+<div class="form-hint small text-secondary mt-1">Centang 5 kotak untuk mengaktifkan <strong>Sahkan</strong>. Shortcut: <kbd>V</kbd> = VERIFIED, <kbd>R</kbd> = REJECTED (tanpa submit otomatis).</div>
+</form>
+</div>
+</div></div></div>
+<script>(function(){var boxes=[].slice.call(document.querySelectorAll('.qv2'));var approve=document.getElementById('qv-approve');var sel=document.getElementById('qv-to');var note=document.getElementById('qv-note');var form=document.getElementById('qv-form');function sync(){var ok=boxes.length>0&&boxes.every(function(b){return b.checked;});if(approve){approve.disabled=!ok;approve.title=ok?'Siap disahkan':'Centang 5 checklist dulu';}}boxes.forEach(function(b){b.addEventListener('change',sync);});sync();if(form){form.addEventListener('submit',function(e){if(sel&&sel.value==='REJECTED'&&note&&!note.value.trim()){e.preventDefault();alert('Catatan wajib diisi bila menolak.');note.focus();}});}document.addEventListener('keydown',function(e){if(!sel)return;var t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'))return;if(e.key==='v'||e.key==='V'){sel.value='VERIFIED';}if(e.key==='r'||e.key==='R'){sel.value='REJECTED';}});})();</script>
 <div class="row"><div class="col-lg-7">
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">{{if .Data.M.Disp}}{{.Data.M.Disp}}{{else}}{{.Data.M.Name}}{{end}}</h3><div class="ms-auto d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Pratinjau</a><a class="btn btn-sm btn-primary" href="/files/{{.Data.M.ID}}">Unduh</a></div></div>
 <div class="card-body">
@@ -115,6 +137,8 @@
 <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Taut</button></div></form></div></div>
 </div>
 <div class="col-lg-5">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Dipakai di mana</h3></div>
+<div class="list-group list-group-flush">{{range .Data.UsedIn}}<a class="list-group-item d-flex align-items-center" href="{{.URL}}"><span class="badge bg-azure-lt me-2">{{.Kind}}</span><span>{{.Title}} <span class="text-secondary small">#{{.ID}}</span></span></a>{{else}}<div class="list-group-item text-secondary small">Belum ditaut ke akta/permohonan/invoice/tugas.</div>{{end}}</div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Pratinjau</h3></div>
 <div class="card-body text-center">{{if eq .Data.M.MIME "application/pdf"}}<p class="text-secondary">PDF — buka di tab baru (otorisasi + tercatat).</p>{{else if hasPrefix .Data.M.MIME "image/"}}<img src="/documents/{{.Data.M.ID}}/preview" class="img-fluid rounded border" alt="Pratinjau dokumen"/>{{else if hasSuffix .Data.M.Name ".docx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks DOCX"></iframe><p class="text-secondary small mt-1">Teks saja (format diabaikan) — dokumen asli tetap sumber resmi.</p>{{else if hasSuffix .Data.M.Name ".xlsx"}}<iframe src="/documents/{{.Data.M.ID}}/preview" class="w-100 border rounded" style="height:280px" title="Pratinjau teks XLSX"></iframe><p class="text-secondary small mt-1">Nilai sel saja — file asli tetap sumber resmi.</p>{{else}}<p class="text-secondary">Pratinjau: PDF/gambar/DOCX/XLSX. Unduh untuk format lain.</p>{{end}}
 <div class="d-flex gap-2 justify-content-center flex-wrap"><a class="btn btn-sm btn-outline-primary" href="/documents/{{.Data.M.ID}}/preview" target="_blank">Buka Penuh</a>
@@ -137,8 +161,21 @@
 <form method="post" action="/documents/{{.Data.M.ID}}/disposition" class="d-flex gap-2">{{template "csrf" .}}<select class="form-select" name="action"><option>RETAIN</option><option>DESTROY_REQUEST</option><option>DESTROYED</option></select><button class="btn btn-outline-danger" type="submit" onclick="return confirm('Catat keputusan disposisi?')">Catat</button></form>
 <div class="mt-2 small">{{range .Data.Hist}}<div>📦 {{.Move}} {{.Loc}} · {{.Actor}} · {{.At}}</div>{{else}}<span class="text-secondary">Belum ada riwayat fisik.</span>{{end}}</div>
 </div></div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Hasil OCR</h3></div>
-<div class="list-group list-group-flush">{{range .Data.OCRs}}<div class="list-group-item"><span class="badge bg-green-lt">{{.Provider}}</span> <span class="text-secondary small">{{.Provenance}} · {{.CreatedAt}}</span><pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:160px;overflow:auto">{{index .Fields "text"}}</pre></div>{{else}}<div class="list-group-item text-secondary">Belum ada hasil OCR. Jalankan dari halaman berkas klien / antrean OCR.</div>{{end}}</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Hasil OCR + Saran Prefill</h3><span class="ms-auto badge bg-yellow-lt">wajib verifikasi manusia</span></div>
+<div class="list-group list-group-flush">{{range $i, $o := .Data.OCRs}}<div class="list-group-item"><span class="badge bg-green-lt">{{$o.Provider}}</span> <span class="text-secondary small">{{$o.Provenance}} · {{$o.CreatedAt}}</span>
+{{if index $o.Fields "ocr_quality_grade"}}<div class="mt-1"><span class="badge {{if eq (index $o.Fields "ocr_quality_grade") "A_EXCELLENT"}}bg-green-lt{{else if eq (index $o.Fields "ocr_quality_grade") "B_GOOD"}}bg-blue-lt{{else}}bg-yellow-lt{{end}}">Kualitas {{index $o.Fields "ocr_quality_grade"}} ({{index $o.Fields "ocr_quality_score"}})</span> <span class="text-secondary small">{{index $o.Fields "ocr_resolution"}} · varian {{index $o.Fields "ocr_variant"}} · {{index $o.Fields "ocr_psm"}}</span>{{if index $o.Fields "ocr_quality_issues"}}<div class="alert alert-warning py-1 px-2 mt-1 mb-0 small">📷 {{index $o.Fields "ocr_quality_issues"}}</div>{{end}}</div>{{end}}
+{{if index $o.Fields "ktp_nik"}}<div class="table-responsive mt-2"><table class="table table-sm card-table"><tbody>
+<tr><td>NIK {{if eq (index $o.Fields "ktp_nik_valid") "true"}}<span class="badge bg-green-lt">valid struktur</span>{{else}}<span class="badge bg-red-lt">cek ulang</span>{{end}}</td><td><code>{{maskNIK (index $o.Fields "ktp_nik")}}</code> <span class="text-secondary small">{{index $o.Fields "ktp_nik_issue"}}</span></td></tr>
+<tr><td>Nama</td><td><strong>{{index $o.Fields "ktp_nama"}}</strong></td></tr>
+<tr><td>TTL</td><td>{{index $o.Fields "ktp_tmpt_lahir"}}, {{index $o.Fields "ktp_tgl_lahir"}} · {{index $o.Fields "ktp_kelamin"}}</td></tr>
+<tr><td>Alamat</td><td>{{index $o.Fields "ktp_alamat"}} RT {{index $o.Fields "ktp_rt"}}/RW {{index $o.Fields "ktp_rw"}} · {{index $o.Fields "ktp_desa"}}, {{index $o.Fields "ktp_kecamatan"}}</td></tr>
+<tr><td>Lainnya</td><td>{{index $o.Fields "ktp_agama"}} · {{index $o.Fields "ktp_kawin"}} · {{index $o.Fields "ktp_pekerjaan"}} · {{index $o.Fields "ktp_kewarganegaraan"}} · berlaku {{index $o.Fields "ktp_berlaku"}}</td></tr>
+<tr><td>Skor baca</td><td>{{index $o.Fields "ktp_conf"}}{{if index $o.Fields "ktp_review"}}<div class="alert alert-warning py-1 px-2 mt-1 mb-0 small">⚠ {{index $o.Fields "ktp_review"}}</div>{{end}}</td></tr>
+</tbody></table></div>
+<div class="alert alert-info py-2 small mb-2">Salin manual ke form Identitas Klien → klik <strong>Verifikasi</strong>. Saran ini tidak otomatis tersimpan sebagai identitas sah.</div>{{end}}
+{{if index $o.Fields "kk_no"}}<div class="table-responsive mt-2"><table class="table table-sm card-table"><thead><tr><th colspan="2">KK <code>{{index $o.Fields "kk_no"}}</code>{{if index $o.Fields "kk_kepala"}} — {{index $o.Fields "kk_kepala"}}{{end}}</th></tr><tr><th>Nama Anggota</th><th>NIK (mask)</th></tr></thead><tbody>{{range index $.Data.KKMembers $i}}<tr><td>{{.Name}}</td><td><code>{{maskNIK .NIK}}</code></td></tr>{{else}}<tr><td colspan="2" class="text-secondary small">Anggota belum terurai (kk_nama_1/kk_nik_1 …) — cek teks mentah di bawah.</td></tr>{{end}}</tbody></table></div>{{end}}
+{{if index $o.Fields "npwp_no"}}<div class="table-responsive mt-2"><table class="table table-sm card-table"><tbody><tr><td>NPWP</td><td><code>{{index $o.Fields "npwp_no"}}</code></td></tr><tr><td>Nama WP</td><td><strong>{{index $o.Fields "npwp_nama"}}{{index $o.Fields "npwp_nama_wp"}}</strong></td></tr></tbody></table></div>{{end}}
+<pre class="small p-2 bg-light border rounded mt-1" style="white-space:pre-wrap;max-height:160px;overflow:auto" title="NIK 16 digit disamarkan otomatis">{{redactNIK (index $o.Fields "text")}}</pre></div>{{else}}<div class="list-group-item text-secondary">Belum ada hasil OCR. Jalankan dari halaman berkas klien / antrean OCR.</div>{{end}}</div></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Jejak Akses</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Access}}<div class="list-group-item small">{{.Action}} · {{.Actor}} · {{.IP}} · {{.At}}</div>{{else}}<div class="list-group-item text-secondary small">Belum ada akses tercatat.</div>{{end}}</div></div>
 </div></div>
@@ -223,6 +260,8 @@
 
 {{define "dms_checklists"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/dms">DMS</a></li><li class="breadcrumb-item active">Template Checklist</li></ol></nav>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Standar Notaris-PPAT</h3><div class="ms-auto"><form method="post" action="/dms/checklists/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 20 paket standar yang belum ada">⚡ Pasang Standar (20 paket)</button></form></div></div>
+<div class="card-body"><p class="text-secondary small mb-0">Sekali klik: PT (dirian+ubah+bubar) · CV (dirian+ubah) · Firma · Yayasan · Koperasi · PPAT (AJB/Hibah/Tukar/APHB/Inbreng/SKMHT/APHT) · Jual-beli · Kuasa · Prenup · Wasiat · AHU · OSS — total 20 paket. Yang sudah ada dilewati. Setelah itu setiap permohonan baru otomatis dapat checklist (paket PRO+).</p></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru (satu baris = satu item)</h3></div>
 <form method="post" action="/dms/checklists"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><select class="form-select" name="service_code"><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</select></div>

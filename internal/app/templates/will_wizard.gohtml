@@ -1,0 +1,41 @@
+{{define "wasiat_wizard"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/requests/{{.Data.Req.ID}}">Permohonan #{{.Data.Req.ID}}</a></li><li class="breadcrumb-item active">Wizard Wasiat</li></ol></nav>
+<div class="alert alert-warning">Data wasiat bersifat <strong>terbatas</strong> — hanya notaris, notaris pengganti, dan auditor. Jangan tampilkan ke pihak selain pewasiat/ahli waris yang berhak.</div>
+<div class="card mb-3"><div class="card-body">
+<h3 class="card-title">Wizard Wasiat — {{.Data.Req.Title}} ({{.Data.CheckDone}}/{{.Data.CheckTotal}} syarat)</h3>
+<p class="text-secondary small mb-2">3 langkah memandu dari pewasiat → ahli waris &amp; objek → review &amp; daftar wasiat. Wizard ini hanya memandu + link; penyimpanan memakai endpoint yang sudah ada (<code>POST /wills</code>, <code>POST /requests/{id}/checklist</code>, <code>POST /deeds</code>).</p>
+<div class="progress mb-2"><div class="progress-bar" role="progressbar" style="width:{{.Data.CheckPct}}%"></div></div>
+<div class="d-flex gap-2 flex-wrap"><a class="btn btn-sm btn-ghost-secondary" href="/requests/{{.Data.Req.ID}}">← Kembali ke permohonan</a><a class="btn btn-sm btn-ghost-secondary" href="/wills">Register Wasiat</a></div>
+</div></div>
+<div class="row"><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">1 · Pewasiat</h3></div>
+<div class="card-body"><p class="small mb-2">Pewasiat (klien permohonan ini): <strong>{{.Data.Req.ClientName}}</strong></p>
+<form method="post" action="/wills"><div class="row">{{template "csrf" .}}
+<input type="hidden" name="client_id" value="{{.Data.Req.ClientID}}"/>
+<div class="col-8 mb-2"><input class="form-control" name="register_no" placeholder="Nomor register wasiat*" required/></div>
+<div class="col-4 mb-2"><button class="btn btn-primary w-100" type="submit">Daftar</button></div>
+<p class="text-secondary small col-12 mb-0">Mendaftarkan wasiat untuk klien di atas (POST /wills). Pembukaan bersaksi &amp; serah-terima dicatat di <a href="/wills">Register Wasiat</a>.</p>
+</div></form></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">2 · Ahli Waris &amp; Objek</h3></div>
+<div class="card-body">
+<p class="small mb-2">Checklist WASIAT ({{.Data.CheckDone}}/{{.Data.CheckTotal}}): KTP pewasiat + daftar ahli waris, objek wasiat + 2 saksi (dicatat saat pengesahan).</p>
+{{range .Data.Checklist}}<form method="post" action="/requests/{{$.Data.Req.ID}}/checklist" class="d-flex gap-1 align-items-center mb-1">{{template "csrf" $}}<input type="hidden" name="item_id" value="{{.ID}}"/><span class="small flex-fill">{{if eq .Status "VERIFIED"}}✅{{else if eq .Status "RECEIVED"}}📥{{else}}⬜{{end}} {{.Label}}</span><select class="form-select form-select-sm" name="status" style="max-width:130px"><option value="RECEIVED">RECEIVED</option><option value="VERIFIED">VERIFIED</option><option value="MISSING">MISSING</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form>{{else}}<p class="text-secondary small mb-0">Belum ada checklist untuk permohonan ini — pasang paket standar via <code>/dms/checklists → ⚡ Pasang Standar</code> (paket WASIAT).</p>{{end}}
+</div></div>
+</div><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">3 · Review &amp; Daftar Wasiat</h3></div>
+<div class="card-body">{{range .Data.Wills}}<div class="small mb-1"><strong>#{{.ID}}</strong> {{.ClientName}} · {{if .RegisterNo}}{{.RegisterNo}}{{else}}<span class="text-secondary">tanpa nomor register</span>{{end}} · <span class="badge bg-yellow-lt">{{.Status}}</span></div>{{else}}<p class="text-secondary small mb-0">Belum ada wasiat tertaut (klien sama / draf akta permohonan ini). Daftarkan lewat langkah 1 di atas.</p>{{end}}
+<hr/>
+<p class="small mb-2">Butuh draf akta? Buat draf berjenis <strong>Will</strong> tertaut permohonan ini via <code>POST /deeds</code>:</p>
+<form method="post" action="/deeds"><div class="d-flex gap-1">{{template "csrf" .}}
+<input type="hidden" name="request_id" value="{{.Data.Req.ID}}"/>
+<input type="hidden" name="kind" value="Will"/>
+<input class="form-control form-control-sm" name="title" placeholder="Judul draf akta wasiat (opsional)"/>
+<button class="btn btn-sm btn-outline-primary" type="submit">📄 Buat Draf</button>
+</div></form>
+</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Panel Prenup</h3></div>
+<div class="card-body"><p class="small mb-1">Perjanjian kawin memakai layanan <strong>PRENUP</strong> (deed kind <code>Prenup</code>): KTP calon/pasangan + daftar harta bawaan.</p>
+<p class="text-secondary small mb-2">Draf akta prenup dibuat dari permohonan berlayanan PRENUP via <code>POST /deeds</code> (otomatis pilih template Kawin). Lihat daftar draf di <a href="/deeds">/deeds</a>.</p>
+<a class="btn btn-sm btn-ghost-secondary" href="/requests/{{.Data.Req.ID}}">← Kembali ke permohonan #{{.Data.Req.ID}}</a></div></div>
+</div></div>
+{{template "page_close" .}}{{end}}

@@ -31,3 +31,50 @@
 <p class="text-secondary small mt-2 mb-0">NIK hanya disimpan 4 digit terakhir (UU PDP).</p></div></div>
 </div></div>
 {{template "page_close" .}}{{end}}
+
+{{define "ajb_wizard"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/requests/{{.Data.Req.ID}}">Permohonan #{{.Data.Req.ID}}</a></li><li class="breadcrumb-item active">Wizard AJB</li></ol></nav>
+<div class="card mb-3"><div class="card-body">
+<h3 class="card-title">Wizard AJB — {{.Data.Req.Title}} ({{.Data.CheckDone}}/{{.Data.CheckTotal}} syarat)</h3>
+<p class="text-secondary small mb-2">4 langkah memandu dari penjual → pembeli → objek &amp; pajak → catat ke Register PPAT. Wizard ini hanya memandu + link; penyimpanan memakai endpoint yang sudah ada (<code>POST /ppat</code>, <code>POST /requests/{id}/checklist</code>).</p>
+<div class="progress mb-2"><div class="progress-bar" role="progressbar" style="width:{{.Data.CheckPct}}%"></div></div>
+<div class="d-flex gap-2 flex-wrap"><a class="btn btn-sm btn-ghost-secondary" href="/requests/{{.Data.Req.ID}}">← Kembali ke permohonan</a><a class="btn btn-sm btn-ghost-secondary" href="/ppat">Buku Register PPAT</a></div>
+</div></div>
+<div class="row"><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">1 · Penjual</h3></div>
+<div class="card-body"><p class="small mb-2">Penjual dari catatan permohonan: <strong>{{if .Data.Penjual}}{{.Data.Penjual}}{{else}}—{{end}}</strong></p>
+<form method="post" action="/ppat"><div class="row">{{template "csrf" .}}
+<input type="hidden" name="jenis" value="AJB"/>
+<input type="hidden" name="pembeli" value="{{.Data.Pembeli}}"/>
+<input type="hidden" name="objek_sertifikat" value="{{.Data.Sertifikat}}"/>
+<input type="hidden" name="objek_lokasi" value="{{.Data.LuasLokasi}}"/>
+<div class="col-8 mb-2"><input class="form-control" name="penjual" placeholder="Nama penjual" value="{{.Data.Penjual}}"/></div>
+<div class="col-4 mb-2"><input class="form-control" name="akta_no" placeholder="No. akta PPAT*"/></div>
+<p class="text-secondary small col-12">Lengkapi di langkah 4 sebelum menekan Catat (kolom lain ikut terkirim sebagai hidden).</p>
+</div></form></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">2 · Pembeli</h3></div>
+<div class="card-body"><p class="small mb-2">Pembeli dari catatan permohonan: <strong>{{if .Data.Pembeli}}{{.Data.Pembeli}}{{else}}—{{end}}</strong></p>
+<p class="text-secondary small mb-0">Pastikan KTP + KK + NPWP kedua belah pihak (+ persetujuan pasangan) sudah diverifikasi di checklist bawah.</p></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">3 · Objek + Pajak</h3></div>
+<div class="card-body"><p class="small mb-1">Sertifikat: <strong>{{if .Data.Sertifikat}}{{.Data.Sertifikat}}{{else}}—{{end}}</strong> · Luas/lokasi: <strong>{{if .Data.LuasLokasi}}{{.Data.LuasLokasi}}{{else}}—{{end}}</strong>{{if .Data.Nilai}} · Nilai: <strong>{{.Data.Nilai}}</strong>{{end}}</p>
+<ul class="small mb-0"><li>Cek bersih BPN (tidak sengketa/blokir) — sertifikat asli</li><li>PBB lunas 10 thn + NOP sesuai sertifikat</li><li>PPh penjual lunas + BPHTB pembeli lunas (validasi)</li></ul></div></div>
+</div><div class="col-md-6">
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">4 · Review &amp; Catat PPAT</h3></div>
+<form method="post" action="/ppat"><div class="card-body row">{{template "csrf" .}}
+<input type="hidden" name="jenis" value="AJB"/>
+<div class="col-md-6 mb-2"><input class="form-control" name="penjual" placeholder="Penjual" value="{{.Data.Penjual}}"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="pembeli" placeholder="Pembeli" value="{{.Data.Pembeli}}"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="akta_no" placeholder="No. akta PPAT*" required/></div>
+<div class="col-md-4 mb-2"><input class="form-control" type="date" name="akta_date"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="deed_id" placeholder="ID draf akta (opsional)"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="objek_sertifikat" placeholder="No. sertifikat" value="{{.Data.Sertifikat}}"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="objek_luas" placeholder="Luas (m²)"/></div>
+<div class="col-12 mb-2"><input class="form-control" name="objek_lokasi" placeholder="Lokasi objek" value="{{.Data.LuasLokasi}}"/></div>
+<div class="col-12 text-end"><button class="btn btn-primary" type="submit">Catat ke Register PPAT</button></div>
+</div></form></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Checklist PPAT-AJB ({{.Data.CheckDone}}/{{.Data.CheckTotal}})</h3><div class="ms-auto"><a class="btn btn-sm btn-ghost-secondary" href="/requests/{{.Data.Req.ID}}">Kelola di detail</a></div></div>
+<div class="card-body">{{range .Data.Checklist}}<form method="post" action="/requests/{{$.Data.Req.ID}}/checklist" class="d-flex gap-1 align-items-center mb-1">{{template "csrf" $}}<input type="hidden" name="item_id" value="{{.ID}}"/><span class="small flex-fill">{{if eq .Status "VERIFIED"}}✅{{else if eq .Status "RECEIVED"}}📥{{else}}⬜{{end}} {{.Label}}</span><select class="form-select form-select-sm" name="status" style="max-width:130px"><option value="RECEIVED">RECEIVED</option><option value="VERIFIED">VERIFIED</option><option value="MISSING">MISSING</option></select><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form>{{else}}<p class="text-secondary small mb-0">Belum ada checklist untuk permohonan ini — pasang paket standar via <code>/dms/checklists → ⚡ Pasang Standar</code> (paket PPAT-AJB).</p>{{end}}</div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">PPAT Terkait Permohonan</h3></div>
+<div class="card-body">{{range .Data.PpatRows}}<div class="small mb-1"><strong>{{.No}}</strong> ({{.Jenis}}) — {{.Penjual}} → {{.Pembeli}} · {{.Sertifikat}} {{.Luas}} {{.Lokasi}} · <span class="badge bg-blue-lt">{{.Status}}</span> <a href="/ppat/{{.ID}}/blanko">Blanko</a></div>{{else}}<p class="text-secondary small mb-0">Belum ada register PPAT tertaut (tertambat via draf akta permohonan ini). Catat lewat langkah 4 di atas.</p>{{end}}</div></div>
+</div></div>
+{{template "page_close" .}}{{end}}

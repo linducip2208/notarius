@@ -2,15 +2,21 @@
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/finance">Keuangan</a></li><li class="breadcrumb-item active">Kuitansi {{.Data.Number}}</li></ol></nav>
 <div class="card" style="max-width:640px"><div class="card-body p-4">
 <div class="d-flex justify-content-between align-items-center mb-3">
-<div><h2 class="mb-0">KUITANSI PEMBAYARAN</h2><div class="text-secondary">{{.Brand.AppName}} · {{.Data.Number}}</div></div>
+<div><h2 class="mb-0">KUITANSI PEMBAYARAN</h2><div class="text-secondary">{{.Brand.AppName}} · {{.Data.Number}} {{if eq .Data.Kind "DP"}}<span class="badge bg-yellow-lt ms-1">DP — uang muka</span>{{else if eq .Data.Kind "PELUNASAN"}}<span class="badge bg-purple-lt ms-1">PELUNASAN</span>{{else if hasPrefix .Data.Number "[DP]"}}<span class="badge bg-yellow-lt ms-1">DP — uang muka</span>{{else if hasPrefix .Data.Number "[PELUNASAN]"}}<span class="badge bg-purple-lt ms-1">PELUNASAN</span>{{end}}</div></div>
 <img src="/qr/inv/{{.Data.ID}}" alt="QR verifikasi" style="width:110px;height:110px"/>
 </div>
+{{if eq .Data.Kind "DP"}}<div class="alert alert-info py-2 small">Invoice uang muka (DP) — sisa tagihan ditagih lewat invoice PELUNASAN terpisah.</div>{{end}}
 <dl class="row"><dt class="col-4">Klien</dt><dd class="col-8">{{.Data.Client}}</dd>
 <dt class="col-4">Total</dt><dd class="col-8">Rp {{.Data.Total}}</dd>
 <dt class="col-4">Dibayar</dt><dd class="col-8">Rp {{.Data.Paid}}</dd>
+<dt class="col-4">Sisa</dt><dd class="col-8">Rp {{if .Data.Outstanding}}{{.Data.Outstanding}}{{else}}{{sub .Data.Total .Data.Paid}}{{end}}</dd>
 <dt class="col-4">Status</dt><dd class="col-8"><span class="badge bg-green-lt">{{.Data.Status}}</span></dd>
 <dt class="col-4">Kode verifikasi</dt><dd class="col-8"><code>{{.Data.Code}}</code></dd></dl>
-<p class="text-secondary small">Pindai QR / cocokkan kode di halaman <a href="/verify?code={{.Data.Code}}">verifikasi publik</a>. Dokumen ini sah bila status LUNAS dan kode cocok.</p>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Riwayat Pembayaran</h3></div>
+{{if .Data.Payments}}<div class="table-responsive"><table class="table table-sm card-table mb-0"><thead><tr><th>Waktu</th><th>Metode</th><th>Referensi</th><th class="text-end">Nominal</th></tr></thead>
+<tbody>{{range .Data.Payments}}<tr><td class="text-secondary small">{{.PaidAt}}</td><td><span class="badge bg-blue-lt">{{.Method}}</span></td><td class="small">{{if .Reference}}{{.Reference}}{{else}}<span class="text-secondary">—</span>{{end}}</td><td class="text-end">Rp {{.Amount}}</td></tr>{{end}}</tbody></table></div>
+{{else}}<div class="card-body"><p class="text-secondary small mb-0">Total Rp {{.Data.Total}} · Dibayar Rp {{.Data.Paid}} · Sisa Rp {{if .Data.Outstanding}}{{.Data.Outstanding}}{{else}}{{sub .Data.Total .Data.Paid}}{{end}} · Status <span class="badge bg-green-lt">{{.Data.Status}}</span>. Rincian per pembayaran tercatat setelah pembayaran pertama dicatat.</p></div>{{end}}</div>
+<p class="text-secondary small mt-3">Pindai QR / cocokkan kode di halaman <a href="/verify?code={{.Data.Code}}">verifikasi publik</a>. Dokumen ini sah bila status LUNAS dan kode cocok.</p>
 <div class="d-flex gap-2 no-print"><button class="btn btn-primary" type="button" onclick="window.print()">Cetak</button><a class="btn btn-outline-primary" href="/finance">Kembali</a></div>
 </div></div>
 {{template "page_close" .}}{{end}}

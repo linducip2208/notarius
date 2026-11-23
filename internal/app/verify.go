@@ -58,6 +58,46 @@ func (a *App) receipt(w http.ResponseWriter, r *http.Request) {
 	if paidAt.Valid {
 		paidAtStr = paidAt.String
 	}
+	// Jenis invoice dari prefix baris pertama (tanpa migrasi skema).
+	kind := ""
+	if a.db != nil {
+		var first string
+		if err := a.db.QueryRow(`SELECT description FROM invoice_lines WHERE invoice_id=? ORDER BY id LIMIT 1`, id).Scan(&first); err == nil {
+			switch {
+			case len(first) >= 4 && first[:4] == "[DP]":
+				kind = "DP"
+			case len(first) >= 11 && first[:11] == "[PELUNASAN]":
+				kind = "PELUNASAN"
+			}
+		}
+	}
+	// Riwayat pembayaran untuk blok "Riwayat Pembayaran" di kuitansi.
+	type payRow struct {
+		Amount    int64
+		Method    string
+		Reference string
+		PaidAt    string
+	}
+	var pays []payRow
+	if a.db != nil {
+		if rs, err := a.db.Query(`SELECT amount, method, COALESCE(reference,''), paid_at FROM payments WHERE invoice_id=? ORDER BY paid_at, id`, id); err == nil && rs != nil {
+			defer rs.Close()
+			for rs.Next() {
+				var p payRow
+				var samt, sat sql.NullString
+				if err := rs.Scan(&samt, &p.Method, &p.Reference, &sat); err != nil {
+					continue
+				}
+				if samt.Valid {
+					p.Amount = decWhole(samt.String)
+				}
+				if sat.Valid {
+					p.PaidAt = sat.String
+				}
+				pays = append(pays, p)
+			}
+		}
+	}
 	code, err := verifyCode("INV", id)
 	if err != nil {
 		http.Error(w, "kunci verifikasi belum dikonfigurasi (NOTARYOS_FIELD_KEY)", http.StatusServiceUnavailable)
@@ -66,7 +106,8 @@ func (a *App) receipt(w http.ResponseWriter, r *http.Request) {
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "invoice.receipt", Entity: "invoice", EntityID: strconv.FormatInt(id, 10)})
 	a.render(w, r, "receipt", "Kuitansi "+number, map[string]any{
 		"ID": id, "Number": number, "Client": client, "Status": status,
-		"Total": total, "Paid": paid, "PaidAt": paidAtStr, "Code": code,
+		"Total": total, "Paid": paid, "Outstanding": total - paid, "PaidAt": paidAtStr, "Code": code,
+		"Kind": kind, "Payments": pays,
 	})
 }
 

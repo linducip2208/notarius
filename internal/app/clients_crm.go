@@ -109,6 +109,9 @@ func (a *App) identityStatus(w http.ResponseWriter, r *http.Request) {
 	_ = a.db.QueryRow(`SELECT i.client_id, COALESCE(i.status,'UNCHECKED') FROM identities i
 		JOIN clients c ON c.id=i.client_id WHERE i.id=?`, id).Scan(&cid, &status)
 	to := r.FormValue("to")
+	if to == "" {
+		to = r.FormValue("status") // kompat template lama
+	}
 	if err := a.clients.IdentityStatus(a.officeOf(r), id, to, r.FormValue("note"), a.uid(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

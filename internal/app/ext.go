@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,11 +24,13 @@ import (
 	"notaryos/internal/doctpl"
 	"notaryos/internal/docengine"
 	"notaryos/internal/docx"
+	"notaryos/internal/deliver"
 	"notaryos/internal/gov"
 	"notaryos/internal/mfa"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/money"
 	"notaryos/internal/notify"
+	"notaryos/internal/ocr"
 	"notaryos/internal/pdf"
 	"notaryos/internal/rbac"
 	"notaryos/internal/safehtml"
@@ -271,7 +275,38 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	if _, err := a.dms.EnqueueOCR(a.officeOf(r), id); err == nil {
 		_ = a.dms.Move(a.officeOf(r), id, "CLASSIFICATION", a.uid(r), "otomatis saat unggah")
 	}
-	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash=Berkas+diunggah", http.StatusSeeOther)
+	// Upload Quality Gate (jujur, tak memblokir): nilai berkas tersimpan.
+	// PDF / decode gagal → abaikan gate, tetap flash sukses biasa.
+	flash := "Berkas diunggah"
+	if _, rc, gerr := a.uploads.Get(a.officeOf(r), id); gerr == nil {
+		func() {
+			defer rc.Close()
+			tmp, terr := os.CreateTemp("", "quality-*")
+			if terr != nil {
+				return
+			}
+			tname := tmp.Name()
+			defer os.Remove(tname)
+			if _, terr := io.Copy(tmp, io.LimitReader(rc, 100<<20)); terr != nil {
+				tmp.Close()
+				return
+			}
+			tmp.Close()
+			q, qerr := ocr.AssessImage(tname)
+			if qerr != nil {
+				return
+			}
+			switch q.Grade {
+			case "D_RESHOOT_REQUIRED":
+				flash = "Berkas tersimpan TAPI kualitas D (blur/gelap) — foto ulang lalu jalankan OCR ulang"
+				a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.quality.warn", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "grade=D score=" + strconv.FormatFloat(q.Score, 'f', 0, 64)})
+			case "C_RETRY_RECOMMENDED":
+				flash = "Berkas tersimpan, kualitas C — disarankan foto ulang"
+				a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.quality.warn", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "grade=C score=" + strconv.FormatFloat(q.Score, 'f', 0, 64)})
+			}
+		}()
+	}
+	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
 }
 
 func (a *App) fileOCR(w http.ResponseWriter, r *http.Request) {
@@ -405,7 +440,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(shs) > 0 && co.Issued > 0 && (pctSum < 99.5 || pctSum > 100.5) {
-			corpWarn = append(corpWarn, fmt.Sprintf("total %d lembar tidak sama dengan modal ditempatkan %.0f — selisih harus dijelaskan", totalShares, co.Issued))
+			corpWarn = append(corpWarn, fmt.Sprintf("total %d lembar tidak sama dengan modal ditempatkan %d — selisih harus dijelaskan", totalShares, co.Issued))
 		}
 		if co.Paid > co.Issued {
 			corpWarn = append(corpWarn, "modal disetor melebihi ditempatkan — tidak wajar")
@@ -433,10 +468,44 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	if total > 0 {
 		pct = done * 100 / total
 	}
+	// Tautan WA manual (tanpa layanan berbayar): nomor dari data klien,
+	// pesan berisi ringkasan permohonan. Kosong = tombol disembunyikan.
+	var cliPhone, cliWA sql.NullString
+	_ = a.db.QueryRow(`SELECT phone, wa_number FROM clients WHERE id=?`, d.ClientID).Scan(&cliPhone, &cliWA)
+	waPhone := ""
+	waText := fmt.Sprintf("Halo %s, menindaklanjuti permohonan #%d %q (%s) di kantor kami.", d.ClientName, d.ID, d.Title, d.Status)
+	if cliPhone.Valid || cliWA.Valid {
+		waNum := ""
+		if cliWA.Valid {
+			waNum = cliWA.String
+		}
+		ph := ""
+		if cliPhone.Valid {
+			ph = cliPhone.String
+		}
+		waPhone = deliver.PreferWA(waNum, ph)
+	}
+	waLink := ""
+	if waPhone != "" {
+		waLink = deliver.WALink(waPhone, waText)
+	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
+		"SvcCode": a.svcCodeOf(id),
+		"WAPhone": waPhone, "WAText": waText, "WALink": waLink,
 	})
+}
+
+// svcCodeOf mengambil kode layanan permohonan (untuk link wizard yang sesuai).
+// Gagal diam-diam -> "" (template menyembunyikan link wizard khusus).
+func (a *App) svcCodeOf(reqID int64) string {
+	var code sql.NullString
+	_ = a.db.QueryRow(`SELECT s.code FROM service_requests r JOIN services s ON s.id=r.service_id WHERE r.id=?`, reqID).Scan(&code)
+	if code.Valid {
+		return code.String
+	}
+	return ""
 }
 
 func numForm(r *http.Request, k string) int64 {
@@ -789,6 +858,88 @@ func (a *App) templateSave(w http.ResponseWriter, r *http.Request) {
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "template.save", Entity: "doc_template", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/templates/"+strconv.FormatInt(id, 10)+"?flash=Template+disimpan", http.StatusSeeOther)
 }
+
+// templateSeed memasang paket template KONSEP (DRAFT, belum approved) agar
+// draf 1-klik langsung menemukan template. Notaris WAJIB review & approve
+// sebelum dipakai — template konsep tidak bisa dipakai membuat draf.
+func (a *App) templateSeed(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	office := a.officeOf(r)
+	std := []struct{ name, cat, body string }{
+		{"Standar Pendirian PT", "PT", tplPT},
+		{"Standar Pendirian CV", "CV", tplCV},
+		{"Standar AJB", "AJB", tplAJB},
+		{"Standar Hibah", "Hibah", tplHibah},
+		{"Standar Surat Kuasa", "Kuasa", tplKuasa},
+		{"Standar Sewa Menyewa", "Sewa", tplSewa},
+		{"Standar Prenup", "Prenup", tplPrenup},
+		{"Standar Perjanjian Kerjasama", "Perjanjian", tplPK},
+	}
+	made := 0
+	for _, s := range std {
+		var n int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM doc_templates WHERE office_id=? AND name=?`, office, s.name).Scan(&n)
+		if n > 0 {
+			continue
+		}
+		if _, err := a.tpl.Save(office, 0, s.name, s.cat, s.body); err == nil {
+			made++
+		}
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "template.seed", Entity: "office", EntityID: strconv.FormatInt(office, 10), Detail: strconv.Itoa(made) + " konsep"})
+	http.Redirect(w, r, "/templates?flash="+url.QueryEscape(strconv.Itoa(made)+" template konsep dipasang — review lalu Approve"), http.StatusSeeOther)
+}
+
+const tplHead = `<p><strong>KONSEP — wajib direview &amp; disetujui notaris sebelum dipakai.</strong></p>` + "\n"
+
+const tplPT = tplHead + `<h3>AKTA PENDIRIAN PERSEROAN TERBATAS {{company_name}}</h3>
+<p>Pada hari ini, ______________________, menghadap kepada saya, {{notary_name}}, Notaris di {{notary_office}}, dengan dihadiri saksi-saksi, para penghadap yang telah dikenalkan:</p>
+<p>{{shareholder_list}}</p>
+<p>Para penghadap menerangkan mendirikan Perseroan Terbatas dengan ketentuan:</p>
+<p>Nama: <strong>{{company_name}}</strong>, berkedudukan di {{company_address}}.<br/>
+Modal dasar: Rp {{authorized_capital}}, ditempatkan Rp {{issued_capital}}.<br/>
+Direksi: {{director_list}}</p>
+<p><em>Lengkapi pasal modal, saham, RUPS, dan penutup sesuai kebutuhan — lalu kirim Review.</em></p>`
+
+const tplCV = tplHead + `<h3>AKTA PENDIRIAN PERSEKUTUAN KOMANDITER (CV) {{company_name}}</h3>
+<p>Menghadap kepada saya, {{notary_name}}, Notaris di {{notary_office}}, para penghadap:</p>
+<p>{{shareholder_list}}</p>
+<p>Para penghadap sepakat mendirikan CV bernama <strong>{{company_name}}</strong>, berkedudukan di {{company_address}}, dengan maksud dan tujuan usaha sebagaimana diuraikan dalam akta ini.</p>
+<p><em>Lengkapi pasal sekutu aktif/pasif, modal, keuntungan, dan penutup — lalu kirim Review.</em></p>`
+
+const tplAJB = tplHead + `<h3>AKTA JUAL BELI No. ___</h3>
+<p>Pada hari ini, ______________________, menghadap kepada saya, PPAT di wilayah kerja ______________________, dengan dihadiri saksi-saksi:</p>
+<p>I. Nama: ______________________, NIK: ______________________ (PIHAK PERTAMA/Penjual).<br/>
+II. Nama: {{client_name}}, NIK: {{client_nik}} (PIHAK KEDUA/Pembeli).</p>
+<p>Pihak Pertama menjual kepada Pihak Kedua sebidang tanah sebagaimana Sertifikat Hak ______ No. ______, luas ______ m2, terletak di ______________________, dengan harga Rp ______________________.</p>
+<p><em>Lengkapi uraian objek, pembayaran, PPh/BPHTB, dan penutup sesuai blanko — lalu kirim Review.</em></p>`
+
+const tplHibah = tplHead + `<h3>AKTA HIBAH No. ___</h3>
+<p>Menghadap kepada saya, PPAT di wilayah kerja ______________________, Pihak Pertama menerangkan menghibahkan kepada Pihak Kedua:</p>
+<p>Nama penerima: {{client_name}}, NIK: {{client_nik}}, berupa ______________________ (uraikan objek), yang diterima dengan rasa syukur oleh Pihak Kedua.</p>
+<p><em>Lengkapi uraian objek, syarat hibah, dan penutup — lalu kirim Review.</em></p>`
+
+const tplKuasa = tplHead + `<h3>SURAT KUASA No. ___</h3>
+<p>Yang bertanda tangan di bawah ini, Nama: {{client_name}}, NIK: {{client_nik}}, memberi kuasa kepada ______________________, NIK ______________________, untuk ______________________ (ruang lingkup kuasa).</p>
+<p>Kuasa ini berlaku sejak ______________________ sampai ______________________. Dibuat di hadapan {{notary_name}}, Notaris di {{notary_office}}.</p>`
+
+const tplSewa = tplHead + `<h3>PERJANJIAN SEWA MENYEWA</h3>
+<p>PIHAK PERTAMA (Pemilik): {{client_name}}, NIK {{client_nik}}.<br/>PIHAK KEDUA (Penyewa): ______________________.</p>
+<p>Objek sewa: ______________________. Jangka waktu: ______ s/d ______. Harga sewa: Rp ______________________ dibayar ______________________.</p>
+<p><em>Lengkapi hak-kewajiban, denda, dan penyelesaian sengketa — lalu kirim Review.</em></p>`
+
+const tplPrenup = tplHead + `<h3>PERJANJIAN KAWIN (PRENUP)</h3>
+<p>Calon suami: ______________________. Calon istri: {{client_name}}.</p>
+<p>Para pihak sepakat memisahkan harta bawaan dan harta yang diperoleh selama perkawinan sebagaimana daftar terlampir, serta pengaturannya bila perkawinan berakhir.</p>
+<p>Dibuat sebelum perkawinan dilangsungkan, di hadapan {{notary_name}}, Notaris di {{notary_office}}.</p>`
+
+const tplPK = tplHead + `<h3>PERJANJIAN KERJASAMA</h3>
+<p>PIHAK PERTAMA: {{client_name}} ({{company_name}}, {{company_address}}).<br/>PIHAK KEDUA: ______________________.</p>
+<p>Maksud dan tujuan: ______________________. Hak dan kewajiban, jangka waktu, serta penyelesaian perselisihan diuraikan dalam pasal-pasal berikut.</p>
+<p><em>Lengkapi pasal tujuan, kontribusi, keuntungan, dan penutup — lalu kirim Review.</em></p>`
 
 func (a *App) templateEdit(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermManageTemplates) {
@@ -1502,9 +1653,26 @@ func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
 	var name, notary, sk, addr, phone, email, plan string
 	_ = a.db.QueryRow(`SELECT o.name, o.notary_name, o.sk_number, o.address, o.phone, o.email, o.plan
 		FROM offices o JOIN users u ON u.office_id=o.id WHERE u.id=?`, *a.uid(r)).Scan(&name, &notary, &sk, &addr, &phone, &email, &plan)
-	a.render(w, r, "office", "Profil Kantor", map[string]string{
+	var strictInt int
+	_ = a.db.QueryRow(`SELECT strict_checklist FROM office_flags WHERE office_id=?`, a.officeOf(r)).Scan(&strictInt)
+	a.render(w, r, "office", "Profil Kantor", map[string]any{
 		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email, "Plan": plan,
+		"Strict": strictInt == 1,
 	})
+}
+
+// strictChecklistEnabled reports whether the office enforces the strict
+// checklist gate. Fail-open (false) on any error so old DBs without the
+// office_flags table keep the legacy behavior.
+func (a *App) strictChecklistEnabled(officeID int64) bool {
+	if a.db == nil {
+		return false
+	}
+	var v int
+	if err := a.db.QueryRow(`SELECT strict_checklist FROM office_flags WHERE office_id=?`, officeID).Scan(&v); err != nil {
+		return false
+	}
+	return v == 1
 }
 
 func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
@@ -1519,6 +1687,15 @@ func (a *App) officeSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Toggle mode ketat checklist — hanya kolom ini yang ditulis ke office_flags.
+	strict := 0
+	if v := r.FormValue("strict_checklist"); v == "1" || v == "on" {
+		strict = 1
+	}
+	// Best-effort: abaikan error (mis. tabel belum termigrasi) agar simpan
+	// profil kantor tidak pernah rusak oleh flag ini.
+	_, _ = a.db.Exec(`INSERT INTO office_flags(office_id, strict_checklist) VALUES(?,?)
+		ON DUPLICATE KEY UPDATE strict_checklist=VALUES(strict_checklist)`, a.officeOf(r), strict)
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "office.update", Entity: "office", EntityID: "self"})
 	http.Redirect(w, r, "/office?flash=Profil+kantor+disimpan", http.StatusSeeOther)
 }
@@ -1571,6 +1748,11 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 		Title, Due, Status   string
 		Rec, RefType         string
 		RefID                int64
+		DeedTitle            string
+		DeedStatus           string
+		DeedVersion          int
+		DeedPreview          string
+		DeedLocked           bool
 	}
 	var out []task
 	if rows != nil {
@@ -1583,6 +1765,26 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 				t.Due = due.String
 			}
 			out = append(out, t)
+		}
+	}
+	// Hydrate deed drafts untuk preview + edit cepat langsung dari Todo.
+	for i := range out {
+		if out[i].RefType != "deed" || out[i].RefID <= 0 {
+			continue
+		}
+		var title, status, content sql.NullString
+		var ver sql.NullInt64
+		var locked sql.NullBool
+		_ = a.db.QueryRow(`SELECT title, status, version, LEFT(content,2000), locked FROM deed_drafts WHERE id=? AND office_id=?`,
+			out[i].RefID, a.officeOf(r)).Scan(&title, &status, &ver, &content, &locked)
+		if title.Valid {
+			out[i].DeedTitle = title.String
+			out[i].DeedStatus = status.String
+			out[i].DeedPreview = safehtml.ToText(content.String)
+			if ver.Valid {
+				out[i].DeedVersion = int(ver.Int64)
+			}
+			out[i].DeedLocked = locked.Valid && locked.Bool
 		}
 	}
 	a.render(w, r, "tasks", "Tugas", out)

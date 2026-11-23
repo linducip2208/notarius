@@ -414,31 +414,116 @@ func (a *App) portalReceipt(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "kunci verifikasi belum dikonfigurasi", http.StatusServiceUnavailable)
 		return
 	}
+	kind := ""
+	var first string
+	if err := a.db.QueryRow(`SELECT description FROM invoice_lines WHERE invoice_id=? ORDER BY id LIMIT 1`, invID).Scan(&first); err == nil {
+		switch {
+		case len(first) >= 4 && first[:4] == "[DP]":
+			kind = "DP"
+		case len(first) >= 11 && first[:11] == "[PELUNASAN]":
+			kind = "PELUNASAN"
+		}
+	}
+	type payRow struct {
+		Amount    int64
+		Method    string
+		Reference string
+		PaidAt    string
+	}
+	var pays []payRow
+	if rs, err := a.db.Query(`SELECT amount, method, COALESCE(reference,''), paid_at FROM payments WHERE invoice_id=? ORDER BY paid_at, id`, invID); err == nil && rs != nil {
+		defer rs.Close()
+		for rs.Next() {
+			var p payRow
+			var samt, sat sql.NullString
+			if err := rs.Scan(&samt, &p.Method, &p.Reference, &sat); err != nil {
+				continue
+			}
+			if samt.Valid {
+				p.Amount = decWhole(samt.String)
+			}
+			if sat.Valid {
+				p.PaidAt = sat.String
+			}
+			pays = append(pays, p)
+		}
+	}
 	a.render(w, r, "receipt", "Kuitansi "+number, map[string]any{
 		"ID": invID, "Number": number, "Client": cname, "Status": status,
-		"Total": decWhole(stotal), "Paid": decWhole(spaid), "Code": code,
+		"Total": decWhole(stotal), "Paid": decWhole(spaid),
+		"Outstanding": decWhole(stotal) - decWhole(spaid), "Code": code,
+		"Kind": kind, "Payments": pays,
 	})
 }
 
-// ---- retention -> task ----
+// ---- retention -> task (aturan otomatis, bukan manual) ----
 
+// retentionTask membuat tugas tindak lanjut dari aturan retensi:
+//   - bendel protokol berumur >25 tahun (kolom year) -> tugas arsip;
+//   - berkas CONFIDENTIAL/RESTRICTED berumur >10 tahun (created_at, karena
+//     tabel files tidak memiliki kolom updated_at) -> tugas review retensi.
+//
+// Dibatasi 50 baris per jenis; tugas file bertaut ref_type='file' dan tidak
+// diduplikasi bila masih ada yang OPEN untuk ref yang sama.
 func (a *App) retentionTask(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
 		a.forbidden(w, r)
 		return
 	}
-	exp, _ := a.dms.Expiring(a.officeOf(r))
-	if len(exp) == 0 {
-		http.Redirect(w, r, "/dms/retention?flash=Tidak+ada+berkas+kedaluwarsa", http.StatusSeeOther)
+	office := a.officeOf(r)
+	made := 0
+
+	// 1. Protokol >25 tahun -> tugas arsip.
+	if prows, err := a.db.Query(`SELECT id, bundle_no, year FROM protocols
+		WHERE office_id=? AND year <= YEAR(CURDATE())-25 ORDER BY year LIMIT 50`, office); err == nil && prows != nil {
+		defer prows.Close()
+		for prows.Next() {
+			var id int64
+			var bundle string
+			var year int
+			_ = prows.Scan(&id, &bundle, &year)
+			title := fmt.Sprintf("Arsipkan protokol #%d (bundel %s/%d): melewati retensi 25 tahun", id, bundle, year)
+			var n int
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN' AND title=?`, office, title).Scan(&n)
+			if n > 0 {
+				continue
+			}
+			if _, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,CURDATE()+INTERVAL 7 DAY,?)`,
+				office, title, a.uid(r)); err == nil {
+				made++
+			}
+		}
+	}
+
+	// 2. Berkas CONFIDENTIAL/RESTRICTED berumur >10 tahun -> tugas review retensi.
+	if frows, err := a.db.Query(`SELECT id, COALESCE(display_name,original_name) FROM files
+		WHERE office_id=? AND confidentiality IN ('CONFIDENTIAL','RESTRICTED')
+		AND created_at < DATE_SUB(CURDATE(), INTERVAL 10 YEAR)
+		ORDER BY created_at LIMIT 50`, office); err == nil && frows != nil {
+		defer frows.Close()
+		for frows.Next() {
+			var id int64
+			var name string
+			_ = frows.Scan(&id, &name)
+			var n int
+			_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN' AND ref_type='file' AND ref_id=?`,
+				office, id).Scan(&n)
+			if n > 0 {
+				continue
+			}
+			title := fmt.Sprintf("Review retensi: dok #%d (%s) berumur >10 tahun", id, name)
+			if _, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by, ref_type, ref_id) VALUES(?,?,CURDATE()+INTERVAL 7 DAY,?, 'file', ?)`,
+				office, title, a.uid(r), id); err == nil {
+				made++
+			}
+		}
+	}
+
+	if made == 0 {
+		http.Redirect(w, r, "/tasks?flash=Tidak+ada+aturan+retensi+yang+jatuh+tempo", http.StatusSeeOther)
 		return
 	}
-	_, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,CURDATE()+INTERVAL 7 DAY,?)`,
-		a.officeOf(r), fmt.Sprintf("Tindak lanjut retensi: %d berkas mendekati kedaluwarsa", len(exp)), a.uid(r))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "retention.task", Entity: "office", EntityID: "self", Detail: strconv.Itoa(len(exp)) + " berkas"})
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "retention.task", Entity: "office", EntityID: "self", Detail: strconv.Itoa(made) + " tugas aturan retensi"})
 	http.Redirect(w, r, "/tasks?flash=Tugas+retensi+dibuat", http.StatusSeeOther)
 }
 

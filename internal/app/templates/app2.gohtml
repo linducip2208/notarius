@@ -26,6 +26,7 @@
 <div class="p-3 bg-white border rounded" style="min-height:120px" id="deedview">{{safeHTML .Data.Body}}</div>
 {{if .Data.Seal}}<div class="alert alert-success mt-2 mb-0 small">Segel verifikasi: <code>{{.Data.Seal}}</code> · cek di <a href="/verify?code={{.Data.Seal}}">/verify</a><br/><span class="text-secondary">TTE internal (hash tersertifikasi sistem, bukan PSrE). Berlaku sebagai segel integritas naskah + identitas penandatangan tercatat.</span></div>{{end}}
 <div class="d-flex gap-2 mt-3">
+<form method="post" action="/tasks" class="d-inline">{{template "csrf" .}}<input type="hidden" name="title" value="Tindaklanjuti draft: {{.Data.Deed.Title}}"/><input type="hidden" name="ref_type" value="deed"/><input type="hidden" name="ref_id" value="{{.Data.Deed.ID}}"/><button class="btn btn-outline-warning" type="submit" title="Buat tugas Todo tertaut ke draft ini — bisa preview & edit dari /tasks">+ Todo</button></form>
 {{if and .Data.CanApprove (ne .Data.Deed.Status "APPROVED")}}<form method="post" action="/deeds/{{.Data.Deed.ID}}/review">{{template "csrf" .}}<button class="btn btn-outline-primary" type="submit">Kirim Review</button></form>
 <form method="post" action="/deeds/{{.Data.Deed.ID}}/approve" class="d-flex flex-wrap gap-1 mt-2">{{template "csrf" .}}<input class="form-control" name="number" placeholder="No. akta" required style="max-width:130px"/><input class="form-control" name="witness1" placeholder="Saksi 1 (nama)" required style="max-width:150px"/><input class="form-control" name="witness1_id" placeholder="ID Saksi 1" style="max-width:110px"/><input class="form-control" name="witness2" placeholder="Saksi 2 (nama)" required style="max-width:150px"/><input class="form-control" name="witness2_id" placeholder="ID Saksi 2" style="max-width:110px"/><input class="form-control" name="read_place" placeholder="Tempat pembacaan" required style="max-width:150px"/><input class="form-control" name="renvoi_note" placeholder="Renvoi (opsional)"/><button class="btn btn-success" type="submit" data-confirm="Sahkan akta? Formalitas (saksi + pembacaan) tercatat permanen. Repertorium otomatis.">Sahkan</button></form>{{end}}
 <a class="btn btn-ghost-primary" href="/deeds/{{.Data.Deed.ID}}/pdf">PDF</a>
@@ -104,10 +105,34 @@ window.insertClause=insertClause;
 {{template "page_close" .}}{{end}}
 
 {{define "audit"}}{{template "head" .}}{{template "page_open" .}}
-<div class="card"><div class="card-header"><h3 class="card-title">Audit Log (imutabel)</h3></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Audit Log (imutabel)</h3><span class="text-secondary small ms-2" id="audit-count"></span></div>
+<div class="card-body d-flex gap-2 flex-wrap"><input class="form-control" id="audit-q" placeholder="Saring: ketik aksi / entitas… (cth. login, deed)" style="max-width:320px" aria-label="Saring audit"/><select class="form-select" id="audit-limit" style="max-width:140px" aria-label="Batas tampil"><option value="20">20 baris</option><option value="50">50 baris</option><option value="100" selected>100 baris</option><option value="0">Semua</option></select><span class="text-secondary small align-self-center">Filter lokal (tanpa reload) — cocokkan kolom Aksi/Entitas/ID Entitas.</span></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Aktor</th><th>Aksi</th><th>Entitas</th><th>ID Entitas</th><th>Waktu</th></tr></thead>
-<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Actor}}</td><td>{{.Action}}</td><td>{{.Entity}}</td><td>{{.EntityID}}</td><td>{{.At}}</td></tr>
+<tbody id="audit-rows">{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Actor}}</td><td>{{.Action}}</td><td>{{.Entity}}</td><td>{{.EntityID}}</td><td>{{.At}}</td></tr>
 {{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada aktivitas tercatat.</td></tr>{{end}}</tbody></table></div></div>
+<script>
+(function(){
+var q=document.getElementById('audit-q');var lim=document.getElementById('audit-limit');
+var tb=document.getElementById('audit-rows');var cnt=document.getElementById('audit-count');
+if(!tb)return;
+function apply(){
+var needle=(q&&q.value||'').toLowerCase().trim();
+var max=lim?parseInt(lim.value||'100',10):100;
+var rows=tb.querySelectorAll('tr');var shown=0;var matched=0;
+rows.forEach(function(tr){
+if(tr.cells.length<6){tr.style.display='';return;}
+var hay=(tr.cells[2].textContent+' '+tr.cells[3].textContent+' '+tr.cells[4].textContent+' '+tr.cells[1].textContent).toLowerCase();
+var ok=!needle||hay.indexOf(needle)>-1;
+if(ok)matched++;
+if(ok&&(max===0||shown<max)){tr.style.display='';shown++;}else{tr.style.display='none';}
+});
+if(cnt)cnt.textContent='menampilkan '+shown+' dari '+matched+' cocok';
+}
+if(q)q.addEventListener('input',apply);
+if(lim)lim.addEventListener('change',apply);
+apply();
+})();
+</script>
 {{template "page_close" .}}{{end}}
 
 {{define "office"}}{{template "head" .}}{{template "page_open" .}}
@@ -119,6 +144,7 @@ window.insertClause=insertClause;
 <div class="col-md-4 mb-2"><label class="form-label">Telepon</label><input class="form-control" name="phone" value="{{.Data.Phone}}"/></div>
 <div class="col-md-4 mb-2"><label class="form-label">Email</label><input class="form-control" name="email" value="{{.Data.Email}}"/></div>
 <div class="col-12 mb-2"><label class="form-label">Alamat</label><textarea class="form-control" name="address" rows="2">{{.Data.Address}}</textarea></div>
+<div class="col-12 mb-2"><label class="form-check"><input class="form-check-input" type="checkbox" name="strict_checklist" value="1" {{if .Data.Strict}}checked{{end}}/><span class="form-check-label"><strong>Mode ketat checklist</strong> — bila aktif, permohonan tidak bisa ke IN_REVIEW/APPROVED selama masih ada item MISSING.</span></label></div>
 <div class="col-12 text-end"><button class="btn btn-primary" type="submit">Simpan</button></div>
 </div></form></div>
 {{template "page_close" .}}{{end}}
@@ -137,16 +163,24 @@ window.insertClause=insertClause;
 {{define "tasks"}}{{template "head" .}}{{template "page_open" .}}
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Tugas Baru</h3><div class="ms-auto"><form method="post" action="/reminders/run">{{template "csrf" .}}<button class="btn btn-sm btn-outline-primary" type="submit">Jalankan Pengingat</button></form></div></div>
 <form method="post" action="/tasks"><div class="card-body row">{{template "csrf" .}}
-<div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul tugas" required/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul tugas — cth. Finalkan draft akta Jual Beli" required/></div>
 <div class="col-md-2 mb-2"><input class="form-control" type="date" name="due"/></div>
 <div class="col-md-2 mb-2"><select class="form-select" name="recurrence"><option value="NONE">Sekali</option><option value="DAILY">Harian</option><option value="WEEKLY">Mingguan</option><option value="MONTHLY">Bulanan</option></select></div>
 <div class="col-md-2 mb-2"><select class="form-select" name="ref_type"><option value="">Tanpa tautan</option><option value="deed">Akta #</option><option value="request">Permohonan #</option><option value="client">Klien #</option><option value="file">Berkas #</option></select></div>
 <div class="col-md-1 mb-2"><input class="form-control" name="ref_id" placeholder="ID"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div>
+<div class="col-12"><p class="text-secondary small mb-0">Tips: dari halaman akta klik <strong>+ Todo</strong> — tugas terisi otomatis + bisa preview &amp; edit cepat di bawah tanpa pindah halaman.</p></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Daftar Tugas</h3></div>
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>ID</th><th>Judul</th><th>Tenggat</th><th>Status</th><th></th></tr></thead>
-<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Title}}{{if ne .Rec "NONE"}} <span class="badge bg-azure-lt">{{.Rec}}</span>{{end}}{{if .RefType}} <span class="text-secondary small">{{refLink .RefType .RefID}}</span>{{end}}</td><td>{{.Due}}</td><td>{{.Status}}</td><td>{{if eq .Status "OPEN"}}<form method="post" action="/tasks/{{.ID}}/done">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">Selesai</button></form>{{end}}</td></tr>
+<tbody>{{range .Data}}<tr><td>{{.ID}}</td><td>{{.Title}}{{if ne .Rec "NONE"}} <span class="badge bg-azure-lt">{{.Rec}}</span>{{end}}{{if .RefType}} <span class="text-secondary small">{{refLink .RefType .RefID}}</span>{{end}}
+{{if and (eq .RefType "deed") .DeedTitle}}<div class="mt-1"><span class="badge bg-blue-lt">{{.DeedStatus}} · v{{.DeedVersion}}</span>{{if .DeedLocked}} <span class="badge bg-red-lt">🔒 terkunci</span>{{end}} <strong>{{.DeedTitle}}</strong></div>
+<details class="mt-1"><summary class="text-primary" style="cursor:pointer">👁 Preview draft (klik)</summary><div class="p-2 bg-light border rounded small mt-1" style="white-space:pre-wrap;max-height:220px;overflow:auto">{{.DeedPreview}}</div>
+<div class="d-flex gap-1 mt-1 flex-wrap"><a class="btn btn-sm btn-outline-primary" href="/deeds/{{.RefID}}" target="_blank">Buka penuh</a><a class="btn btn-sm btn-ghost-secondary" href="/deeds/{{.RefID}}#deedform">Edit di halaman akta →</a></div></details>
+{{if not .DeedLocked}}<details class="mt-1"><summary class="text-success" style="cursor:pointer">✏️ Edit cepat dari sini</summary>
+<form method="post" action="/deeds/{{.RefID}}/version"><div class="mt-1">{{template "csrf" $}}<textarea class="form-control" name="content" rows="5" placeholder="Tulis revisi di sini — tersimpan sebagai versi baru…"></textarea><input class="form-control mt-1" name="note" placeholder="Catatan revisi (cth. perbaiki pasal 3)"/><button class="btn btn-sm btn-success mt-1" type="submit" onclick="return confirm('Simpan sebagai versi baru?')">Simpan revisi</button></div></form></details>{{end}}
+{{else if and (eq .RefType "deed") (eq .DeedTitle "")}}<div class="text-warning small mt-1">⚠ Draft tidak ditemukan / beda kantor.</div>{{end}}
+</td><td>{{.Due}}</td><td>{{.Status}}</td><td>{{if eq .Status "OPEN"}}<form method="post" action="/tasks/{{.ID}}/done">{{template "csrf" $}}<button class="btn btn-sm btn-success" type="submit">Selesai</button></form>{{end}}</td></tr>
 {{else}}<tr><td colspan="5" class="text-center text-secondary py-4">Tidak ada tugas terbuka. Tambahkan di atas.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,29 @@ import (
 
 //go:embed templates/*.gohtml
 var tmplFS embed.FS
+
+// reNIKFull menutupi NIK 16 digit berurutan pada tampilan (UU PDP: NIK
+// penuh tidak boleh tampil di layar/log — hanya 4 digit terakhir).
+var reNIKFull = regexp.MustCompile(`\d{16}`)
+
+// maskNIKDisp menampilkan NIK/NPWP/No.KK dalam bentuk mask:
+// "•••• •••••••• 1234" (hanya 4 digit terakhir yang terlihat).
+func maskNIKDisp(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if len(s) < 4 {
+		return "••••"
+	}
+	return "•••• •••••••• " + s[len(s)-4:]
+}
+
+// redactNIKDisp menutupi setiap run 16 digit pada teks bebas (mis. teks
+// mentah OCR) dengan format mask yang sama, tanpa mengubah data tersimpan.
+func redactNIKDisp(s string) string {
+	return reNIKFull.ReplaceAllStringFunc(s, maskNIKDisp)
+}
 
 // App wires the modular monolith: router, stores, templates.
 type App struct {
@@ -120,6 +144,8 @@ func New(cfg config.Config, db *sql.DB, log *slog.Logger) (*App, error) {
 		"lower":     func(s string) string { return strings.ToLower(s) },
 		"hasPrefix": func(s, p string) bool { return strings.HasPrefix(s, p) },
 		"hasSuffix": func(s, p string) bool { return strings.HasSuffix(s, p) },
+		"maskNIK":   func(s string) string { return maskNIKDisp(s) },
+		"redactNIK": func(s string) string { return redactNIKDisp(s) },
 		"safeHTML":  func(s string) template.HTML { return template.HTML(safehtml.Sanitize(s)) },
 		"cmsHTML":   func(s string) template.HTML { return template.HTML(cms.SanitizeHTML(s)) },
 		"plaintext": func(s string) string { return safehtml.ToText(s) },
@@ -505,6 +531,8 @@ func (a *App) Router() http.Handler {
 		p.Post("/requests/{id}/officers", a.officerAdd)
 		p.Post("/requests/{id}/bo", a.boAdd)
 		p.Get("/requests/{id}/wizard", a.corpWizard)
+		p.Get("/requests/{id}/wizard-ajb", a.ajbWizard)
+		p.Get("/requests/{id}/wizard-wasiat", a.willWizard)
 		p.Get("/appointments", a.appointments)
 		p.Post("/appointments", a.appointmentCreate)
 		p.Post("/appointments/{id}/status", a.appointmentStatus)
@@ -532,6 +560,10 @@ func (a *App) Router() http.Handler {
 		p.Get("/legalisasi", a.legalisasi)
 		p.Post("/legalisasi", a.legalisasiCreate)
 		p.Post("/legalisasi/{id}/advance", a.legalisasiAdvance)
+		p.Get("/ppat", a.ppatRegister)
+		p.Post("/ppat", a.ppatCreate)
+		p.Post("/ppat/{id}/advance", a.ppatAdvance)
+		p.Get("/ppat/{id}/blanko", a.ppatBlanko)
 		p.Get("/gov", a.gov)
 		p.Post("/gov", a.govCreate)
 		p.Post("/gov/{id}/advance", a.govAdvance)
@@ -548,6 +580,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/budgets", a.budgetSave)
 		p.Get("/templates", a.templatesPage)
 		p.Post("/templates", a.templateSave)
+		p.Post("/templates/seed", a.templateSeed)
 		p.Get("/templates/{id}", a.templateEdit)
 		p.Post("/templates/{id}/approve", a.templateApprove)
 		p.Post("/clauses", a.clauseSave)
@@ -671,6 +704,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/dms/categories", a.dmsCategoryCreate)
 		p.Get("/dms/checklists", a.dmsChecklists)
 		p.Post("/dms/checklists", a.dmsChecklistCreate)
+		p.Post("/dms/checklists/seed", a.dmsChecklistSeed)
 		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
 		p.Get("/qr", a.qrText)
 		p.Get("/dms/archive/labels", a.dmsLabels)
@@ -959,26 +993,46 @@ type docStep struct {
 
 func docSteps() []docStep {
 	return []docStep{
-		{"ktp-masuk", "1. KTP & Dokumen Masuk", "notarius-doc-ktp.jpg", "Memfoto KTP di atas meja notaris",
-			"Unggah foto/scan KTP, KK, NPWP, atau dokumen pendukung dari halaman detail klien.",
-			[]string{"Buka /clients → pilih klien → tab Dokumen → Unggah", "Format JPG/PNG/WebP/PDF, maksimal 100MB, tersimpan privat", "Setiap berkas tercatat hash SHA-256 + status OCR"},
-			"Foto buram = OCR gagal. Pastikan KTP terang, fokus, dan tidak terpotong.",
-			"Mulai dari klien", "/clients"},
-		{"ocr-proses", "2. OCR Memproses", "notarius-doc-ocr.jpg", "Pemindai OCR membaca dokumen",
-			"Tesseract lokal membaca teks (Indonesia/Inggris), hasilnya disimpan beserta provenance.",
-			[]string{"Klik Jalankan OCR pada berkas → status PENDING → DONE/FAILED", "Hasil mentah tersimpan di riwayat AI (provider, versi engine, waktu)", "Tidak ada data yang otomatis dianggap benar pada tahap ini"},
-			"OCR salah baca adalah normal (stempel, tulisan tangan). Tahap berikut wajib verifikasi manusia.",
-			"Lihat Document Center", "/documents"},
-		{"review-verifikasi", "3. Review & Verifikasi Manusia", "notarius-doc-review.jpg", "Staf memverifikasi hasil OCR",
-			"Staf membandingkan teks hasil OCR dengan dokumen asli, lalu mengesahkan identitas.",
-			[]string{"Buka berkas → cocokkan NIK/nama dengan fisik dokumen", "Klik Verifikasi — tercatat siapa & kapan (verified_by/at)", "Hanya identitas terverifikasi yang dipakai ke akta"},
-			"Verifikasi tidak boleh diwakilkan ke OCR. Akun verifier tercatat di audit log.",
+		{"ktp-masuk", "1. Klien Baru & Cek Duplikat", "notarius-doc-ktp.jpg", "Tambah klien perorangan dan badan hukum di SaktiNotaris",
+			"Tambah klien perorangan / PT / CV / Yayasan di /clients — sistem otomatis cegah data ganda.",
+			[]string{"Buka /clients → + Tambah Klien → isi jenis, nama, NIK/NPWP, telepon, email, alamat", "Peringatan duplikat otomatis: telepon sama / nama mirip (SOUNDS LIKE) → gabungkan via Merge", "Untuk PT/CV: lanjut isi Pemegang Saham, Pengurus & Beneficial Owner (BO, TPPU/PEP) di detail permohonan"},
+			"NIK/NPWP wajib valid. Data ganda merusak repertorium — selalu cek peringatan duplikat dulu.",
+			"Tambah klien sekarang", "/clients"},
+		{"ocr-proses", "2. Upload Dokumen & OCR", "notarius-doc-ocr.jpg", "Upload berkas dan proses OCR di Document Center",
+			"Unggah KTP, KK, NPWP & pendukung ke Document Center — OCR lokal Tesseract membantu membaca.",
+			[]string{"Buka detail klien → tab Dokumen → Unggah (JPG/PNG/WebP/PDF, maks 100MB, privat per kantor)", "Klik Jalankan OCR di /documents → status PENDING → DONE/FAILED + hash SHA-256", "Hasil + provenance (engine, versi, waktu) tersimpan di riwayat AI"},
+			"OCR hanya membantu baca. Stempel / tulisan tangan sering salah baca — wajib verifikasi manusia.",
+			"Buka Document Center", "/documents"},
+		{"review-verifikasi", "3. Verifikasi Manusia", "notarius-doc-review.jpg", "Staf memverifikasi identitas sebelum dipakai ke akta",
+			"Bandingkan hasil OCR dengan fisik dokumen, lalu sahkan — tercatat siapa & kapan.",
+			[]string{"Buka berkas → cocokkan NIK/nama dengan dokumen asli", "Klik Verifikasi — tersimpan verified_by / verified_at + audit log", "Hanya identitas Sudah Diverifikasi yang bisa ditarik ke draf akta"},
+			"OCR tidak pernah auto-verify. Tanpa verifikasi manusia, data tidak boleh masuk akta.",
 			"Verifikasi identitas", "/clients"},
-		{"dokumen-sah", "4. Menjadi Dokumen Legalitas yang Sah", "notarius-doc-legal.jpg", "Akta ditandatangani dengan segel",
-			"Data terverifikasi masuk draf akta → review → pengesahan notaris → dokumen sah + repertorium.",
-			[]string{"Buat draf dari template terapproved (data terisi dari identitas terverifikasi)", "Kirim review → notaris mengesahkan dengan nomor akta", "Final terkunci; repertorium otomatis; ekspor PDF/DOCX berwatermark"},
-			"Keabsahan berasal dari pengesahan notaris sesuai UUJN — bukan dari OCR/aplikasi.",
+		{"permohonan-layanan", "4. Permohonan & Workflow Layanan", "notarius-doc-permohonan.svg", "Buat permohonan layanan dan gerakkan status workflow",
+			"Pilih klien + katalog 22 layanan → buat permohonan → gerakkan 9 status hingga selesai.",
+			[]string{"Buka /requests → pilih Klien + Layanan + judul → Buat", "Gerakkan status: DRAFT → SUBMITTED → IN_REVIEW → APPROVED → IN_PROGRESS → COMPLETED (transisi legal divalidasi)", "Untuk korporat: isi Data Korporat, Legal AHU/OSS checklist + bukti di tab yang sama; atur Janji/Reminder bila perlu"},
+			"Status tidak bisa loncat. Bukti AHU/OSS hanya checklist asistensi — bukan klaim pengajuan otomatis.",
+			"Buat permohonan", "/requests"},
+		{"akta-template", "5. Draf Akta dari Template", "notarius-doc-akta.svg", "Buat draf akta berversi dari template yang disetujui notaris",
+			"Semua akta hanya dari template Approved — revisi berversi, review, lalu kunci final.",
+			[]string{"Buka /deeds → Buat draf → pilih Template Approved (variabel {{nama}} terisi dari identitas terverifikasi)", "Simpan revisi → versi tercatat + hash; klik Preview / missing-vars sebelum kirim", "Kirim Review → notaris Approve + nomor akta → terkunci; ekspor PDF/DOCX (watermark DRAFT bila belum sah)"},
+			"Template Draft tidak bisa dipakai. Pengesahan hanya oleh peran notaris — staf hanya sampai Review.",
 			"Buat draf akta", "/deeds"},
+		{"dokumen-sah", "6. Register Resmi: Repertorium, Protokol, Legalisasi", "notarius-doc-register.svg", "Repertorium, protokol dan legalisasi tercatat otomatis dan manual",
+			"Akta yang disahkan otomatis masuk repertorium — protokol & legalisasi dicatat di registernya.",
+			[]string{"Repertorium /repertorium: nomor unik per kantor, otomatis saat pengesahan + cek nomor lompat (gaps) + Ekspor CSV", "Protokol /protocols: bendel minuta/salinan/grosse per tahun + lokasi arsip, retensi 25 tahun", "Legalisasi /legalisasi: LEGALISASI/WAARMERKING/SALINAN/KUTIPAN → REGISTERED → COMPLETED → HANDED_OVER + biaya; Wasiat /wills & serah-terima hanya notaris"},
+			"Keabsahan berasal dari pengesahan notaris sesuai UUJN — bukan dari aplikasi. Nomor register tidak boleh manual ganda.",
+			"Lihat repertorium", "/repertorium"},
+		{"keuangan-invoice", "7. Invoice, Bayar & Rekonsiliasi Bank", "notarius-doc-keuangan.svg", "Buat invoice multi-baris, catat pembayaran dan rekonsiliasi bank",
+			"Invoice rupiah presisi (int64) + PPN 11% otomatis — kelebihan bayar ditolak sistem.",
+			[]string{"Buka /finance → Invoice Baru (multi-baris) → PPN otomatis → kirim ke klien", "Catat pembayaran per invoice — anti-overpay; void tercatat audit", "Impor mutasi di /finance/bank → auto-match → cocok manual; pantau Piutang & Penerimaan bulan berjalan"},
+			"Jangan hapus invoice lunas — gunakan Void agar jejak audit utuh.",
+			"Buka keuangan", "/finance"},
+		{"portal-pantau", "8. Portal Klien & Dashboard Laporan", "notarius-doc-legal.jpg", "Klien pantau mandiri, pimpinan pantau operasional real-time",
+			"Klien hanya lihat datanya sendiri — pimpinan lihat angka real-query tanpa fabrikasi.",
+			[]string{"Klien login → /portal: status permohonan, draf akta terkait & invoice + konfirmasi bayar + unduh kwitansi", "Pimpinan → /app dashboard: pending/aktif/selesai, piutang, agenda hari ini + grafik 6/12 bulan", "Laporan /reports + /metrics: semua angka dari query langsung — bukan contoh statis"},
+			"Isolasi portal ditegakkan server-side. Akun klien yang belum ditautkan tidak melihat data apa pun.",
+			"Pantau dashboard", "/app"},
 	}
 }
 
@@ -1566,13 +1620,22 @@ func (a *App) requestList(w http.ResponseWriter, r *http.Request) {
 	list, _ := a.reqs.List(a.officeOf(r), r.URL.Query().Get("status"), clientID)
 	svcs, _ := a.reqs.Services()
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
+	// Fokus Notaris: layanan Notaris di grup atas, PPAT di grup bawah.
+	var notarySvcs, ppatSvcs []requests.Service
+	for _, s := range svcs {
+		if s.Category == "ppat" {
+			ppatSvcs = append(ppatSvcs, s)
+		} else {
+			notarySvcs = append(notarySvcs, s)
+		}
+	}
 	var clientName string
 	if clientID != 0 {
 		if c, err := a.clients.Get(a.officeOf(r), clientID); err == nil {
 			clientName = c.FullName
 		}
 	}
-	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "Clients": cl, "ClientName": clientName})
+	a.render(w, r, "requests", "Permohonan", map[string]any{"Requests": list, "Services": svcs, "NotarySvcs": notarySvcs, "PpatSvcs": ppatSvcs, "Clients": cl, "ClientName": clientName})
 }
 
 func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
@@ -1583,7 +1646,39 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	clientID, _ := strconv.ParseInt(r.FormValue("client_id"), 10, 64)
 	serviceID, _ := strconv.ParseInt(r.FormValue("service_id"), 10, 64)
-	id, err := a.reqs.Create(a.officeOf(r), clientID, serviceID, r.FormValue("title"), r.FormValue("notes"), a.uid(r))
+	notes := r.FormValue("notes")
+	// Lampiran terstruktur dari form pintar per kategori (tanpa migrasi:
+	// disimpan sebagai baris [Auto] di catatan + record anak yang sudah ada).
+	var auto []string
+	add := func(k, v string) {
+		if v = strings.TrimSpace(v); v != "" {
+			auto = append(auto, k+": "+v)
+		}
+	}
+	firstOf := func(keys ...string) string {
+		for _, k := range keys {
+			for _, v := range r.Form[k] {
+				if strings.TrimSpace(v) != "" {
+					return v
+				}
+			}
+		}
+		return ""
+	}
+	add("Pihak/para pihak", firstOf("x_parties"))
+	add("Objek", r.FormValue("x_object"))
+	add("Nilai/transaksi", r.FormValue("x_value"))
+	add("Sertifikat", r.FormValue("x_cert"))
+	add("Luas/lokasi", strings.TrimSpace(r.FormValue("x_area")+" "+r.FormValue("x_location")))
+	add("Pewasiat", r.FormValue("x_testator"))
+	add("Ahli waris", r.FormValue("x_heirs"))
+	if len(auto) > 0 {
+		if notes != "" {
+			notes += "\n"
+		}
+		notes += "[Auto " + r.FormValue("x_svccode") + "] " + strings.Join(auto, " | ")
+	}
+	id, err := a.reqs.Create(a.officeOf(r), clientID, serviceID, r.FormValue("title"), notes, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1595,7 +1690,40 @@ func (a *App) requestCreate(w http.ResponseWriter, r *http.Request) {
 	if plan.Allowed(a.officeTier(a.officeOf(r)), plan.FeatChecklist) {
 		_ = a.dms.AutoChecklist(a.officeOf(r), id, serviceID)
 	}
-	http.Redirect(w, r, "/requests?flash=Permohonan+dibuat", http.StatusSeeOther)
+	// Korporat: langsung bentuk record perusahaan anak agar wizard/wizard-lanjut tinggal isi.
+	if code := r.FormValue("x_svccode"); code != "" {
+		if ent := corpEntityOf(code); ent != "" {
+			_, _ = a.corp.UpsertCompany(corp.Company{
+				RequestID:  &id,
+				EntityType: ent,
+				Name:       r.FormValue("x_coname"),
+				Domicile:   r.FormValue("x_cocity"),
+				Address:    r.FormValue("x_coaddr"),
+				Authorized: numForm(r, "x_coauth"),
+				Issued:     numForm(r, "x_coissued"),
+				Paid:       numForm(r, "x_copaid"),
+			})
+		}
+	}
+	http.Redirect(w, r, "/requests/"+strconv.FormatInt(id, 10)+"?flash=Permohonan+dibuat.+Lengkapi+data+di+bawah", http.StatusSeeOther)
+}
+
+// corpEntityOf memetakan kode layanan ke tipe badan usaha ("" bila bukan korporat).
+func corpEntityOf(code string) string {
+	switch {
+	case strings.HasPrefix(code, "PT-"):
+		return "PT"
+	case strings.HasPrefix(code, "CV-"):
+		return "CV"
+	case code == "FIRMA":
+		return "Firma"
+	case strings.HasPrefix(code, "YAYASAN"):
+		return "Yayasan"
+	case code == "KOPERASI":
+		return "Koperasi"
+	default:
+		return ""
+	}
 }
 
 func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
@@ -1605,6 +1733,24 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	target := strings.ToUpper(strings.TrimSpace(r.FormValue("to")))
+	// Gate mode ketat checklist: ke IN_REVIEW/APPROVED ditolak selama masih
+	// ada item checklist berstatus MISSING. Bila strict mati (atau tabel flag
+	// belum ada), perilaku lama dipertahankan.
+	if (target == "IN_REVIEW" || target == "APPROVED") && a.strictChecklistEnabled(a.officeOf(r)) && a.dms != nil {
+		if items, err := a.dms.ChecklistForRequest(a.officeOf(r), id); err == nil {
+			miss := 0
+			for _, it := range items {
+				if it.Status == "MISSING" {
+					miss++
+				}
+			}
+			if miss > 0 {
+				http.Error(w, fmt.Sprintf("Mode ketat checklist aktif: masih ada %d dokumen berstatus MISSING — lengkapi dulu di /requests/%d", miss, id), http.StatusBadRequest)
+				return
+			}
+		}
+	}
 	if err := a.reqs.Move(a.officeOf(r), id, r.FormValue("to"), a.uid(r), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1652,7 +1798,34 @@ func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.ParseInt(v, 10, 64)
 		tplID = &n
 	}
-	id, err := a.deeds.CreateDraft(a.officeOf(r), reqID, r.FormValue("title"), r.FormValue("kind"), tplID, a.uid(r))
+	// 1-klik dari permohonan: bila template tidak dipilih eksplisit, petakan
+	// otomatis template approved milik kantor berdasarkan kode layanan.
+	// Perilaku template_id eksplisit tidak diubah.
+	var svcCode string
+	if reqID != nil && a.db != nil {
+		_ = a.db.QueryRow(`SELECT sv.code FROM service_requests r
+			JOIN services sv ON sv.id=r.service_id
+			WHERE r.id=? AND r.office_id=?`, *reqID, a.officeOf(r)).Scan(&svcCode)
+	}
+	kind := r.FormValue("kind")
+	if kind == "" && svcCode != "" {
+		kind = serviceDeedKind(svcCode)
+	}
+	title := r.FormValue("title")
+	if title == "" && reqID != nil && a.db != nil {
+		var svcName, reqTitle string
+		if err := a.db.QueryRow(`SELECT sv.name, r.title FROM service_requests r
+			JOIN services sv ON sv.id=r.service_id
+			WHERE r.id=? AND r.office_id=?`, *reqID, a.officeOf(r)).Scan(&svcName, &reqTitle); err == nil {
+			title = svcName + " — " + reqTitle
+		}
+	}
+	if tplID == nil && svcCode != "" && a.db != nil {
+		if id := autoDeedTemplate(a.db, a.officeOf(r), svcCode, kind); id != 0 {
+			tplID = &id
+		}
+	}
+	id, err := a.deeds.CreateDraft(a.officeOf(r), reqID, title, kind, tplID, a.uid(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1660,6 +1833,119 @@ func (a *App) deedCreate(w http.ResponseWriter, r *http.Request) {
 	uid := a.uid(r)
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.draft", Entity: "deed", EntityID: strconv.FormatInt(id, 10)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Draf+akta+dibuat", http.StatusSeeOther)
+}
+
+// serviceDeedKind memetakan kode layanan ke deed kind ("" bila tak dikenal).
+func serviceDeedKind(code string) string {
+	c := strings.ToUpper(strings.TrimSpace(code))
+	switch {
+	case strings.HasPrefix(c, "PT-"):
+		return "PT"
+	case strings.HasPrefix(c, "CV-"):
+		return "CV"
+	case c == "FIRMA":
+		return "Firma"
+	case strings.HasPrefix(c, "YAYASAN"):
+		return "Yayasan"
+	case c == "KOPERASI":
+		return "Koperasi"
+	case c == "PPAT-AJB":
+		return "AJB"
+	case c == "PPAT-HIBAH":
+		return "Hibah"
+	case c == "PPAT-TUKAR":
+		return "TukarMenukar"
+	case c == "PPAT-APHB":
+		return "APHB"
+	case c == "PPAT-INBRENG":
+		return "Inbreng"
+	case c == "PPAT-SKMHT":
+		return "SKMHT"
+	case c == "PPAT-APHT":
+		return "APHT"
+	case c == "KUASA":
+		return "POA"
+	case c == "PRENUP":
+		return "Prenup"
+	case strings.HasPrefix(c, "WASIAT"):
+		return "Will"
+	case c == "PK-UMUM", c == "HUTANG", c == "SEWA", c == "JUALBELI-NONPPAT":
+		return "Agreement"
+	case c == "LEGALISASI", c == "WAARMERKING", c == "SALINAN", c == "KUTIPAN",
+		c == "AHU-BANTU", c == "OSS-BANTU":
+		return "Other"
+	default:
+		return ""
+	}
+}
+
+// deedTemplateKeyword memetakan kode layanan ke kata kunci pencarian template.
+func deedTemplateKeyword(code string) string {
+	c := strings.ToUpper(strings.TrimSpace(code))
+	switch {
+	case strings.HasPrefix(c, "PT-"):
+		return "PT"
+	case strings.HasPrefix(c, "CV-"):
+		return "CV"
+	case c == "FIRMA":
+		return "Firma"
+	case strings.HasPrefix(c, "YAYASAN"):
+		return "Yayasan"
+	case c == "KOPERASI":
+		return "Koperasi"
+	case c == "PPAT-AJB":
+		return "AJB"
+	case c == "PPAT-HIBAH":
+		return "Hibah"
+	case c == "PPAT-TUKAR":
+		return "Tukar"
+	case c == "PPAT-APHB":
+		return "APHB"
+	case c == "PPAT-INBRENG":
+		return "Inbreng"
+	case c == "PPAT-SKMHT":
+		return "SKMHT"
+	case c == "PPAT-APHT":
+		return "APHT"
+	case c == "KUASA":
+		return "Kuasa"
+	case c == "PRENUP":
+		return "Kawin"
+	case strings.HasPrefix(c, "WASIAT"):
+		return "wasiat"
+	case c == "PK-UMUM", c == "HUTANG", c == "SEWA", c == "JUALBELI-NONPPAT":
+		return "Perjanjian"
+	default:
+		return ""
+	}
+}
+
+// autoDeedTemplate memilih template approved milik kantor yang paling cocok
+// untuk kode layanan: cocok kata kunci dulu, lalu kategori sejenis kind,
+// terakhir template approved pertama. Mengembalikan 0 bila tidak ada.
+func autoDeedTemplate(db *sql.DB, officeID int64, svcCode, kind string) int64 {
+	var id int64
+	if kw := deedTemplateKeyword(svcCode); kw != "" {
+		like := "%" + kw + "%"
+		if err := db.QueryRow(`SELECT id FROM doc_templates
+			WHERE office_id=? AND approved=1 AND (name LIKE ? OR category LIKE ?)
+			ORDER BY id LIMIT 1`, officeID, like, like).Scan(&id); err == nil {
+			return id
+		}
+	}
+	if kind != "" {
+		like := "%" + kind + "%"
+		if err := db.QueryRow(`SELECT id FROM doc_templates
+			WHERE office_id=? AND approved=1 AND (name LIKE ? OR category LIKE ?)
+			ORDER BY id LIMIT 1`, officeID, like, like).Scan(&id); err == nil {
+			return id
+		}
+	}
+	if err := db.QueryRow(`SELECT id FROM doc_templates
+		WHERE office_id=? AND approved=1 ORDER BY id LIMIT 1`, officeID).Scan(&id); err == nil {
+		return id
+	}
+	return 0
 }
 
 // ---- registers ----
@@ -1888,6 +2174,151 @@ func (a *App) legalisasiCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/legalisasi?flash=Register+tersimpan", http.StatusSeeOther)
 }
 
+// ---- PPAT register (Buku PPAT terpisah dari Repertorium Notaris) ----
+
+func (a *App) ppatRegister(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	type row struct {
+		ID                                            int64
+		No, Date, Jenis                                string
+		Penjual, Pembeli                              string
+		Objek                                         string
+		Status, BPN                                   string
+		DeedID                                        int64
+		Days                                          int
+		Overdue                                       bool
+	}
+	var rows []row
+	if a.db != nil {
+		rs, err := a.db.Query(`SELECT id, akta_no, DATE_FORMAT(akta_date,'%d %b %Y'), jenis,
+			COALESCE(penjual,''), COALESCE(pembeli,''),
+			CONCAT(COALESCE(objek_sertifikat,''),' ',COALESCE(objek_luas,''),' ',COALESCE(objek_lokasi,'')),
+			status, COALESCE(bpn_receipt,''), COALESCE(deed_id,0),
+			DATEDIFF(CURDATE(), COALESCE(akta_date, DATE(created_at)))
+			FROM ppat_register WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
+		if err == nil {
+			defer rs.Close()
+			for rs.Next() {
+				var x row
+				var dt sql.NullString
+				_ = rs.Scan(&x.ID, &x.No, &dt, &x.Jenis, &x.Penjual, &x.Pembeli, &x.Objek, &x.Status, &x.BPN, &x.DeedID, &x.Days)
+				if dt.Valid {
+					x.Date = dt.String
+				}
+				// Pengingat resi BPN: LAPOR_BPN > 14 hari tanpa terbit = overdue.
+				x.Overdue = x.Status == "LAPOR_BPN" && x.Days > 14
+				rows = append(rows, x)
+			}
+		}
+	}
+	deeds, _ := a.deeds.List(a.officeOf(r))
+	a.render(w, r, "ppat", "Register PPAT", map[string]any{"Rows": rows, "Deeds": deeds})
+}
+
+func (a *App) ppatCreate(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageRepert) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	jenis := r.FormValue("jenis")
+	switch jenis {
+	case "AJB", "Hibah", "TukarMenukar", "APHB", "Inbreng", "SKMHT", "APHT":
+	default:
+		http.Error(w, "jenis akta PPAT tidak dikenal", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(r.FormValue("akta_no")) == "" {
+		http.Error(w, "nomor akta PPAT wajib diisi", http.StatusBadRequest)
+		return
+	}
+	var deedID any
+	if v := strings.TrimSpace(r.FormValue("deed_id")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			deedID = n
+		}
+	}
+	var aktaDate any
+	if v := strings.TrimSpace(r.FormValue("akta_date")); v != "" {
+		aktaDate = v
+	}
+	if _, err := a.db.Exec(`INSERT INTO ppat_register(office_id, deed_id, akta_no, akta_date, jenis, penjual, pembeli, objek_sertifikat, objek_luas, objek_lokasi)
+		VALUES(?,?,?,?,?,?,?,?,?,?)`, a.officeOf(r), deedID, r.FormValue("akta_no"), aktaDate, jenis,
+		r.FormValue("penjual"), r.FormValue("pembeli"), r.FormValue("objek_sertifikat"), r.FormValue("objek_luas"), r.FormValue("objek_lokasi")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.create", Entity: "ppat_register", EntityID: r.FormValue("akta_no")})
+	http.Redirect(w, r, "/ppat?flash=Register+PPAT+tersimpan", http.StatusSeeOther)
+}
+
+func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageRepert) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var cur string
+	_ = a.db.QueryRow(`SELECT status FROM ppat_register WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&cur)
+	next := map[string]string{
+		"DRAFT_AKTA": "AKTA_JADI", "AKTA_JADI": "LAPOR_BPN", "LAPOR_BPN": "SERTIFIKAT_TERBIT",
+	}[cur]
+	if next == "" {
+		http.Error(w, "status sudah final", http.StatusBadRequest)
+		return
+	}
+	bpn := r.FormValue("bpn_receipt")
+	if next == "LAPOR_BPN" && strings.TrimSpace(bpn) == "" {
+		bpn = "-"
+	}
+	_, err := a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END WHERE id=? AND office_id=?`,
+		next, bpn, bpn, id, a.officeOf(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.advance." + strings.ToLower(next), Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10)})
+	http.Redirect(w, r, "/ppat?flash=Status+PPAT+diperbarui", http.StatusSeeOther)
+}
+
+// ppatBlanko renders a print-friendly draft sheet for copying onto the
+// official BPN form. Honest: this is a working concept, NOT the official blanko.
+func (a *App) ppatBlanko(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	type data struct {
+		No, Date, Jenis, Penjual, Pembeli, Objek, Status, BPN string
+		DeedTitle, DeedBody                                    string
+		Office, OfficeAddr                                     string
+	}
+	var d data
+	var deedID sql.NullInt64
+	var aktaDate sql.NullString
+	_ = a.db.QueryRow(`SELECT akta_no, DATE_FORMAT(akta_date,'%d %B %Y'), jenis,
+		COALESCE(penjual,''), COALESCE(pembeli,''),
+		TRIM(CONCAT(COALESCE(objek_sertifikat,''),' ',COALESCE(objek_luas,''),' ',COALESCE(objek_lokasi,''))),
+		status, COALESCE(bpn_receipt,''), deed_id
+		FROM ppat_register WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(
+		&d.No, &d.Date, &d.Jenis, &d.Penjual, &d.Pembeli, &d.Objek, &d.Status, &d.BPN, &deedID)
+	if d.No == "" {
+		http.NotFound(w, r)
+		return
+	}
+	_ = aktaDate
+	if deedID.Valid {
+		_ = a.db.QueryRow(`SELECT COALESCE(title,''), COALESCE(content,'') FROM deed_drafts WHERE id=? AND office_id=?`,
+			deedID.Int64, a.officeOf(r)).Scan(&d.DeedTitle, &d.DeedBody)
+	}
+	_ = a.db.QueryRow(`SELECT COALESCE(name,''), COALESCE(address,'') FROM offices WHERE id=?`, a.officeOf(r)).Scan(&d.Office, &d.OfficeAddr)
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.blanko", Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10)})
+	a.render(w, r, "ppat_blanko", "Blanko PPAT #"+d.No, map[string]any{"D": d})
+}
+
 // ---- gov assisted ----
 
 func (a *App) gov(w http.ResponseWriter, r *http.Request) {
@@ -1911,8 +2342,51 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 	rev, _ := a.fin.Revenue(a.officeOf(r), month)
 	cl, _ := a.clients.List(a.officeOf(r), "", 200)
 	reqID, _ := strconv.ParseInt(r.URL.Query().Get("req"), 10, 64)
+	// Suggest tarif otomatis: bila ?req= ada, ambil base_price + nama layanan
+	// permohonan itu (office-scoped). Diteruskan ke template sebagai .Data.Suggest.
+	var suggestVal any
+	if reqID > 0 && a.db != nil {
+		var svcName, priceStr string
+		if err := a.db.QueryRow(`SELECT s.name, s.base_price FROM service_requests r JOIN services s ON s.id=r.service_id WHERE r.id=? AND r.office_id=?`, reqID, a.officeOf(r)).Scan(&svcName, &priceStr); err == nil {
+			suggestVal = map[string]any{"Price": decWhole(priceStr), "ServiceName": svcName}
+		}
+	}
+	// Perkaya baris invoice dengan jenis (DP/PELUNASAN/FULL) + progres bayar.
+	// Jenis dibaca dari prefix baris pertama invoice_lines ("[DP] ..."/"[PELUNASAN] ...")
+	// karena skema invoices tidak memiliki kolom jenis/catatan — tanpa migrasi.
+	type invView struct {
+		finance.Invoice
+		Kind string
+		Pct  int
+	}
+	views := make([]invView, 0, len(invs))
+	for _, iv := range invs {
+		v := invView{Invoice: iv}
+		if iv.Total > 0 && iv.Paid >= 0 {
+			p := iv.Paid * 100 / iv.Total
+			if p < 0 {
+				p = 0
+			}
+			if p > 100 {
+				p = 100
+			}
+			v.Pct = int(p)
+		}
+		if a.db != nil {
+			var first string
+			if err := a.db.QueryRow(`SELECT description FROM invoice_lines WHERE invoice_id=? ORDER BY id LIMIT 1`, iv.ID).Scan(&first); err == nil {
+				switch {
+				case strings.HasPrefix(first, "[DP]"):
+					v.Kind = "DP"
+				case strings.HasPrefix(first, "[PELUNASAN]"):
+					v.Kind = "PELUNASAN"
+				}
+			}
+		}
+		views = append(views, v)
+	}
 	a.render(w, r, "finance", "Keuangan", map[string]any{
-		"Invoices": invs, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID,
+		"Invoices": views, "Outstanding": out, "Revenue": rev, "Month": month, "Clients": cl, "ReqID": reqID, "Suggest": suggestVal,
 	})
 }
 
@@ -1936,6 +2410,13 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 	descs := r.Form["desc[]"]
 	qtys := r.Form["qty[]"]
 	prices := r.Form["price[]"]
+	// Jenis invoice (FULL/DP/PELUNASAN). Skema invoices tidak punya kolom
+	// jenis/catatan, jadi DP/PELUNASAN di-encode sebagai prefix baris pertama
+	// "[DP] ..."/"[PELUNASAN] ..." — tanpa migrasi.
+	kind := strings.ToUpper(strings.TrimSpace(r.FormValue("invoice_kind")))
+	if kind != "DP" && kind != "PELUNASAN" {
+		kind = "FULL"
+	}
 	var lines []finance.Line
 	for i := range descs {
 		if i >= len(qtys) || i >= len(prices) || descs[i] == "" {
@@ -1948,6 +2429,12 @@ func (a *App) invoiceCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		lines = append(lines, finance.Line{Description: descs[i], Qty: q, UnitPrice: p})
+	}
+	if kind != "FULL" && len(lines) > 0 {
+		prefix := "[" + kind + "] "
+		if !strings.HasPrefix(lines[0].Description, "[DP]") && !strings.HasPrefix(lines[0].Description, "[PELUNASAN]") {
+			lines[0].Description = prefix + lines[0].Description
+		}
 	}
 	_, err := a.fin.CreateInvoice(a.officeOf(r), clientID, reqID, r.FormValue("number"), lines, 1100, r.FormValue("due_date"))
 	if err != nil {
@@ -2002,7 +2489,80 @@ func (a *App) templatesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	tpls, _ := a.tpl.List(a.officeOf(r))
 	clauses, _ := a.tpl.Clauses(a.officeOf(r))
-	a.render(w, r, "templates", "Template Dokumen", map[string]any{"Templates": tpls, "Clauses": clauses})
+	a.render(w, r, "templates", "Template Dokumen", map[string]any{
+		"Templates": tpls, "Clauses": clauses, "Readiness": a.serviceReadiness(a.officeOf(r)),
+	})
+}
+
+// serviceReadiness menilai kesiapan jual per layanan:
+// checklist + template approved + harga + sudah dipakai. Tanpa query per baris.
+func (a *App) serviceReadiness(office int64) []map[string]any {
+	svcs, _ := a.reqs.Services()
+	tpls, _ := a.tpl.List(office)
+	lower := func(s string) string { return strings.ToLower(s) }
+	hasCL := map[string]bool{}
+	if rs, err := a.db.Query(`SELECT service_code, COUNT(*) FROM doc_checklist_templates WHERE office_id=? GROUP BY service_code`, office); err == nil && rs != nil {
+		defer rs.Close()
+		for rs.Next() {
+			var code string
+			var n int
+			_ = rs.Scan(&code, &n)
+			if n > 0 {
+				hasCL[code] = true
+			}
+		}
+	}
+	used := map[int64]int{}
+	if rs, err := a.db.Query(`SELECT service_id, COUNT(*) FROM service_requests WHERE office_id=? GROUP BY service_id`, office); err == nil && rs != nil {
+		defer rs.Close()
+		for rs.Next() {
+			var sid int64
+			var n int
+			_ = rs.Scan(&sid, &n)
+			used[sid] = n
+		}
+	}
+	var out []map[string]any
+	for _, s := range svcs {
+		kw := lower(deedTemplateKeyword(s.Code))
+		tplOK, tplName := false, ""
+		if kw != "" {
+			for _, t := range tpls {
+				if !t.Approved {
+					continue
+				}
+				if strings.Contains(lower(t.Name+" "+t.Category), kw) {
+					tplOK, tplName = true, t.Name
+					break
+				}
+			}
+		}
+		score := 0
+		if hasCL[s.Code] {
+			score += 25
+		}
+		if tplOK {
+			score += 40
+		}
+		if s.BasePrice > 0 {
+			score += 15
+		}
+		if used[s.ID] > 0 {
+			score += 20
+		}
+		status := "BELUM"
+		if score >= 80 {
+			status = "SIAP JUAL"
+		} else if score >= 40 {
+			status = "KURANG"
+		}
+		out = append(out, map[string]any{
+			"Code": s.Code, "Name": s.Name, "Cat": s.Category, "Price": s.BasePrice,
+			"CL": hasCL[s.Code], "Tpl": tplName, "TplOK": tplOK,
+			"Used": used[s.ID], "Score": score, "Status": status,
+		})
+	}
+	return out
 }
 
 func (a *App) reports(w http.ResponseWriter, r *http.Request) {
@@ -2056,9 +2616,92 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 			profits = append(profits, x)
 		}
 	}
+	// Rekap per kategori layanan: jumlah permohonan + total invoice + total paid
+	// (3 query GROUP BY kategori layanan, office-scoped).
+	type catRow struct {
+		Category       string
+		Reqs           int64
+		InvTotal, Paid int64
+	}
+	byCatMap := map[string]*catRow{}
+	if a.db != nil {
+		if q1, err := a.db.Query(`SELECT s.category, COUNT(r.id) FROM service_requests r JOIN services s ON s.id=r.service_id WHERE r.office_id=? GROUP BY s.category`, a.officeOf(r)); err == nil && q1 != nil {
+			defer q1.Close()
+			for q1.Next() {
+				var c string
+				var n int64
+				_ = q1.Scan(&c, &n)
+				if _, ok := byCatMap[c]; !ok {
+					byCatMap[c] = &catRow{Category: c}
+				}
+				byCatMap[c].Reqs = n
+			}
+		}
+		if q2, err := a.db.Query(`SELECT s.category, COALESCE(SUM(i.total),0) FROM invoices i JOIN service_requests r ON r.id=i.request_id JOIN services s ON s.id=r.service_id WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY s.category`, a.officeOf(r)); err == nil && q2 != nil {
+			defer q2.Close()
+			for q2.Next() {
+				var c, tot string
+				_ = q2.Scan(&c, &tot)
+				if _, ok := byCatMap[c]; !ok {
+					byCatMap[c] = &catRow{Category: c}
+				}
+				byCatMap[c].InvTotal = decWhole(tot)
+			}
+		}
+		if q3, err := a.db.Query(`SELECT s.category, COALESCE(SUM(i.paid),0) FROM invoices i JOIN service_requests r ON r.id=i.request_id JOIN services s ON s.id=r.service_id WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY s.category`, a.officeOf(r)); err == nil && q3 != nil {
+			defer q3.Close()
+			for q3.Next() {
+				var c, tot string
+				_ = q3.Scan(&c, &tot)
+				if _, ok := byCatMap[c]; !ok {
+					byCatMap[c] = &catRow{Category: c}
+				}
+				byCatMap[c].Paid = decWhole(tot)
+			}
+		}
+	}
+	var byCat []catRow
+	for _, v := range byCatMap {
+		byCat = append(byCat, *v)
+	}
+	// Top 5 layanan bulan berjalan: nama layanan + jumlah invoice + total dibayar,
+	// filter bulan berjalan, office-scoped.
+	type topRow struct {
+		Service    string
+		Count, Paid int64
+	}
+	var topSvc []topRow
+	if a.db != nil {
+		ym := time.Now().Format("2006-01")
+		if trows, err := a.db.Query(`SELECT COALESCE(s.name,'(tanpa tautan layanan)'), COUNT(i.id), COALESCE(SUM(i.paid),0)
+			FROM invoices i LEFT JOIN service_requests r ON r.id=i.request_id LEFT JOIN services s ON s.id=r.service_id
+			WHERE i.office_id=? AND DATE_FORMAT(i.created_at,'%Y-%m')=? AND i.status IN ('ISSUED','PARTIAL','PAID')
+			GROUP BY 1 ORDER BY 3 DESC LIMIT 5`, a.officeOf(r), ym); err == nil && trows != nil {
+			defer trows.Close()
+			for trows.Next() {
+				var x topRow
+				var paid string
+				_ = trows.Scan(&x.Service, &x.Count, &paid)
+				x.Paid = decWhole(paid)
+				topSvc = append(topSvc, x)
+			}
+		}
+	}
+	// Papan SLA: permohonan terbuka yang melewati target umur layanannya (batasi 20).
+	// ServiceOverdue hanya memakai kolom yang sudah ada (r.created_at untuk umur).
+	var slaOver []remind.ServiceOverdueItem
+	if a.db != nil {
+		if over, err := remind.ServiceOverdue(a.db, a.officeOf(r)); err == nil {
+			if len(over) > 20 {
+				over = over[:20]
+			}
+			slaOver = over
+		}
+	}
 	a.render(w, r, "reports", "Laporan", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed, "Outstanding": out,
-		"Budgets": budgets, "Profits": profits, "Month": time.Now().Format("2006-01"),
+		"Budgets": budgets, "Profits": profits, "Month": time.Now().Format("2006-01"), "ByCat": byCat,
+		"TopSvc": topSvc, "SLAOver": slaOver,
 	})
 }
 
@@ -2069,6 +2712,76 @@ func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 	}
 	list, _ := a.users.List(a.officeOf(r))
 	a.render(w, r, "settings", "Pengaturan", map[string]any{"Users": list, "Roles": rbac.Roles()})
+}
+
+// portalNextAction maps the 9-stage request status to a client-facing next step.
+func portalNextAction(status string) string {
+	switch status {
+	case "DRAFT":
+		return "Lengkapi draf lalu kirim permohonan"
+	case "SUBMITTED":
+		return "Menunggu verifikasi awal kantor"
+	case "IN_REVIEW":
+		return "Sedang direview notaris/staf"
+	case "NEED_DOCS":
+		return "Lengkapi dokumen"
+	case "APPROVED":
+		return "Disetujui, menunggu proses minuta"
+	case "IN_PROGRESS":
+		return "Menunggu notaris"
+	case "COMPLETED":
+		return "Selesai, unduh PDF"
+	case "REJECTED":
+		return "Ditolak, hubungi kantor"
+	case "CANCELLED":
+		return "Dibatalkan"
+	default:
+		return "Hubungi kantor untuk info lanjut"
+	}
+}
+
+// portalStep maps status to the 5-stage visual stepper:
+// 1 Diajukan > 2 Dokumen > 3 Review > 4 Proses > 5 Selesai. 0 = terminal gagal.
+func portalStep(status string) int {
+	switch status {
+	case "DRAFT", "SUBMITTED":
+		return 1
+	case "NEED_DOCS":
+		return 2
+	case "IN_REVIEW":
+		return 3
+	case "APPROVED", "IN_PROGRESS":
+		return 4
+	case "COMPLETED":
+		return 5
+	default:
+		return 0
+	}
+}
+
+// portalTimeline returns the 5 latest request_events for one request (newest first).
+func (a *App) portalTimeline(requestID int64) []map[string]any {
+	rows, err := a.db.Query(`SELECT e.from_status, e.to_status, COALESCE(u.name,'sistem'), e.created_at, COALESCE(e.note,'')
+		FROM request_events e LEFT JOIN users u ON u.id=e.actor_id
+		WHERE e.request_id=? ORDER BY e.id DESC LIMIT 5`, requestID)
+	if err != nil || rows == nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []map[string]any
+	for rows.Next() {
+		var from, to, actor, at, note string
+		_ = rows.Scan(&from, &to, &actor, &at, &note)
+		out = append(out, map[string]any{"From": from, "To": to, "Actor": actor, "At": at, "Note": note})
+	}
+	return out
+}
+
+// portalDeedID finds one downloadable deed for the request (0 when none).
+func (a *App) portalDeedID(requestID int64, r *http.Request) int64 {
+	var id int64
+	_ = a.db.QueryRow(`SELECT d.id FROM deed_drafts d WHERE d.request_id=? AND d.office_id=? ORDER BY d.id DESC LIMIT 1`, requestID, a.officeOf(r)).Scan(&id)
+	return id
 }
 
 // portal shows the signed-in client's own requests (strict server-side isolation)
@@ -2097,7 +2810,9 @@ func (a *App) portal(w http.ResponseWriter, r *http.Request) {
 			var id int64
 			var title, status string
 			_ = rows.Scan(&id, &title, &status)
-			list = append(list, map[string]any{"ID": id, "Title": title, "Status": status})
+			list = append(list, map[string]any{"ID": id, "Title": title, "Status": status,
+				"NextAction": portalNextAction(status), "Step": portalStep(status), "Failed": status == "REJECTED" || status == "CANCELLED",
+				"Timeline": a.portalTimeline(id), "DeedID": a.portalDeedID(id, r)})
 		}
 		// Akta milik klien (unduh PDF diizinkan via canViewDeed server-side).
 		drows, _ := a.db.Query(`SELECT d.id, d.title, d.number, d.status FROM deed_drafts d

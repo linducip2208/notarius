@@ -1,14 +1,64 @@
 {{define "requests"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Permohonan Layanan</li></ol></nav>
 {{if .Data.ClientName}}<div class="alert alert-info">Filter klien: <strong>{{.Data.ClientName}}</strong> <a href="/requests">✕ tampilkan semua</a></div>{{end}}
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Baru</h3></div>
-<form method="post" action="/requests">{{template "csrf" .}}<div class="card-body row">
-<div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
-<div class="col-md-3 mb-2"><select class="form-select" name="service_id" required><option value="">— Layanan —</option>{{range .Data.Services}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
-<div class="col-md-3 mb-2"><input class="form-control" name="title" placeholder="Judul permohonan" required/></div>
-<div class="col-md-2 mb-2"><input class="form-control" name="notes" placeholder="Catatan"/></div>
-<div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
-</div></form></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Baru — pilih layanan, form menyesuaikan</h3></div>
+<form method="post" action="/requests" id="reqform"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-4 mb-2"><label class="form-label">Klien</label><select class="form-select" id="f_client" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Layanan (31)</label><select class="form-select" id="f_svc" name="service_id" required><option value="">— Pilih layanan —</option>{{if .Data.NotarySvcs}}<optgroup label="Notaris">{{range .Data.NotarySvcs}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">[{{.Category}}] {{.Name}}</option>{{end}}</optgroup><optgroup label="PPAT">{{range .Data.PpatSvcs}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">{{.Name}}</option>{{end}}</optgroup>{{else}}{{range .Data.Services}}<option value="{{.ID}}" data-code="{{.Code}}" data-cat="{{.Category}}" data-req="{{.Requirements}}">[{{.Category}}] {{.Name}}</option>{{end}}{{end}}</select></div>
+<div class="col-md-4 mb-2"><label class="form-label">Judul permohonan</label><div class="d-flex gap-1"><input class="form-control" id="f_title" name="title" placeholder="cth. Pendirian PT Maju Jaya" required/><button class="btn btn-ghost-secondary" type="button" id="f_autotitle" title="Isi otomatis dari layanan + klien">✨</button></div></div>
+<input type="hidden" name="x_svccode" id="f_svccode"/>
+<div class="col-12"><div id="svc_req" class="alert alert-info py-2 mb-2 d-none"></div></div>
+<div class="col-12 d-none" id="p_corp"><div class="card bg-light mb-2"><div class="card-body row py-2">
+<div class="col-12 small text-secondary mb-1"><strong>Data badan usaha</strong> (langsung tersimpan ke perusahaan)</div>
+<div class="col-md-4 mb-2"><input class="form-control" name="x_coname" placeholder="Nama badan usaha"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="x_cocity" placeholder="Kedudukan/kota"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="x_coaddr" placeholder="Alamat"/></div>
+<div class="col-md-1 mb-2"><input class="form-control" name="x_coauth" placeholder="M dasar"/></div>
+<div class="col-md-1 mb-2"><input class="form-control" name="x_coissued" placeholder="M ditempat"/></div>
+<div class="col-md-1 mb-2"><input class="form-control" name="x_copaid" placeholder="M disetor"/></div>
+</div></div></div>
+<div class="col-12 d-none" id="p_ppat"><div class="card bg-light mb-2"><div class="card-body row py-2">
+<div class="col-12 small text-secondary mb-1"><strong>Data tanah (PPAT)</strong> — tersimpan di catatan + lanjutkan di <code>/ppat</code></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="x_parties" placeholder="Penjual → Pembeli"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="x_cert" placeholder="No. sertifikat"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="x_area" placeholder="Luas (m²)"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="x_location" placeholder="Lokasi objek"/></div>
+</div></div></div>
+<div class="col-12 d-none" id="p_agr"><div class="card bg-light mb-2"><div class="card-body row py-2">
+<div class="col-12 small text-secondary mb-1"><strong>Data perjanjian</strong></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="x_parties" placeholder="Para pihak"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="x_object" placeholder="Objek perjanjian"/></div>
+<div class="col-md-4 mb-2"><input class="form-control" name="x_value" placeholder="Nilai / harga"/></div>
+</div></div></div>
+<div class="col-12 d-none" id="p_will"><div class="card bg-light mb-2"><div class="card-body row py-2">
+<div class="col-12 small text-secondary mb-1"><strong>Data wasiat</strong> (akses terbatas)</div>
+<div class="col-md-6 mb-2"><input class="form-control" name="x_testator" placeholder="Pewasiat"/></div>
+<div class="col-md-6 mb-2"><input class="form-control" name="x_heirs" placeholder="Ahli waris"/></div>
+</div></div></div>
+<div class="col-md-10 mb-2"><input class="form-control" name="notes" placeholder="Catatan (opsional)"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Buat →</button></div>
+</div></form>
+<script>(function(){
+var svc=document.getElementById('f_svc'),box=document.getElementById('svc_req'),code=document.getElementById('f_svccode');
+var panels={corporate:'p_corp',ppat:'p_ppat',agreement:'p_agr',will:'p_will'};
+function hideAll(){for(var k in panels){document.getElementById(panels[k]).classList.add('d-none');}}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+svc.addEventListener('change',function(){
+  var o=svc.options[svc.selectedIndex];hideAll();box.classList.add('d-none');
+  if(!o||!o.value)return;
+  code.value=o.getAttribute('data-code')||'';
+  var cat=o.getAttribute('data-cat')||'';
+  var req=o.getAttribute('data-req')||'';
+  try{var arr=JSON.parse(req);if(arr&&arr.length){box.innerHTML='<strong>Berkas wajib:</strong> '+arr.map(esc).join(' · ');box.classList.remove('d-none');}}catch(e){}
+  if(panels[cat])document.getElementById(panels[cat]).classList.remove('d-none');
+});
+document.getElementById('f_autotitle').addEventListener('click',function(){
+  var o=svc.options[svc.selectedIndex];if(!o||!o.value)return;
+  var cn=document.getElementById('f_client');var cnm=cn.options[cn.selectedIndex]?cn.options[cn.selectedIndex].text:'';
+  document.getElementById('f_title').value=o.text.replace(/^\[[^\]]+\]\s*/,'')+(cnm&&cnm.indexOf('—')!==0?' — '+cnm:'');
+});
+})();</script>
+</div>
 <div class="card"><div class="card-header"><h3 class="card-title">Daftar Permohonan</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Klien</th><th>Layanan</th><th>Status</th><th>Aksi</th></tr></thead>
 <tbody>{{range .Data.Requests}}<tr><td><a href="/requests/{{.ID}}">{{.ID}}</a></td><td><a href="/requests/{{.ID}}">{{.Title}}</a></td><td>{{.ClientName}}</td><td>{{.Service}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
@@ -24,14 +74,16 @@
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Draf Akta Baru (dari template terapproved)</h3></div>
 <form method="post" action="/deeds">{{template "csrf" .}}<div class="card-body row">
 <div class="col-md-4 mb-2"><input class="form-control" name="title" placeholder="Judul akta" required/></div>
-<div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="PT">PT</option><option value="CV">CV</option><option value="Yayasan">Yayasan</option><option value="Agreement">Perjanjian</option><option value="Will">Wasiat</option><option value="POA">Kuasa</option><option value="Prenup">Prenup/Postnup</option><option value="Other">Lainnya</option></select></div>
+<div class="col-md-2 mb-2"><select class="form-select" name="kind"><option value="PT">PT</option><option value="CV">CV</option><option value="Firma">Firma</option><option value="Koperasi">Koperasi</option><option value="Yayasan">Yayasan</option><option value="Agreement">Perjanjian</option><option value="Will">Wasiat</option><option value="POA">Kuasa</option><option value="Prenup">Prenup/Postnup</option><option value="Other">Lainnya</option><option value="AJB">AJB (PPAT)</option><option value="Hibah">Hibah (PPAT)</option><option value="TukarMenukar">Tukar Menukar (PPAT)</option><option value="APHB">APHB (PPAT)</option><option value="Inbreng">Inbreng (PPAT)</option><option value="SKMHT">SKMHT (PPAT)</option><option value="APHT">APHT (PPAT)</option></select></div>
 <div class="col-md-3 mb-2"><select class="form-select" name="template_id"><option value="">— Template (opsional) —</option>{{range .Data.Templates}}{{if .Approved}}<option value="{{.ID}}">{{.Name}} (v{{.Version}})</option>{{end}}{{end}}</select></div>
 <div class="col-md-2 mb-2"><input class="form-control" name="request_id" placeholder="ID permohonan"/></div>
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">Buat</button></div>
 </div></form></div>
-<div class="card"><div class="card-header"><h3 class="card-title">Daftar Akta</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nomor</th><th>Judul</th><th>Jenis</th><th>Status</th><th>Ver</th><th>Terkunci</th><th>Ekspor</th><th>Aksi</th></tr></thead>
-<tbody>{{range .Data.Deeds}}<tr><td><a href="/deeds/{{.ID}}">{{.ID}}</a></td><td>{{.Number}}</td><td><a href="/deeds/{{.ID}}">{{.Title}}</a></td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/docx">DOCX</a></div></td>
+<div class="card"><div class="card-header"><h3 class="card-title">Daftar Akta</h3><span class="ms-auto text-secondary small">semua draft bisa preview langsung</span></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Nomor</th><th>Judul + Preview</th><th>Jenis</th><th>Status</th><th>Ver</th><th>Terkunci</th><th>Ekspor</th><th>Aksi</th></tr></thead>
+<tbody>{{range .Data.Deeds}}<tr><td><a href="/deeds/{{.ID}}">{{.ID}}</a></td><td>{{.Number}}</td><td><a href="/deeds/{{.ID}}">{{.Title}}</a>
+<details><summary class="text-primary" style="cursor:pointer">👁 Preview</summary><div class="p-2 bg-light border rounded small mt-1" style="white-space:pre-wrap;max-height:180px;overflow:auto">{{plaintext .Preview}}</div>
+<div class="d-flex gap-1 mt-1"><a class="btn btn-sm btn-outline-primary" href="/deeds/{{.ID}}">Buka</a><a class="btn btn-sm btn-ghost-secondary" href="/deeds/{{.ID}}#deedform">Edit</a></div></details></td><td>{{.Kind}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td>{{.Version}}</td><td>{{.Locked}}</td><td><div class="d-flex gap-1"><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/pdf">PDF</a><a class="btn btn-sm btn-ghost-primary" href="/deeds/{{.ID}}/docx">DOCX</a></div></td>
 <td><div class="d-flex gap-1"><form method="post" action="/deeds/{{.ID}}/review">{{template "csrf" $}}<button class="btn btn-sm btn-outline-primary" type="submit" title="Kirim ke review notaris">Review</button></form><form method="post" action="/deeds/{{.ID}}/approve" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="number" placeholder="No. akta" style="width:90px"/><button class="btn btn-sm btn-success" type="submit" title="Setujui (notaris) + repertorium otomatis">Sahkan</button></form></div></td></tr>
 {{else}}<tr><td colspan="9" class="text-center text-secondary py-4">Belum ada akta.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
@@ -66,3 +118,57 @@
 <td><form method="post" action="/protocols/{{.ID}}/status" class="d-flex gap-1">{{template "csrf" $}}<select class="form-select form-select-sm" name="location_id"><option value="">Lokasi…</option>{{range $.Data.Locs}}<option value="{{.ID}}">{{.Code}} {{.Room}}/{{.Shelf}}/{{.Box}}</option>{{end}}</select><select class="form-select form-select-sm" name="status"><option>IN_STORAGE</option><option>OUT</option><option>RETURNED</option></select><input class="form-control form-control-sm" name="holder" placeholder="Penanggung jawab" style="max-width:120px"/><button class="btn btn-sm btn-outline-primary" type="submit">OK</button></form></td></tr>
 {{else}}<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada bendel protokol.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
+
+{{define "ppat"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Register PPAT</li></ol></nav>
+<div class="alert alert-info">Buku PPAT <strong>terpisah</strong> dari Repertorium Notaris — 1 kantor Notaris-PPAT memegang 2 buku. Alur: DRAFT_AKTA → AKTA_JADI → LAPOR_BPN → SERTIFIKAT_TERBIT.</div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Akta Tanah Baru</h3></div>
+<form method="post" action="/ppat"><div class="card-body row">{{template "csrf" .}}
+<div class="col-md-2 mb-2"><select class="form-select" name="jenis"><option value="AJB">AJB</option><option value="Hibah">Hibah</option><option value="TukarMenukar">Tukar Menukar</option><option value="APHB">APHB</option><option value="Inbreng">Inbreng</option><option value="SKMHT">SKMHT</option><option value="APHT">APHT</option></select></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="akta_no" placeholder="No. akta PPAT" required/></div>
+<div class="col-md-2 mb-2"><input class="form-control" type="date" name="akta_date"/></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="deed_id"><option value="">Draf akta: —</option>{{range .Data.Deeds}}<option value="{{.ID}}">#{{.ID}} {{.Title}} ({{.Kind}})</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="penjual" placeholder="Penjual / pemberi"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="pembeli" placeholder="Pembeli / penerima"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="objek_sertifikat" placeholder="No. sertifikat"/></div>
+<div class="col-md-2 mb-2"><input class="form-control" name="objek_luas" placeholder="Luas (m²)"/></div>
+<div class="col-md-3 mb-2"><input class="form-control" name="objek_lokasi" placeholder="Lokasi objek"/></div>
+<div class="col-md-2 mb-2"><button class="btn btn-primary w-100" type="submit">Catat</button></div>
+</div></form></div>
+<div class="card"><div class="card-header"><h3 class="card-title">Buku Register PPAT</h3><div class="ms-auto no-print"><button class="btn btn-sm btn-outline-primary" onclick="window.print()">Cetak</button></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>No. Akta</th><th>Tanggal</th><th>Jenis</th><th>Para pihak</th><th>Objek</th><th>Status</th><th>Bukti BPN</th><th class="no-print">Maju</th></tr></thead>
+<tbody>{{range .Data.Rows}}<tr><td><strong>{{.No}}</strong>{{if gt .DeedID 0}} <a class="text-secondary small" href="/deeds/{{.DeedID}}">#draf</a>{{end}}</td><td>{{.Date}}</td><td><span class="badge bg-blue-lt">{{.Jenis}}</span></td><td class="small">{{.Penjual}} → {{.Pembeli}}</td><td class="small">{{.Objek}}</td><td><span class="badge {{if eq .Status "SERTIFIKAT_TERBIT"}}bg-green-lt{{else}}bg-yellow-lt{{end}}">{{.Status}}</span>{{if .Overdue}} <span class="badge bg-red-lt" title="LAPOR_BPN lebih dari 14 hari">resi lewat {{.Days}} hr</span>{{end}}</td><td class="small">{{.BPN}}</td>
+<td class="no-print">{{if ne .Status "SERTIFIKAT_TERBIT"}}<form method="post" action="/ppat/{{.ID}}/advance" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="bpn_receipt" placeholder="No. resi BPN" style="max-width:120px"/><button class="btn btn-sm btn-success" type="submit">Maju →</button></form>{{else}}<span class="text-success">✓</span>{{end}} <a class="btn btn-sm btn-ghost-secondary" href="/ppat/{{.ID}}/blanko" target="_blank" title="Cetak konsep blanko untuk disalin ke formulir resmi BPN">Blanko</a></td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada register PPAT. Catat akta tanah pertama di atas.</td></tr>{{end}}</tbody></table></div></div>
+{{template "page_close" .}}{{end}}
+
+{{define "ppat_blanko"}}<!doctype html>
+<html lang="id"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Konsep Blanko {{.Data.D.Jenis}} No. {{.Data.D.No}}</title>
+<link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
+<style>@media print{.no-print{display:none}body{background:#fff}}</style>
+</head><body>
+<main class="container py-4" style="max-width:760px">
+<div class="alert alert-warning no-print"><strong>KONSEP — bukan blanko resmi BPN.</strong> Salin isi ini ke formulir resmi, cocokkan dengan sertifikat asli, lalu tanda tangani di hadapan PPAT.</div>
+<div class="text-center border-bottom pb-2 mb-3">
+<div class="fw-bold">{{.Data.D.Office}}</div>
+<div class="text-secondary small">{{.Data.D.OfficeAddr}}</div>
+<h2 class="mt-2">KONSEP AKTA {{.Data.D.Jenis}}</h2>
+<div>Nomor: <strong>{{.Data.D.No}}</strong> · Tanggal: {{.Data.D.Date}} · Status: {{.Data.D.Status}}</div>
+</div>
+<dl class="row">
+<dt class="col-3">Pihak Pertama</dt><dd class="col-9">{{.Data.D.Penjual}}</dd>
+<dt class="col-3">Pihak Kedua</dt><dd class="col-9">{{.Data.D.Pembeli}}</dd>
+<dt class="col-3">Objek</dt><dd class="col-9">{{.Data.D.Objek}}</dd>
+<dt class="col-3">Resi BPN</dt><dd class="col-9">{{.Data.D.BPN}}</dd>
+</dl>
+<h4>Isi draf{{if .Data.D.DeedTitle}} — {{.Data.D.DeedTitle}}{{end}}</h4>
+<div class="p-3 bg-white border rounded" style="min-height:200px">{{safeHTML .Data.D.DeedBody}}</div>
+<div class="row mt-4 text-center">
+<div class="col-6"><br/><br/><br/>( {{.Data.D.Penjual}} )<br/>Pihak Pertama</div>
+<div class="col-6"><br/><br/><br/>( {{.Data.D.Pembeli}} )<br/>Pihak Kedua</div>
+</div>
+<div class="text-center mt-4"><br/><br/>( PPAT )<br/>Tanda tangan &amp; stempel</div>
+<div class="no-print mt-4 d-flex gap-2"><button class="btn btn-primary" onclick="window.print()">Cetak Konsep</button><a class="btn btn-outline-primary" href="/ppat">Kembali ke Register PPAT</a></div>
+</main>
+</body></html>{{end}}

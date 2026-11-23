@@ -45,9 +45,11 @@
 <p><a class="btn btn-ghost-primary" href="/finance/bank">Rekonsiliasi Bank →</a></p>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Invoice Baru</h3></div>
 <form method="post" action="/invoices">{{template "csrf" .}}<input type="hidden" name="request_id" value="{{.Data.ReqID}}"/><div class="card-body">
-<div class="row"><div class="col-md-4 mb-2"><input class="form-control" name="number" placeholder="Nomor invoice" required/></div>
-<div class="col-md-4 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
-<div class="col-md-4 mb-2"><input class="form-control" type="date" name="due_date"/></div></div>
+{{if .Data.Suggest}}<div class="mb-2"><button type="button" class="btn btn-ghost-primary" id="fillTarifBtn" data-price="{{.Data.Suggest.Price}}" data-service="{{.Data.Suggest.ServiceName}}">⚡ Isi dari tarif layanan (Rp {{.Data.Suggest.Price}} — {{.Data.Suggest.ServiceName}})</button></div><script>(function(){var b=document.getElementById('fillTarifBtn');if(!b)return;b.addEventListener('click',function(){var svc=b.getAttribute('data-service')||'';var price=b.getAttribute('data-price')||'0';var descs=document.getElementsByName('desc[]');var qtys=document.getElementsByName('qty[]');var prices=document.getElementsByName('price[]');if(descs.length>0)descs[0].value='Jasa '+svc;if(prices.length>0)prices[0].value=price;if(qtys.length>0&&!qtys[0].value)qtys[0].value='1';if(descs.length>1)descs[1].value='PNBP / biaya resmi (diteruskan)';if(prices.length>1)prices[1].value='50000';if(qtys.length>1&&!qtys[1].value)qtys[1].value='1';if(descs.length>2)descs[2].value='Biaya materai & administrasi';if(prices.length>2)prices[2].value='20000';if(qtys.length>2&&!qtys[2].value)qtys[2].value='1';});})();</script>{{end}}
+<div class="row"><div class="col-md-3 mb-2"><input class="form-control" name="number" placeholder="Nomor invoice" required/></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="client_id" required><option value="">— Klien —</option>{{range .Data.Clients}}<option value="{{.ID}}">{{.FullName}}</option>{{end}}</select></div>
+<div class="col-md-3 mb-2"><input class="form-control" type="date" name="due_date"/></div>
+<div class="col-md-3 mb-2"><select class="form-select" name="invoice_kind" title="Jenis invoice"><option value="FULL">FULL — pelunasan penuh</option><option value="DP">DP — uang muka</option><option value="PELUNASAN">PELUNASAN — sisa DP</option></select></div></div>
 <div class="row"><div class="col-md-6 mb-2"><input class="form-control" name="desc[]" placeholder="Uraian baris 1"/></div>
 <div class="col-md-3 mb-2"><input class="form-control" name="qty[]" placeholder="Qty" value="1"/></div>
 <div class="col-md-3 mb-2"><input class="form-control" name="price[]" placeholder="Harga satuan" value="0"/></div></div>
@@ -60,13 +62,20 @@
 <div class="text-end"><button class="btn btn-primary" type="submit">Terbitkan (PPN 11%)</button></div>
 </div></form></div>
 <div class="card"><div class="card-header"><h3 class="card-title">Daftar Invoice</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nomor</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Status</th><th>Bayar</th></tr></thead>
-<tbody>{{range .Data.Invoices}}<tr><td><a href="/invoices/{{.ID}}/receipt">{{.Number}}</a></td><td>{{.Total}}</td><td>{{.Paid}}</td><td>{{.Outstanding}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
-<td><div class="d-flex gap-1 flex-wrap"><form method="post" action="/payments" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal"/><select class="form-select form-select-sm" name="method"><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="QRIS">QRIS</option><option value="OTHER">OTHER</option></select><button class="btn btn-sm btn-primary" type="submit">Catat</button></form>{{if or (eq .Status "ISSUED") (eq .Status "PARTIAL")}}<form method="post" action="/invoices/{{.ID}}/void" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="reason" placeholder="Alasan void" style="max-width:110px"/><button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Void invoice ini? Tidak dapat dibatalkan.')">Void</button></form>{{end}}</div></td></tr>
-{{else}}<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada invoice.</td></tr>{{end}}</tbody></table></div></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Nomor</th><th>Jenis</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Progress</th><th>Status</th><th>Bayar</th></tr></thead>
+<tbody>{{range .Data.Invoices}}<tr><td><a href="/invoices/{{.ID}}/receipt">{{.Number}}</a></td><td>{{if eq .Kind "DP"}}<span class="badge bg-yellow-lt">DP</span>{{else if eq .Kind "PELUNASAN"}}<span class="badge bg-purple-lt">PELUNASAN</span>{{else}}<span class="text-secondary small">FULL</span>{{end}}</td><td>{{.Total}}</td><td>{{.Paid}}</td><td>{{.Outstanding}}</td><td style="min-width:140px"><div class="small text-secondary mb-1">Rp {{.Paid}} / Rp {{.Total}} · {{.Pct}}%</div><div class="progress progress-sm"><div class="progress-bar bg-primary" style="width:{{.Pct}}%" role="progressbar" aria-valuenow="{{.Pct}}" aria-valuemin="0" aria-valuemax="100"></div></div></td><td><span class="badge bg-blue-lt">{{.Status}}</span></td>
+<td><div class="d-flex gap-1 flex-wrap">{{if or (eq .Status "PAID") (eq .Status "PARTIAL")}}<a class="btn btn-sm btn-ghost-primary" href="/invoices/{{.ID}}/receipt">Kuitansi</a>{{end}}<form method="post" action="/payments" class="d-flex gap-1">{{template "csrf" $}}<input type="hidden" name="invoice_id" value="{{.ID}}"/><input class="form-control form-control-sm" name="amount" placeholder="Nominal"/><select class="form-select form-select-sm" name="method"><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="QRIS">QRIS</option><option value="OTHER">OTHER</option></select><button class="btn btn-sm btn-primary" type="submit">Catat</button></form>{{if or (eq .Status "ISSUED") (eq .Status "PARTIAL")}}<form method="post" action="/invoices/{{.ID}}/void" class="d-flex gap-1">{{template "csrf" $}}<input class="form-control form-control-sm" name="reason" placeholder="Alasan void" style="max-width:110px"/><button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Void invoice ini? Tidak dapat dibatalkan.')">Void</button></form>{{end}}</div></td></tr>
+{{else}}<tr><td colspan="8" class="text-center text-secondary py-4">Belum ada invoice.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "templates"}}{{template "head" .}}{{template "page_open" .}}
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Paket Template Konsep</h3><div class="ms-auto"><form method="post" action="/templates/seed">{{template "csrf" .}}<button class="btn btn-sm btn-success" type="submit" title="Pasang 8 template konsep (DRAFT). Wajib direview & Approve notaris sebelum dipakai draf.">⚡ Pasang 8 Konsep</button></form></div></div>
+<div class="card-body"><p class="text-secondary small mb-0">Template konsep (PT, CV, AJB, Hibah, Kuasa, Sewa, Prenup, Perjanjian) — agar tombol 📄 Buat Draf Akta langsung menemukan template. Status DRAFT: <strong>tidak bisa</strong> dipakai draf sampai di-Approve.</p></div></div>
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Kesiapan Jual per Layanan</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Layanan</th><th class="text-end">Skor</th><th>Status</th><th>Checklist</th><th>Template ✓</th><th>Harga</th><th>Dipakai</th></tr></thead>
+<tbody>{{range .Data.Readiness}}<tr><td><span class="text-secondary small">[{{.Cat}}]</span> {{.Name}}<div class="text-secondary small"><code>{{.Code}}</code></div></td><td class="text-end">{{.Score}}</td><td><span class="badge {{if eq .Status "SIAP JUAL"}}bg-green-lt{{else if eq .Status "KURANG"}}bg-yellow-lt{{else}}bg-red-lt{{end}}">{{.Status}}</span></td><td class="text-center">{{if .CL}}✓{{else}}—{{end}}</td><td class="small">{{if .TplOK}}✓ {{.Tpl}}{{else}}—{{end}}</td><td class="text-end">{{.Price}}</td><td class="text-end">{{.Used}}×</td></tr>
+{{else}}<tr><td colspan="7" class="text-center text-secondary py-3">Belum ada layanan aktif.</td></tr>{{end}}</tbody></table></div>
+<div class="card-body"><p class="text-secondary small mb-0">Skor = checklist 25 + template approved 40 + harga 15 + sudah dipakai 20. SIAP JUAL ≥ 80. Cara menaikkan: ⚡ Pasang di <a href="/dms/checklists">Checklist</a>, Approve template di bawah, isi tarif, buat 1 permohonan percobaan.</p></div></div>
 <div class="card mb-3"><div class="card-header"><h3 class="card-title">Template Baru</h3></div>
 <form method="post" action="/templates"><div class="card-body row">{{template "csrf" .}}
 <div class="col-md-3 mb-2"><input class="form-control" name="name" placeholder="Nama template" required/></div>
@@ -104,6 +113,15 @@
 <div class="table-responsive"><table class="table card-table"><thead><tr><th>Layanan</th><th class="text-end">Invoice</th><th class="text-end">Total</th></tr></thead>
 <tbody>{{range .Data.Profits}}<tr><td>{{.Service}}</td><td class="text-end">{{.Count}}</td><td class="text-end">{{.Total}}</td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada data.</td></tr>{{end}}</tbody></table></div>
 <p class="text-secondary small mx-3">Hanya invoice yang tertaut permohonan yang terpetakan ke layanan — tautkan invoice baru lewat halaman permohonan.</p></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Top 5 Layanan Bulan Ini ({{.Data.Month}})</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Layanan</th><th class="text-end">Invoice</th><th class="text-end">Dibayar</th></tr></thead>
+<tbody>{{range .Data.TopSvc}}<tr><td>{{.Service}}</td><td class="text-end">{{.Count}}</td><td class="text-end">{{.Paid}}</td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada transaksi bulan ini.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Rekap per Kategori Layanan</h3></div>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Kategori</th><th class="text-end">Jml permohonan</th><th class="text-end">Total tagihan</th><th class="text-end">Sudah dibayar</th></tr></thead>
+<tbody>{{range .Data.ByCat}}<tr><td>{{.Category}}</td><td class="text-end">{{.Reqs}}</td><td class="text-end">{{.InvTotal}}</td><td class="text-end">{{.Paid}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada data.</td></tr>{{end}}</tbody></table></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Melewati SLA</h3></div>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Permohonan</th><th>Layanan</th><th>Kode</th><th class="text-end">Umur (hari)</th><th class="text-end">SLA (hari)</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.SLAOver}}<tr><td><a href="/requests/{{.ID}}">#{{.ID}} {{.Title}}</a></td><td>{{.Service}}</td><td class="text-secondary small">{{.Code}}</td><td class="text-end">{{.AgeDays}}</td><td class="text-end">{{.SLADays}}</td><td><span class="badge bg-red-lt">{{.Status}}</span></td></tr>{{else}}<tr><td colspan="6" class="text-center text-secondary py-3">Tidak ada permohonan melewati SLA.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "settings"}}{{template "head" .}}{{template "page_open" .}}
@@ -147,9 +165,28 @@
 <div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Portal Klien</h3><p class="text-secondary mb-0">Setiap akun hanya melihat datanya sendiri — penegakan server-side.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-portal.jpg" alt="Portal klien" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="alert alert-info">Portal klien: setiap akun hanya dapat melihat dokumen dan permohonannya sendiri (penegakan di sisi server).</div>
 <div class="mb-2"><a class="btn btn-outline-primary" href="/portal/invoices">Lihat Tagihan & Konfirmasi Bayar</a></div>
-{{if .Data.Mine}}<div class="card"><div class="card-header"><h3 class="card-title">Permohonan Saya</h3></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Status</th></tr></thead>
-<tbody>{{range .Data.Mine}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>{{end}}</tbody></table></div></div>
+{{if .Data.Mine}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Permohonan Saya — Tracking Timeline</h3></div></div>
+{{range .Data.Mine}}{{$st := .Step}}{{$fail := .Failed}}<div class="card mb-3"><div class="card-body">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+<div><strong>#{{.ID}} {{.Title}}</strong></div>
+<div class="d-flex gap-2 align-items-center flex-wrap">{{if eq .Status "COMPLETED"}}<span class="badge bg-green-lt">{{.Status}}</span>{{else if or (eq .Status "REJECTED") (eq .Status "CANCELLED")}}<span class="badge bg-red-lt">{{.Status}}</span>{{else if eq .Status "NEED_DOCS"}}<span class="badge bg-yellow-lt">{{.Status}}</span>{{else}}<span class="badge bg-blue-lt">{{.Status}}</span>{{end}}<span class="text-secondary small">{{.NextAction}}</span></div>
+</div>
+{{if $fail}}<div class="alert alert-danger py-2 mb-2">{{if eq .Status "REJECTED"}}Permohonan ditolak — {{.NextAction}}.{{else}}Permohonan dibatalkan.{{end}}</div>
+{{else}}<div class="d-flex text-center mb-3">
+<div style="flex:1"><div class="mx-auto mb-1 rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;{{if ge $st 1}}background:#206bc4;color:#fff{{else}}background:#e9ecef;color:#868e96{{end}};font-weight:600">1</div><div class="small {{if eq $st 1}}fw-bold{{else}}text-secondary{{end}}">Diajukan</div></div>
+<div style="flex:1"><div class="mx-auto mb-1 rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;{{if ge $st 2}}background:#206bc4;color:#fff{{else}}background:#e9ecef;color:#868e96{{end}};font-weight:600">2</div><div class="small {{if eq $st 2}}fw-bold{{else}}text-secondary{{end}}">Dokumen</div></div>
+<div style="flex:1"><div class="mx-auto mb-1 rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;{{if ge $st 3}}background:#206bc4;color:#fff{{else}}background:#e9ecef;color:#868e96{{end}};font-weight:600">3</div><div class="small {{if eq $st 3}}fw-bold{{else}}text-secondary{{end}}">Review</div></div>
+<div style="flex:1"><div class="mx-auto mb-1 rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;{{if ge $st 4}}background:#206bc4;color:#fff{{else}}background:#e9ecef;color:#868e96{{end}};font-weight:600">4</div><div class="small {{if eq $st 4}}fw-bold{{else}}text-secondary{{end}}">Proses</div></div>
+<div style="flex:1"><div class="mx-auto mb-1 rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;{{if ge $st 5}}background:#2fb344;color:#fff{{else}}background:#e9ecef;color:#868e96{{end}};font-weight:600">5</div><div class="small {{if eq $st 5}}fw-bold{{else}}text-secondary{{end}}">Selesai</div></div>
+</div>{{end}}
+{{if .Timeline}}<div class="list-group list-group-flush border rounded mb-2">{{range .Timeline}}<div class="list-group-item small"><span class="badge bg-azure-lt">{{.From}} → {{.To}}</span> {{.Actor}} · {{.At}}{{if .Note}} — {{.Note}}{{end}}</div>{{end}}</div>{{else}}<p class="text-secondary small">Belum ada peristiwa tercatat.</p>{{end}}
+<div class="d-flex gap-2 flex-wrap">
+{{if or (eq .Status "NEED_DOCS") (eq .Status "DRAFT")}}<a class="btn btn-sm btn-warning" href="/requests/{{.ID}}">Lengkapi Dokumen</a>{{end}}
+{{if and (eq .Status "COMPLETED") (.DeedID)}}<a class="btn btn-sm btn-primary" href="/deeds/{{.DeedID}}/pdf">Unduh PDF</a>{{end}}
+<a class="btn btn-sm btn-outline-primary" href="/requests/{{.ID}}">Detail</a>
+{{if or (eq .Status "REJECTED") (eq .Status "CANCELLED")}}<a class="btn btn-sm btn-outline-danger" href="/requests/{{.ID}}">Hubungi Kantor</a>{{end}}
+</div>
+</div></div>{{end}}
 {{if .Data.Deeds}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Akta Saya</h3></div>
 <div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>ID</th><th>Judul</th><th>Nomor</th><th>Status</th><th></th></tr></thead>
 <tbody>{{range .Data.Deeds}}<tr><td>{{.ID}}</td><td>{{.Title}}</td><td>{{.Number}}</td><td><span class="badge bg-green-lt">{{.Status}}</span></td><td><a class="btn btn-sm btn-outline-primary" href="/deeds/{{.ID}}/pdf">Unduh PDF</a></td></tr>{{end}}</tbody></table></div></div>{{end}}

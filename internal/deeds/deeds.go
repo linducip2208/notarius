@@ -20,6 +20,7 @@ type Deed struct {
 	Status    string
 	Version   int
 	Content   string
+	Preview   string
 	Locked    bool
 }
 
@@ -182,7 +183,7 @@ func isDupEntry(err error) bool {
 
 // List returns deeds newest first (optional status filter).
 func (s *Store) List(officeID int64, status ...string) ([]Deed, error) {
-	q := `SELECT id, office_id, request_id, number, title, kind, status, version, locked
+	q := `SELECT id, office_id, request_id, number, title, kind, status, version, locked, LEFT(COALESCE(content,''),1500)
 		FROM deed_drafts WHERE office_id=?`
 	args := []any{officeID}
 	if len(status) > 0 && status[0] != "" {
@@ -198,12 +199,15 @@ func (s *Store) List(officeID int64, status ...string) ([]Deed, error) {
 	var out []Deed
 	for rows.Next() {
 		var d Deed
-		var num sql.NullString
-		if err := rows.Scan(&d.ID, &d.OfficeID, &d.RequestID, &num, &d.Title, &d.Kind, &d.Status, &d.Version, &d.Locked); err != nil {
+		var num, prev sql.NullString
+		if err := rows.Scan(&d.ID, &d.OfficeID, &d.RequestID, &num, &d.Title, &d.Kind, &d.Status, &d.Version, &d.Locked, &prev); err != nil {
 			return nil, err
 		}
 		if num.Valid {
 			d.Number = num.String
+		}
+		if prev.Valid {
+			d.Preview = prev.String
 		}
 		out = append(out, d)
 	}

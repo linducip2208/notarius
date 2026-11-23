@@ -1,4 +1,13 @@
 # CHANGELOG
+## [0.4.0] — 2026-11-23 — OCR enterprise + DMS lengkap + PPAT + bundel publik
+- Layanan & Katalog: request form pintar + optgroup kategori, draf 1-klik dari permohonan, publik layanan detail + 3 paket bundel (PT+OSS, AJB+Balik Nama, CV+NIB), wizard korporat/AJB/wasiat, docs 8 langkah + checklist cetak + panduan uji.
+- OCR & DMS: OCR enterprise (quality gate + preprocessing + voting multi-engine + parser KTP/KK/NPWP + cek konsistensi antar-dokumen); DMS preview universal (PDF/gambar/teks), dipakai-di-mana per berkas, verifikasi 2-kolom (checklist vs berkas), SLA + retensi per dokumen, seed 23 paket checklist, mode ketat per kantor.
+- Akta & Register: Todo↔akta (preview + edit dari daftar tugas), preview semua draf di daftar deed, jenis baru Firma/Koperasi + 7 jenis PPAT (AJB, Hibah, TukarMenukar, APHB, Inbreng, SKMHT, APHT), register PPAT terpisah (2 buku) + blanko bernomor + resi SLA BPN.
+- Keuangan & Laporan: uang muka/DP per invoice, tarif otomatis dari katalog saat buat invoice, laporan rekap per kategori + top 5 layanan + kepatuhan SLA.
+- Portal & Notifikasi: timeline status permohonan di portal klien, notifikasi WA manual per permohonan (template + audit, tanpa klaim otomatis).
+- Keamanan: PII masking (NIK/NPWP/tanggal lahir) di daftar + preview + log sesuai peran; tanpa perubahan auth/RBAC.
+- Migrasi DB 021–024 (idempoten, jalan otomatis saat boot via tracker schema_migrations): 021 register PPAT + 6 layanan PPAT; 022 jenis Firma/Koperasi + layanan Inbreng; 023 flag mode ketat + slot SLA per kantor; 024 kategori 'ppat' + 3 layanan bundel. Tanpa DROP/ubah data pengguna (INSERT IGNORE + CREATE TABLE IF NOT EXISTS).
+- Go-Live: backup DB → deploy biner → restart (migrasi otomatis) → ⚡ Pasang Standar di /dms/checklists → ⚡ Pasang 8 Konsep di /templates → Approve template → uji 1 permohonan (lihat docs/DEPLOYMENT_GUIDE.md).
 ## [Ops-Growth] — 2026-11-22 — semua ide fitur non-SaaS (dibuktikan E2E + integrasi)
 - CRM: skor kelengkapan profil, timeline 360 (tagihan/janji/berkas/verifikasi), spesimen TTD pembanding visual.
 - Keuangan: rekonsiliasi bank CSV + automatch eksplisit, anggaran vs realisasi, laba per layanan, invoice tertaut permohonan.
