@@ -148,14 +148,14 @@ func (a *App) mfaEnable(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	secret, code := r.FormValue("secret"), r.FormValue("code")
 	if !mfa.Verify(secret, code, time.Now()) {
-		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kode salah — pindai ulang & coba lagi."})
+		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kode salah — pindai ulang & coba lagi.", "Enabled": a.users.MFAEnabled(*id)})
 		return
 	}
 	// Re-autentikasi: enroll MFA wajib membuktikan kata sandi saat ini.
 	var email string
 	_ = a.db.QueryRow(`SELECT email FROM users WHERE id=?`, *id).Scan(&email)
 	if _, err := a.users.Authenticate(email, r.FormValue("password")); err != nil {
-		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kata sandi salah — enroll MFA dibatalkan."})
+		a.render(w, r, "mfa", "Aktifkan MFA", map[string]any{"Secret": secret, "Error": "Kata sandi salah — enroll MFA dibatalkan.", "Enabled": a.users.MFAEnabled(*id)})
 		return
 	}
 	if err := a.users.SetMFASecret(*id, secret); err != nil {

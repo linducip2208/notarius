@@ -1287,6 +1287,15 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		_ = a.db.QueryRow(`SELECT COALESCE(DATEDIFF(NOW(), password_changed_at), 9999) FROM users WHERE id=?`, *id).Scan(&days)
 		pwStale = days > 180
 	}
+	// Penegakan ringan MFA untuk peran sensitif wasiat (peringatan saja,
+	// tanpa blokir login agar tak mengunci kantor): willReader yang belum
+	// enroll TOTP (users.mfa_secret kosong) diminta aktifkan via /mfa.
+	mfaWarn := false
+	if id := a.uid(r); id != nil && a.db != nil {
+		if willReader(mw.RoleOf(r)) && !a.users.MFAEnabled(*id) {
+			mfaWarn = true
+		}
+	}
 	// Kartu notaris: menunggu persetujuan, siap TTE, macet SLA.
 	var toApprove, readySign, stuck int
 	if a.db != nil {
@@ -1324,7 +1333,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Clients": totalClients, "MonthDeeds": monthDeeds, "Range": r.URL.Query().Get("range"),
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
-		"SLAOverdue": slaTop, "DocOverdue": docOver,
+		"SLAOverdue": slaTop, "DocOverdue": docOver, "MFAWarn": mfaWarn,
 	})
 }
 

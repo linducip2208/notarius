@@ -24,7 +24,37 @@
          salinan off-bucket: `aws s3 sync s3://"$NOTARYOS_S3_BUCKET" s3://"${NOTARYOS_S3_BUCKET}-backup" --delete`
          (MinIO: `mc version enable SRC/BUCKET` + `mc mirror --overwrite SRC/BUCKET DST/BUCKET-backup`).
 9. JANGAN deploy otomatis ke server tak dikenal; JANGAN seed data produksi palsu.
-10. Go-Live v0.4.0 (setelah restart, migrasi 021–024 jalan otomatis — cek `schema_migrations`):
+10. Pengingat otomatis harian (timer systemd, 07:00 WIB).
+    Prinsip: TANPA perubahan kode Go. Endpoint `POST /reminders/run`
+    (internal/app/verify.go `remindersRun`) tetap butuh sesi login + izin
+    `office.manage` + token CSRF — timer memakainya lewat skrip login
+    localhost, bukan jalur auth baru. Aman dari pemalsuan: skrip menolak
+    BASE non-localhost, kredensial hanya di file 0600, tak pernah di argv/ps.
+    a. Buat akun layanan khusus: peran `office_admin` (satu-satunya peran
+       operasional dengan `office.manage`; staff/finance/doc_operator/
+       auditor DITOLAK endpoint ini), TANPA MFA (login skrip tak bisa
+       lewati TOTP), password panjang acak.
+    b. Simpan kredensial: `install -m 0600 -o root -g notaryos /dev/null /etc/notaryos/reminder.env`,
+       isi `REMINDER_USER=<email akun layanan>`, `REMINDER_PASS=<password>`.
+       Opsional: `REMINDER_BASE_URL=http://127.0.0.1:8080` (default ini;
+       wajib localhost), `SESSION_NAME=notaryos_sess` (bila diubah).
+    c. Salin unit + skrip sudah di repo: `cp deploy/systemd/notaryos-reminder.service
+       deploy/systemd/notaryos-reminder.timer /etc/systemd/system/`
+       (pastikan `/opt/notaryos/deploy/reminder/run-reminder.sh` executable),
+       lalu `timedatectl set-timezone Asia/Jakarta` (jadwal 07:00 mengikuti
+       zona waktu sistem) + `systemctl daemon-reload && systemctl enable --now notaryos-reminder.timer`.
+    d. Verifikasi: `systemctl list-timers notaryos-reminder.timer` (NEXT =
+       besok 07:00), uji manual `systemctl start notaryos-reminder.service`
+       lalu `journalctl -u notaryos-reminder.service` harus `reminder: ok`,
+       dan `/audit` memuat `reminders.run` oleh akun layanan.
+    e. Idempotensi: pemindaian anti-spam 24 jam (lihat docs/PROJECT_GAP_ANALYSIS),
+       jadi timer 07:00 + ticker in-process 24 jam (internal/app/app.go `New`)
+       + tombol manual "Jalankan Pengingat" boleh hidup berdampingan.
+    f. Alternatif bila timer tak dipakai: cron root
+       `0 7 * * * notaryos /opt/notaryos/deploy/reminder/run-reminder.sh`
+       dengan env dari `/etc/notaryos/reminder.env`
+       (`set -a; . /etc/notaryos/reminder.env; set +a` di wrapper).
+11. Go-Live v0.4.0 (setelah restart, migrasi 021–024 jalan otomatis — cek `schema_migrations`):
   a. Backup DB dulu: `deploy/backup/backup.sh` (wajib sebelum deploy biner).
   b. Deploy biner: `go build -o bin/notaryos ./cmd/notaryos`, lalu `systemctl restart notaryos`.
   c. Pastikan migrasi otomatis sukses: `journalctl -u notaryos | grep -i migrat` + `/readyz` 200.

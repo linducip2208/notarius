@@ -1,7 +1,7 @@
 # DMS — API & Routes (terverifikasi)
 
 Sumber: `internal/app/app.go` (chi). Hanya rute yang terlihat di kode yang
-dicantumkan; sisanya eksplisit ditandai TODO — bukan klaim.
+dicantumkan.
 
 ## 1. Kesehatan & publik
 
@@ -31,10 +31,13 @@ Unduhan diotorisasi per-file; tidak ada URL file publik.
 `GET /clients`, `POST /clients`, `GET /clients/new`, `GET /clients/{id}`,
 `GET /clients/export`, `POST /clients/{id}/reps`.
 
-## 4. TODO (jangan dianggap ada)
+## 4. Rute arsip (terverifikasi di `app.go`)
 
-- Tabel rute arsip khusus (`/archive/...`) belum ditemukan di `app.go`
-  saat dokumen ini ditulis — verifikasi via `grep -n "archive" internal/app/`
-  sebelum merujuknya.
+| Method | Path | Handler |
+|---|---|---|
+| POST | `/documents/{id}/archive` | `dmsArchiveMove` |
+| GET | `/dms/archive` | `dmsArchive` |
+| POST | `/dms/archive/locations` | `dmsArchiveLoc` |
+| GET | `/dms/archive/labels` | `dmsLabels` |
 - Bila menambah rute: daftarkan di `app.go`, lindungi dengan middleware
   sesi + RBAC, dan catat audit.

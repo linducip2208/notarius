@@ -1,0 +1,12 @@
+[Unit]
+Description=NOTARYOS pengingat otomatis harian (POST /reminders/run)
+After=network.target notaryos.service
+Wants=notaryos.service
+
+[Service]
+Type=oneshot
+User=notaryos
+EnvironmentFile=/etc/notaryos/reminder.env
+ExecStart=/opt/notaryos/deploy/reminder/run-reminder.sh
+NoNewPrivileges=true
+PrivateTmp=true

@@ -1,0 +1,12 @@
+[Unit]
+Description=Jadwal harian pengingat NOTARYOS (07:00 WIB)
+
+[Timer]
+# Zona waktu = zona waktu sistem; server produksi wajib Asia/Jakarta
+# (timedatectl set-timezone Asia/Jakarta) agar ini benar-benar 07:00 WIB.
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+Unit=notaryos-reminder.service
+
+[Install]
+WantedBy=timers.target

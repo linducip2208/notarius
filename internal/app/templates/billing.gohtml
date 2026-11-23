@@ -1,5 +1,5 @@
 {{define "receipt"}}{{template "head" .}}{{template "page_open" .}}
-<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/finance">Keuangan</a></li><li class="breadcrumb-item active">Kuitansi {{.Data.Number}}</li></ol></nav>
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/finance">Keuangan</a></li><li class="breadcrumb-item active">Kuitansi {{.Data.Number}}</li></ol></nav>
 <div class="card" style="max-width:640px"><div class="card-body p-4">
 <div class="d-flex justify-content-between align-items-center mb-3">
 <div><h2 class="mb-0">KUITANSI PEMBAYARAN</h2><div class="text-secondary">{{.Brand.AppName}} · {{.Data.Number}} {{if eq .Data.Kind "DP"}}<span class="badge bg-yellow-lt ms-1">DP — uang muka</span>{{else if eq .Data.Kind "PELUNASAN"}}<span class="badge bg-purple-lt ms-1">PELUNASAN</span>{{else if hasPrefix .Data.Number "[DP]"}}<span class="badge bg-yellow-lt ms-1">DP — uang muka</span>{{else if hasPrefix .Data.Number "[PELUNASAN]"}}<span class="badge bg-purple-lt ms-1">PELUNASAN</span>{{end}}</div></div>

@@ -3,6 +3,7 @@
 <div class="card-body">
 {{if .Data}}{{if .Data.Error}}<div class="alert alert-danger">{{.Data.Error}}</div>{{end}}{{end}}
 {{if .Data.Enabled}}<div class="alert alert-success">MFA sudah aktif untuk akun Anda.</div>{{end}}
+{{if and (not .Data.Enabled) (or (eq .Role "notary") (eq .Role "super_admin") (eq .Role "substitute_notary") (eq .Role "auditor"))}}<div class="alert alert-warning" role="alert">Akun Anda berhak akses wasiat — aktifkan MFA untuk melindungi register wasiat.</div>{{end}}
 <p class="text-secondary">Pindai ke aplikasi autentikator (Google/Microsoft Authenticator), lalu masukkan 6 digit kode.</p>
 {{if .Data.Secret}}<p>Secret (bila QR tak terbaca): <code>{{.Data.Secret}}</code></p>
 <p class="text-secondary small">otpauth URI: <code>{{.Data.URI}}</code></p>{{end}}

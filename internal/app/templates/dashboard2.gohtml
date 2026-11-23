@@ -12,6 +12,7 @@
 </div>
 </div>
 {{if .Data.PwStale}}<div class="alert alert-warning" role="alert">Kata sandi Anda tidak diganti &gt;180 hari. Minta admin mereset demi keamanan akun.</div>{{end}}
+{{if .Data.MFAWarn}}<div class="alert alert-danger" role="alert">Akun Anda berhak akses wasiat — aktifkan MFA di <a href="/mfa">/mfa</a> demi keamanan register wasiat.</div>{{end}}
 {{if or (eq .Role "notary") (eq .Role "substitute_notary") (eq .Role "super_admin") (eq .Role "office_admin")}}<div class="row row-deck row-cards mb-3">
 <div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Menunggu Persetujuan</div><div class="h1 mb-0">{{.Data.ToApprove}}</div><a href="/deeds?status=REVIEW">Review akta →</a></div></div></div>
 <div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Siap Tanda Tangan</div><div class="h1 mb-0">{{.Data.ReadySign}}</div><a href="/deeds?status=APPROVED">Akta disetujui →</a></div></div></div>
