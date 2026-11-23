@@ -1,4 +1,10 @@
 # CHANGELOG
+## [0.5.3] — 2026-11-24 — Auto-step workflow instances + export/import template + docs rilis
+- Cakupan: 1 commit sejak v0.5.2 (7a0923f "v0.5.3: auto-step instances, export/import template, docs rilis", 8 files, +555/-0); tanggal dari git log (2026-11-24).
+- Auto-step DONE dari kejadian nyata: workflow_instance.go +160 (autoWorkflowStep generik keyword "draf"/"sah"/"syarat"/"akta"/"lapor" + autoWorkflowSyarat + workflowActorName) + wiring app.go/ext.go/dms.go; draf dibuat → step "draf" DONE, akta disahkan → "sah" DONE, checklist lengkap (semua VERIFIED/RECEIVED) → "syarat" DONE, ppatAdvance AKTA_JADI/LAPOR_BPN → "akta"/"lapor" DONE; tiap penandaan diaudit workflow.step, idempoten, majukan current_step/COMPLETED, fail-open tanpa blokir alur utama.
+- Export/import JSON checklist+workflow antar-kantor: dms_checklist_port.go baru 343 baris (GET /dms/checklists/export attachment office-scoped + POST /dms/checklists/import; batas 2MB, 100 paket, 200 item/paket, 100 workflow, 100 langkah); idempoten (service_code + nama yang sudah ada dilewati); kartu Portabilitas Antar-Kantor di dms.gohtml +6; audit checklist.export/import; strict flash redirect 303 ke /dms/checklists; route di app.go +22/ext.go +6.
+- Docs & ops: entri CHANGELOG + RELEASE_NOTES v0.5.2 (ditulis di commit ini); TEST_STRATEGY live 23/23; backfill audit_logs.office_id 532 baris.
+- Go-Live: seperti v0.5.2 + verifikasi auto-step (buat draf → step draf DONE, sahkan → sah DONE, lengkapi checklist → syarat DONE) dan uji export/import JSON antar-kantor, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.2] — 2026-11-24 — Workflow instances live + docs rilis
 - Cakupan: 1 commit sejak v0.5.1 (29058ed "v0.5.2: workflow instances live + docs rilis", 12 files, +748/-7); tanggal dari git log (2026-11-24).
 - Workflow instances live: seed 3 template workflow (PT/AJB/Kuasa) via tombol seed checklist (internal/app/seed_catalog.go +48); auto-instance saat permohonan dibuat + kartu Alur Kerja + tombol maju (internal/app/workflow_instance.go baru 319 baris + wiring app.go/ext.go/dms.go + pages2.gohtml); RBAC per langkah, audit step, fail-open aman.

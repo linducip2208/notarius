@@ -218,6 +218,29 @@ func (a *App) workflowActorName(r *http.Request) (*int64, string) {
 	return uid, actor
 }
 
+// matchStepKey mengembalikan step_key pertama (urut template) yang mengandung
+// kw (case-insensitive, substring). Murni tanpa DB/IO; diekstrak mekanis dari
+// autoWorkflowStep agar mudah diuji — perilaku identik: contains, bukan
+// pencocokan kata (word-boundary). Disengaja: kw "sah" memang harus cocok
+// dengan step_key "Sahkan" (awalan), dan word-boundary eksak ("sah"==token)
+// justru akan MERUSAK pemetaan itu. Matcher hanya menerima step_key (bukan
+// label), jadi label "Pengesahan" tak pernah masuk ke sini — tak ada
+// false-positive "Pengesahan"-lebih-dulu di domain nyata (seluruh step_key
+// seed diverifikasi di workflow_match_test.go: hanya "Sahkan" yang mengandung
+// "sah", dan "Syarat" tidak mengandung "sah" berurutan).
+func matchStepKey(keys []string, kw string) string {
+	kw = strings.ToLower(strings.TrimSpace(kw))
+	if kw == "" {
+		return ""
+	}
+	for _, k := range keys {
+		if strings.Contains(strings.ToLower(k), kw) {
+			return k
+		}
+	}
+	return ""
+}
+
 // autoWorkflowStep menandai step DONE secara best-effort (fail-open):
 // cocokkan step_key pertama (urut template) yang mengandung salah satu
 // keyword (case-insensitive). Bila tak ada yang cocok / instance tak ada /
@@ -279,9 +302,8 @@ func (a *App) autoWorkflowStep(officeID, requestID int64, actorID *int64, actor,
 		}
 		match := ""
 		for _, stepKey := range order {
-			lk := strings.ToLower(stepKey)
 			for _, kw := range keys {
-				if strings.Contains(lk, kw) {
+				if matchStepKey([]string{stepKey}, kw) != "" {
 					match = stepKey
 					break
 				}

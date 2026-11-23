@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.3 (2026-11-24) — AUTO-STEP WORKFLOW INSTANCES + EXPORT/IMPORT TEMPLATE
+Ringkasan: sejak v0.5.2 ada 1 commit (7a0923f, 2026-11-24): (1) auto-step DONE dari kejadian nyata — draf → "draf", sahkan → "sah", checklist lengkap → "syarat", PPAT AKTA_JADI/LAPOR_BPN → "akta"/"lapor", tiap penandaan diaudit workflow.step (idempoten, fail-open); (2) export/import JSON checklist+workflow antar-kantor (idempoten, batas 2MB/100 paket/200 item, kartu Portabilitas + audit + strict flash 303); (3) docs v0.5.2 + TEST_STRATEGY live 23/23 + backfill audit 532 baris.
+Go-Live: seperti v0.5.2 + verifikasi auto-step per permohonan (draf/sah/syarat) dan uji export/import JSON antar-kantor, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.2 (2026-11-24) — WORKFLOW INSTANCES LIVE + DOCS RILIS
 Ringkasan: sejak v0.5.1 ada 1 commit (29058ed, 2026-11-24): (1) workflow instances live — seed 3 template (PT/AJB/Kuasa) via tombol seed checklist, auto-instance saat permohonan dibuat + kartu Alur Kerja + tombol maju, RBAC per langkah + audit step (fail-open aman); (2) test integrasi workflow 23/23 live (unit baru + tests/workflow_integration_test.go, 23/23 PASS 0 FAIL cleanup bersih); (3) docs v0.5.1 + TEST_STRATEGY live + BACKFILL_AUDIT panduan DBA (138 baris).
 Go-Live: seperti v0.5.1 + klik seed checklist untuk pasang 3 template workflow, verifikasi kartu Alur Kerja + tombol maju per permohonan (RBAC per langkah), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
