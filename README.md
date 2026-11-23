@@ -10,7 +10,8 @@ cp .env.example .env          # isi DB_PASS
 mysql -u root -p -e "CREATE DATABASE notaryos CHARACTER SET utf8mb4;"
 make migrate                  # butuh akses mysql client
 go run ./cmd/notaryos
-# buka http://localhost:8080/login
+# buka http://localhost:8080/setup untuk admin pertama (sekali-pakai),
+# selanjutnya http://localhost:8080/login
 ```
 
 ## Perintah wajib
@@ -22,6 +23,8 @@ go build ./...
 ```
 
 ## Membuat admin pertama
+Cara utama: buka `/setup` (aktif hanya bila tabel users masih kosong;
+begitu ada 1 user dialihkan ke `/login`). Fallback SQL bila perlu:
 ```sql
 INSERT INTO offices(name, notary_name, sk_number, address, phone, email)
 VALUES ('Kantor Notaris Contoh','Nama Notaris, S.H.','SK.123','Jl. Contoh 1','021-000','office@contoh.id');
@@ -31,5 +34,9 @@ VALUES (1, 1, 'Admin','admin@contoh.id','<bcrypt-hash>');
 ```
 
 ## Struktur
-`cmd/notaryos` entrypoint · `internal/` 19 paket domain · `migrations/` skema MySQL ·
-`internal/app/templates/` UI Tabler · `deploy/` nginx+systemd+backup · `docs/` PRD & audit.
+`cmd/notaryos` entrypoint · `internal/` 38 paket · `migrations/` 001–025 (021 PPAT, 023 office ketat, 025 indeks) ·
+`internal/app/templates/` UI Tabler · `deploy/` nginx+systemd (timer pengingat)+backup DB & berkas ·
+`docs/` USER_MANUAL + panduan (PRD, audit, DEPLOYMENT_GUIDE).
+
+## Rilis
+Lihat `docs/RELEASE_NOTES.md` untuk catatan rilis dan `docs/DEPLOYMENT_GUIDE.md` untuk go-live.

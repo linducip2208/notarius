@@ -1,3 +1,15 @@
+# RELEASE_NOTES — v0.4.8 (2026-11-23) — SETUP WIZARD + AUDIT LOGIN + LABEL FORM
+Ringkasan: wizard /setup sekali-pakai (kantor + super_admin pertama, aktif hanya bila users kosong, redirect /login selebihnya, rate-limit + transaksi anti-race, fail-closed); audit login gagal / MFA gagal / logout / MFA-sukses + lockout terverifikasi; 12 label form + autocomplete; strict redirect + anchor checklist.
+Go-Live: seperti v0.4.6 + untuk instalasi baru buka /setup sekali untuk buat kantor + admin pertama (setelah ada ≥1 user endpoint terkunci otomatis ke /login). Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
+# RELEASE_NOTES — v0.4.7 (2026-11-23) — PPAT TERKAIT + SEARCH GLOBAL + EMPTY CTA
+Ringkasan: kartu register PPAT di detail permohonan (JOIN deed_drafts + scope kantor); search global tambah hasil PPAT (akta/jenis/para pihak/sertifikat) + tugas; 6 empty-state dapat CTA (seed 1-klik, anchor form); docs CHANGELOG + RELEASE_NOTES v0.4.6.
+Go-Live: seperti v0.4.6 + verifikasi kartu PPAT terkait di detail permohonan dan search PPAT/tugas. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.4.6 (2026-11-23) — AKTIVASI KANTOR + FILTER + AUDIT SCOPE
 Ringkasan: kartu Aktivasi Kantor x/5 di /office (checklist, template + approved, tarif/uji transaksi, 1 permohonan, mode ketat), filter status permohonan + filter status/jenis akta, badge jatuh tempo invoice LEWAT N hari; 8 kebocoran office-scope ditutup (audit feed/ekspor, booking, spesimen DMS, deed detail/timeline, invoice_lines) + template yatim dihapus; dipakai ulang: SEO dinamis + responsif + audit CSV + strict UX flash, timer pengingat 07:00 WIB, CSS print, MFA warning, cookie flags, backup DB+files; .env.example 49 kunci.
 Go-Live: seperti v0.4.5 + verifikasi kartu aktivasi di /office mencapai 5/5 setelah ⚡ Pasang Standar di /dms/checklists → ⚡ Pasang 8 Konsep di /templates → Approve template → uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

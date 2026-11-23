@@ -1,4 +1,13 @@
 # CHANGELOG
+## [0.4.8] — 2026-11-23 — Setup wizard, audit login, label form, strict UX
+- Setup wizard sekali-pakai: GET/POST /setup aktif hanya bila tabel users kosong (0 baris), selebihnya redirect ke /login anti-ambil-alih; rate-limit + transaksi anti-race (cek ganda sebelum validasi dan di dalam transaksi); fail-closed bila DB nil/query error (internal/app/setup.go baru 153 baris + route di app.go/ext.go).
+- Audit login: audit login gagal / MFA gagal / logout / MFA-sukses + lockout terverifikasi.
+- Form & strict UX: 12 label form + autocomplete (login.gohtml + dms/ops/registers), strict redirect 303 + anchor checklist.
+## [0.4.7] — 2026-11-23 — PPAT terkait, search global, empty CTA, docs rilis
+- PPAT terkait: kartu register PPAT di detail permohonan (JOIN ppat_register→deed_drafts.request_id, scope office_id, ORDER BY id DESC).
+- Search global: hasil search tambah PPAT (akta_no/jenis/penjual/pembeli/sertifikat, limit 10) + tugas (title, limit 10), scope office_id.
+- Empty-state CTA: 6 empty-state dapat CTA (seed 1-klik, anchor form) di app2/dms/ops/pages2/registers.
+- Docs: CHANGELOG + RELEASE_NOTES v0.4.6.
 ## [0.4.6] — 2026-11-23 — Aktivasi kantor + filter + audit scope + SEO responsif
 - Aktivasi & Filter: kartu Aktivasi Kantor x/5 di /office (template checklist, template dokumen + approved, tarif/uji transaksi via invoice atau permohonan, uji 1 permohonan, mode ketat diketahui; fail-open 0 bila tabel belum termigrasi) + filter status permohonan /requests (pertahankan client + Reset) + filter status + jenis akta /deeds (kind difilter di Go cocok persis ENUM, aman injeksi) + badge jatuh tempo invoice LEWAT N hari + tgl Jt (overdue di atas, partisi stabil tanpa ubah ORDER BY store).
 - Keamanan scope: 8 kebocoran office-scope ditutup — feed audit dashboard + /audit + /audit/export WHERE office (aktor NULL lolos), booking DISETUJUI/tolak UPDATE ... AND office_id, spesimen DMS AND office_id, deed detail props/template/timeline (versions JOIN deed_drafts, approval, signatures) AND office_id, invoice_lines JOIN invoices cek office; template yatim "documents" dihapus dari app2.gohtml.
