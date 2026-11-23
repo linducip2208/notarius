@@ -1306,17 +1306,56 @@ func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Transisi status APPROVED → SIGNED (office-scoped; hanya dari APPROVED).
-	// SIGNED bersifat terminal laporannya: rekap dasbor sudah menghitung
+	// SIGNED bersifat final laporannya: rekap dasbor sudah menghitung
 	// SIGNED (app.go monthly query IN APPROVED/SIGNED/ARCHIVED), tombol
 	// tanda tangan hanya tampil untuk APPROVED, dan penandatangan kedua
-	// otomatis ditolak gate status di atas. SIGNED → ARCHIVED TIDAK dibuatkan
-	// endpoint di sini (arsip via protokol yang sudah ada).
+	// otomatis ditolak gate status di atas. SIGNED → ARCHIVED lewat
+	// deedArchive di bawah (arsip minuta final, tanpa hapus data).
 	if _, err := a.db.Exec(`UPDATE deed_drafts SET status='SIGNED' WHERE id=? AND office_id=? AND status='APPROVED'`, id, office); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.sign", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: "hash:" + hash[:16] + " segel:" + seal, OfficeID: officePtr(office)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Tanda+tangan+internal+tercatat", http.StatusSeeOther)
+}
+
+// deedArchive menutup lifecycle akta: SIGNED → ARCHIVED (arsip minuta final).
+// Guard: PermApproveDeed (setara deedApprove/deedSign/deedHandover —
+// melepas minuta dari peredaran aktif). Hanya dari status SIGNED; status
+// lain ditolak (ARCHIVED yang sudah arsip → 409, selain itu → 400).
+// Tanpa hapus data, tanpa ubah minuta (hanya kolom status yang berubah).
+func (a *App) deedArchive(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) {
+		http.Error(w, "hanya notaris yang dapat mengarsipkan akta", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	office := a.officeOf(r)
+	var status string
+	if err := a.db.QueryRow(`SELECT status FROM deed_drafts WHERE id=? AND office_id=?`, id, office).Scan(&status); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if status == "ARCHIVED" {
+		http.Error(w, "akta sudah diarsipkan", http.StatusConflict)
+		return
+	}
+	if status != "SIGNED" {
+		http.Error(w, "hanya akta SIGNED yang dapat diarsipkan (status saat ini: "+status+")", http.StatusBadRequest)
+		return
+	}
+	res, err := a.db.Exec(`UPDATE deed_drafts SET status='ARCHIVED' WHERE id=? AND office_id=? AND status='SIGNED'`, id, office)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		http.Error(w, "gagal mengarsipkan: status berubah bersamaan", http.StatusConflict)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "deed.archive", Entity: "deed", EntityID: strconv.FormatInt(id, 10), OfficeID: officePtr(office)})
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Akta+diarsipkan", http.StatusSeeOther)
 }
 
 // deedHandover records serah dokumen akta ke klien (tanda terima serah dokumen).
@@ -1774,6 +1813,7 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"TplBody":    safehtml.ToText(tplBody),
 		"CanApprove": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
+		"CanArchive": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "SIGNED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
 		"Timeline": a.deedTimeline(a.officeOf(r), id),
 		"Handovers":  a.deedHandovers(a.officeOf(r), id),

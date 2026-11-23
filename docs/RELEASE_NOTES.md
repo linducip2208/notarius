@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.4 (2026-11-24) — RANTAI STATUS + SERAH TERIMA + PENAWARAN→INVOICE
+Ringkasan: sejak v0.5.3 ada 3 commit (cabdf99, 670850d, d4bbf98; 2026-11-24): (1) kunci unik template 029 (12 PT-DIRIAN ganda → 1, refresh 8 item + isi ulang 13 permohonan); (2) status otomatis + serah terima 031 (akta sah → IN_PROGRESS, serah → COMPLETED) + penawaran resmi 030 (→ invoice ISSUED PPN 11%, kartu di permohonan); (3) rantai IN_REVIEW→APPROVED→IN_PROGRESS saat akta disahkan + jadwal pembacaan terikat akta (lunak) + widget serah dashboard + rekap bulan di laporan + verifikasi alur docs/ops/ALUR_UJI_REALITA.md (352 baris).
+Go-Live: seperti v0.5.3 + pastikan migrasi 029–031 jalan otomatis (cek schema_migrations), verifikasi rantai status + serah 1 akta + penawaran → invoice, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.3 (2026-11-24) — AUTO-STEP WORKFLOW INSTANCES + EXPORT/IMPORT TEMPLATE
 Ringkasan: sejak v0.5.2 ada 1 commit (7a0923f, 2026-11-24): (1) auto-step DONE dari kejadian nyata — draf → "draf", sahkan → "sah", checklist lengkap → "syarat", PPAT AKTA_JADI/LAPOR_BPN → "akta"/"lapor", tiap penandaan diaudit workflow.step (idempoten, fail-open); (2) export/import JSON checklist+workflow antar-kantor (idempoten, batas 2MB/100 paket/200 item, kartu Portabilitas + audit + strict flash 303); (3) docs v0.5.2 + TEST_STRATEGY live 23/23 + backfill audit 532 baris.
 Go-Live: seperti v0.5.2 + verifikasi auto-step per permohonan (draf/sah/syarat) dan uji export/import JSON antar-kantor, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

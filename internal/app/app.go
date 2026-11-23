@@ -576,6 +576,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/deeds/{id}/approve", a.deedApprove)
 		p.Post("/deeds/{id}/review", a.deedToReview)
 		p.Post("/deeds/{id}/sign", a.deedSign)
+		p.Post("/deeds/{id}/archive", a.deedArchive)
 		p.Post("/deeds/{id}/handover", a.deedHandover)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
 		p.Get("/deeds/{id}/docx", a.deedDOCX)
