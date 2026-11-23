@@ -1930,14 +1930,14 @@ func (a *App) requestMove(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := a.reqs.Move(a.officeOf(r), id, r.FormValue("to"), a.uid(r), r.FormValue("note")); err != nil {
+	if err := a.reqs.Move(a.officeOf(r), id, target, a.uid(r), r.FormValue("note")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	uid := a.uid(r)
-	a.audit.Record(audit.Entry{ActorID: uid, Action: "request.move", Entity: "service_request", EntityID: strconv.FormatInt(id, 10), Detail: r.FormValue("to")})
+	a.audit.Record(audit.Entry{ActorID: uid, Action: "request.move", Entity: "service_request", EntityID: strconv.FormatInt(id, 10), Detail: target})
 	// Notify assignee in background (best effort, never blocks the request).
-	to := r.FormValue("to")
+	to := target
 	a.pool.Submit(func(ctx context.Context) error {
 		var assignee sql.NullInt64
 		_ = a.db.QueryRow(`SELECT assignee_id FROM service_requests WHERE id=?`, id).Scan(&assignee)

@@ -81,3 +81,82 @@ func TestValidateTransitionRejectBlockedAndMissingEvidence(t *testing.T) {
 		t.Fatal("bukti BPN_RECEIPT yang hilang harus ditolak")
 	}
 }
+
+func TestValidateTransitionRejectBackward(t *testing.T) {
+	steps := fixtureSteps()
+	done := map[string]bool{"INTAKE": true, "VERIFY": true}
+	// Mundur VERIFY -> INTAKE: target sudah done + posisi mundur → ditolak.
+	if err := ValidateTransition(steps, done, "VERIFY", "INTAKE", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("mundur ke langkah sebelumnya harus ditolak")
+	}
+	// Mundur BPN -> VERIFY (posisi mundur walau target belum done) → ditolak.
+	if err := ValidateTransition(steps, nil, "BPN", "VERIFY", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("mundur dari BPN ke VERIFY harus ditolak")
+	}
+}
+
+func TestValidateTransitionMultiSkipSkippable(t *testing.T) {
+	steps := []Step{
+		{Key: "A", SortOrder: 1, Skippable: false},
+		{Key: "B", SortOrder: 2, Skippable: true},
+		{Key: "C", SortOrder: 3, Skippable: true},
+		{Key: "D", SortOrder: 4, Skippable: false},
+	}
+	done := map[string]bool{"A": true}
+	// Lompat A -> D melewati dua langkah skippable berurutan: lolos.
+	if err := ValidateTransition(steps, done, "A", "D", ChecklistSummary{}, nil); err != nil {
+		t.Fatalf("lompat melewati 2 langkah skippable harus lolos: %v", err)
+	}
+}
+
+func TestValidateTransitionMultiJumpBlockedByOneRequired(t *testing.T) {
+	steps := []Step{
+		{Key: "A", SortOrder: 1, Skippable: false},
+		{Key: "B", SortOrder: 2, Skippable: true},
+		{Key: "C", SortOrder: 3, Skippable: false},
+		{Key: "D", SortOrder: 4, Skippable: false},
+	}
+	done := map[string]bool{"A": true}
+	// Lompat A -> D melewati B (skippable) + C (wajib): ditolak karena C.
+	if err := ValidateTransition(steps, done, "A", "D", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("lompat melewati satu langkah wajib di antara skippable harus ditolak")
+	}
+}
+
+func TestValidateTransitionStartFromEmpty(t *testing.T) {
+	steps := fixtureSteps()
+	// Mulai dari awal ("") ke langkah pertama: lolos.
+	if err := ValidateTransition(steps, nil, "", "INTAKE", ChecklistSummary{}, nil); err != nil {
+		t.Fatalf("mulai dari awal ke INTAKE harus lolos: %v", err)
+	}
+	// Mulai dari awal langsung ke BPN melewati INTAKE/VERIFY wajib: ditolak.
+	if err := ValidateTransition(steps, nil, "", "BPN", ChecklistSummary{}, map[string]bool{"BPN_RECEIPT": true}); err == nil {
+		t.Fatal("mulai dari awal langsung ke BPN harus ditolak (melewati wajib)")
+	}
+}
+
+func TestValidateTransitionRejectDoneTargetAndUnknown(t *testing.T) {
+	steps := fixtureSteps()
+	done := map[string]bool{"INTAKE": true}
+	if err := ValidateTransition(steps, done, "INTAKE", "INTAKE", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("target yang sudah done harus ditolak")
+	}
+	if err := ValidateTransition(steps, nil, "", "TIDAK_ADA", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("toKey tak dikenal harus ditolak")
+	}
+	if err := ValidateTransition(steps, nil, "TIDAK_ADA", "INTAKE", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("fromKey tak dikenal harus ditolak")
+	}
+	if err := ValidateTransition(steps, nil, "INTAKE", "  ", ChecklistSummary{}, nil); err == nil {
+		t.Fatal("toKey kosong harus ditolak")
+	}
+}
+
+func TestNextStepsNilDoneAndUnsorted(t *testing.T) {
+	// done nil = semua pending, tetap terurut walau input acak.
+	rev := []Step{fixtureSteps()[3], fixtureSteps()[2], fixtureSteps()[1], fixtureSteps()[0]}
+	got := NextSteps(rev, nil)
+	if len(got) != 4 || got[0].Key != "INTAKE" || got[3].Key != "BPN" {
+		t.Fatalf("done nil harus kembalikan semua terurut: %+v", got)
+	}
+}

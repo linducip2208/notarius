@@ -128,7 +128,7 @@ func (s *Store) Stats(officeID int64) (Stats, error) {
 	q(&st.Individual, `SELECT COUNT(*) FROM clients WHERE office_id=? AND kind='individual' AND status!='ARCHIVED'`, officeID)
 	q(&st.Corporate, `SELECT COUNT(*) FROM clients WHERE office_id=? AND kind='corporate' AND status!='ARCHIVED'`, officeID)
 	q(&st.Active, `SELECT COUNT(*) FROM clients WHERE office_id=? AND status='ACTIVE'`, officeID)
-	q(&st.InProcess, `SELECT COUNT(DISTINCT client_id) FROM service_requests WHERE office_id=? AND status IN ('SUBMITTED','IN_REVIEW','NEEDS_DOCS','APPROVED','IN_PROGRESS')`, officeID)
+	q(&st.InProcess, `SELECT COUNT(DISTINCT client_id) FROM service_requests WHERE office_id=? AND status IN ('SUBMITTED','IN_REVIEW','NEED_DOCS','APPROVED','IN_PROGRESS')`, officeID)
 	q(&st.DocsIncomplete, `SELECT COUNT(*) FROM clients c WHERE c.office_id=? AND c.status='ACTIVE' AND NOT EXISTS (SELECT 1 FROM files f WHERE f.owner_type='client' AND f.owner_id=c.id AND f.office_id=?)`, officeID, officeID)
 	q(&st.PendingVerify, `SELECT COUNT(DISTINCT i.client_id) FROM identities i JOIN clients c ON c.id=i.client_id WHERE c.office_id=? AND i.status IN ('UNCHECKED','PENDING','NEEDS_REVISION')`, officeID)
 	q(&st.Finished, `SELECT COUNT(DISTINCT client_id) FROM service_requests WHERE office_id=? AND status='COMPLETED'`, officeID)

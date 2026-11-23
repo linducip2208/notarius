@@ -1,3 +1,15 @@
+# RELEASE_NOTES — v0.5.10 (2026-11-24) — VERIFIKASI TYPO STATUS + MATRIKS LEGAL + TEST WORKFLOW
+Ringkasan: NEEDS_DOCS→NEED_DOCS (counter benar); normalisasi target requestMove; klaim rekap SIGNED/ARCHIVED ditolak setelah verifikasi (sudah benar); 4 file docs/legal (tanpa fabrikasi pasal, semua NEEDS_LEGAL_REVIEW); 6 test workflow baru (coverage workflow 95,9%).
+Go-Live: seperti v0.5.9 + uji 1 permohonan IN_REVIEW lengkap. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
+# RELEASE_NOTES — v0.5.9 (2026-11-24) — NOTARIUS 4.0 TAHAP 1-2: AUDIT + BPR + GUARD TUGAS
+Ringkasan: sejak v0.5.8 ada 1 commit (cc8ef97, 2026-11-24): (1) 7 file audit baca-saja (repo, fitur, DB, API, UI/UX, security, proses bisnis); (2) BPR design — stack dikunci Go+MySQL+Tabler+HTMX, pertahankan fondasi (service_requests/matter_parties/clients/workflowGate/PPAT 2-buku), tanpa Metronic/REST/PPAT-baru; (3) guard requireStaff taskCreate/taskDone (tutup tulis tugas oleh client); (4) empty-state CTA klien + DMS fields/chain; (5) koreksi false alarm (tak ada halaman yatim/tombol buntu/filter mati; office-scope valid); tanpa migrasi baru.
+Go-Live: seperti v0.5.8 + verifikasi client ditolak POST /tasks, cek CTA empty-state klien/DMS, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.8 (2026-11-24) — PWA INSTALLABLE + RESPONSIF MOBILE
 Ringkasan: sejak v0.5.7 ada 1 commit (b6341c5, 2026-11-24): (1) PWA installable — manifest (start_url /app, standalone, ikon 192/512/maskable + apple-touch) via /manifest.webmanifest + service worker via /sw.js (scope root, no-cache) + head PWA di template app + publik, tanpa ubah auth/RBAC; (2) offline jujur — /offline menjelaskan data di server kantor + SW network-first navigasi (fallback cache lalu /offline), cache-first /assets/*, halaman privat tak di-cache, precache + bersih cache lama; (3) responsif mobile — CSS ≤576px + flex-wrap form aksi permohonan.
 Go-Live: seperti v0.5.7 + uji install (Android/iOS), /offline langsung, navigasi saat koneksi mati (harus /offline), pastikan halaman privat tak tersaji dari cache, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

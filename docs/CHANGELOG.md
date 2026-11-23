@@ -1,4 +1,18 @@
 # CHANGELOG
+## [0.5.10] — 2026-11-24 — Verifikasi typo status + matriks legal + test workflow
+- Typo NEEDS_DOCS→NEED_DOCS (crm.go:131, counter kini benar); normalisasi target requestMove (gate/Move/audit/notif konsisten); klaim rekap SIGNED/ARCHIVED DITOLAK setelah verifikasi (sudah benar).
+- Matriks legal: docs/legal/ 4 file (tanpa fabrikasi pasal, semua NEEDS_LEGAL_REVIEW).
+- Unit test workflow: 6 test baru internal/workflow (coverage 95,9%), matchStepKey/requestEventTarget 100%.
+- Go-Live: seperti v0.5.9 + uji 1 permohonan IN_REVIEW lengkap.
+## [0.5.9] — 2026-11-24 — NOTARIUS 4.0 tahap 1-2: audit + BPR + guard tugas + empty CTA
+- Cakupan: 1 commit sejak v0.5.8 (cc8ef97 "NOTARIUS 4.0 tahap 1-2: audit + BPR + hardening awal", 11 files, +752/-33); tanggal dari git log (2026-11-24).
+- 7 file audit (baca-saja, tanpa ubah kode): docs/audit/REPOSITORY_AUDIT.md + FEATURE_INVENTORY.md + DATABASE_AUDIT.md + API_AUDIT.md + UI_UX_AUDIT.md + SECURITY_AUDIT.md + BUSINESS_PROCESS_AUDIT.md (menggantikan draf/stub lama dengan audit penuh skala FASE 1C).
+- BPR design: docs/NOTARIUS_4_0_BPR_DESIGN.md baru (88 baris, status MEMUTUSKAN) — stack dikunci Go + MySQL 8 + Tabler server-render + HTMX (modular monolith); DIPERTAHANKAN service_requests/matter_parties/clients/service_workflow_rules+workflowGate/PPAT 2-buku; DIROMBAK wizard/checklist/enum role/lazy instances tanpa migrasi merusak; TIDAK DIBANGUN tabel matters/parties generik, mesin workflow abstrak baru, REST publik, tema Metronic, modul PPAT baru.
+- Guard tugas: taskCreate + taskDone di internal/app/ext.go kini requireStaff (menutup celah tulis tugas oleh peran client, temuan HIGH); temuan sisa (guard tulis retensi/protokol/CMS terlalu luas, dmsBulk verify lewati PermVerifyIdentity, upload tanpa auto malware-scan, masking PII parsial UU PDP) dicatat di SECURITY_AUDIT sebagai tindak lanjut, bukan penahan rilis ini.
+- Empty-state CTA: clients_list (tombol Tambah klien pertama) + dms_fields (anchor #field-baru) + dms chain (anchor #rantai-baru).
+- Koreksi false alarm: audit ulang membuktikan tidak ada halaman yatim (130 define terpetakan), tidak ada tombol POST buntu (150+ action cocok route), tidak ada filter mati (12 param clients_list → ListAdvanced), klaim office-scope valid (150+ query sampel tak bocor lintas-kantor); draf audit lama yang menandai sebaliknya dikoreksi.
+- Tanpa migrasi baru: tanpa ubah skema/migrasi; boot normal tanpa cek schema_migrations tambahan.
+- Go-Live: seperti v0.5.8 + verifikasi peran client ditolak POST /tasks dan /tasks/{id}/done, cek CTA empty-state klien/DMS, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.8] — 2026-11-24 — PWA installable + responsif mobile
 - Cakupan: 1 commit sejak v0.5.7 (b6341c5 "PWA installable + responsif mobile", 11 files, +141/-2); tanggal dari git log (2026-11-24).
 - PWA installable: web/assets/manifest.webmanifest baru (nama SaktiNotaris, start_url /app, scope /, display standalone, tema #0a1428, ikon 192/512 + maskable) diserve via GET /manifest.webmanifest (MIME application/manifest+json, cache 1 jam); service worker web/assets/sw.js baru diserve via GET /sw.js (scope root agar mencakup seluruh origin, Cache-Control no-cache agar update tak macet di perangkat); route + handler di internal/app/app.go (pwaManifest/pwaSW/offlinePage); ikon 192/512/maskable + apple-touch-icon diturunkan dari logo; head PWA (theme-color, manifest, apple-touch-icon, mobile-web-app-capable, registrasi SW best-effort saat load) di partials.gohtml (app) + public.gohtml (halaman publik); tanpa ubah auth/RBAC/skema.
