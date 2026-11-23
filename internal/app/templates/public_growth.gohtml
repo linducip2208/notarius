@@ -3,11 +3,11 @@
 <p class="meta">Transparan: tarif dasar layanan + komponen biaya resmi (PNBP/materai/administrasi). <strong>Bukan harga final</strong> — final setelah verifikasi berkas &amp; kompleksitas perkara.</p>
 <form method="get" action="/kalkulator" style="display:flex;gap:8px;margin-bottom:22px"><select name="code">{{range .Data.Opts}}<option value="{{.Code}}"{{if eq $.Data.Code .Code}} selected{{end}}>{{.Name}}</option>{{end}}</select><button class="btn" type="submit">Hitung</button></form>
 {{if .Data.Name}}<div class="card"><h2 style="margin-top:0">{{.Data.Name}}</h2>
-<table style="width:100%"><tbody>
+<div class="table-responsive"><table style="width:100%"><tbody>
 <tr><td>Tarif dasar layanan</td><td style="text-align:right">{{.Data.BaseFmt}}</td></tr>
 {{range .Data.Comps}}<tr><td>{{.Name}}</td><td style="text-align:right">{{.Fmt}}</td></tr>{{end}}
 <tr><td><strong>Estimasi awal</strong></td><td style="text-align:right"><strong>{{.Data.TotalFmt}}</strong></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p class="meta">Belum termasuk: biaya pihak ketiga di luar kewenangan notaris (mis. pajak, bank) yang bersifat situasional.</p>
 <p><a class="btn" href="/konsultasi">Lanjut Konsultasi →</a></p></div>{{end}}
 </div></section></main>{{template "pub_foot" .}}{{end}}
