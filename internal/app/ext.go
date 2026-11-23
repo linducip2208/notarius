@@ -1766,6 +1766,7 @@ func (a *App) officePage(w http.ResponseWriter, r *http.Request) {
 	a.render(w, r, "office", "Profil Kantor", map[string]any{
 		"Name": name, "Notary": notary, "SK": sk, "Address": addr, "Phone": phone, "Email": email, "Plan": plan,
 		"Strict": strictInt == 1, "SLAJSON": slaJSON.String, "Activation": activation,
+		"LegacyPlaintext": countLegacyPlaintextBackups("storage/backups"),
 	})
 }
 

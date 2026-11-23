@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"strings"
 )
 
 // Allowed workflow transitions (spec F10).
@@ -92,13 +93,54 @@ func (s *Store) AddVersion(officeID, fileID int64, ref, sha string, size int64, 
 	if err := s.officeOfFile(fileID, officeID); err != nil {
 		return 0, err
 	}
+	// Alokasi version_no di dalam transaksi + kunci baris file; uq_docver
+	// (file_id, version_no) dari 011 tetap jadi jaring pengaman 1062.
+	for attempt := 0; attempt < 3; attempt++ {
+		next, err := s.addVersionOnce(fileID, ref, sha, size, note, by)
+		if err == nil {
+			return next, nil
+		}
+		if isDupEntry(err) && attempt < 2 {
+			continue
+		}
+		return 0, err
+	}
+	return 0, errors.New("gagal menambah versi setelah 3 percobaan — coba lagi")
+}
+
+func (s *Store) addVersionOnce(fileID int64, ref, sha string, size int64, note string, by *int64) (int, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	// Kunci baris file: serialisasi alokasi version_no per file. Ini wajib
+	// karena SELECT MAX ... FOR UPDATE saja tidak mengunci gap saat belum ada
+	// baris doc_versions (versi pertama) — dua insert konkuren tetap bentrok.
+	var fid int64
+	if err := tx.QueryRow(`SELECT id FROM files WHERE id=? FOR UPDATE`, fileID).Scan(&fid); err != nil {
+		return 0, err
+	}
 	var next int
-	_ = s.db.QueryRow(`SELECT COALESCE(MAX(version_no),0)+1 FROM doc_versions WHERE file_id=?`, fileID).Scan(&next)
-	if _, err := s.db.Exec(`INSERT INTO doc_versions(file_id, version_no, ref, sha256, size_bytes, note, created_by)
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(version_no),0)+1 FROM doc_versions WHERE file_id=? FOR UPDATE`, fileID).Scan(&next); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`INSERT INTO doc_versions(file_id, version_no, ref, sha256, size_bytes, note, created_by)
 		VALUES(?,?,?,?,?,?,?)`, fileID, next, ref, sha, size, note, by); err != nil {
 		return 0, err
 	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
 	return next, nil
+}
+
+func isDupEntry(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "1062") || strings.Contains(msg, "Duplicate entry")
 }
 
 func (s *Store) Versions(officeID, fileID int64) ([]Version, error) {

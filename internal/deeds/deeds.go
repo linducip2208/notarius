@@ -114,8 +114,10 @@ func (s *Store) SaveVersion(deedID int64, content string, createdBy *int64, note
 
 // Approve locks the deed with notary approval, assigns a number, and writes
 // the automatic repertorium entry (UUJN tertib administrasi).
-// Race-safe: deed row locked; repertorium range locked via FOR UPDATE predicate;
-// on 1062 collision the tx retries once with a fresh number, else friendly error.
+// Nomor akta (number) adalah MASUKAN USER dan tidak pernah diubah/di-fresh-kan
+// oleh retry: bentrok uq_deed_number langsung error jelas. Yang dihitung ulang
+// saat retry hanyalah entry_no repertorium (otomatis MAX+1). Race entry_no
+// diserialisasi via kunci baris kantor; uq_repert jadi jaring pengaman 1062.
 func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	if number == "" {
 		return errors.New("nomor akta wajib diisi saat pengesahan")
@@ -123,10 +125,15 @@ func (s *Store) Approve(deedID int64, number string, approverID int64) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		if err := s.approveOnce(deedID, number, approverID); err == nil {
 			return nil
+		} else if isDeedNumberConflict(err) {
+			// Nomor milik user — JANGAN ubah/fresh-kan, kembalikan apa adanya.
+			return err
 		} else if isDupEntry(err) && attempt == 0 {
+			// Bentrok entry_no repertorium otomatis — ulangi agar MAX+1
+			// dihitung ulang dalam transaksi baru (nomor akta tetap sama).
 			continue
 		} else if isDupEntry(err) {
-			return errors.New("nomor akta/entri repertorium sudah dipakai — gunakan nomor lain")
+			return errors.New("bentrok entri repertorium, silakan coba lagi (nomor akta Anda tetap)")
 		} else {
 			return err
 		}
@@ -150,6 +157,15 @@ func (s *Store) approveOnce(deedID int64, number string, approverID int64) error
 	if status != "IN_REVIEW" {
 		return errors.New("hanya draf IN_REVIEW yang dapat disetujui")
 	}
+	// Serialisasi alokasi entry_no per kantor. SELECT MAX ... FOR UPDATE saja
+	// tidak mengunci gap untuk entry_no berikutnya, jadi dua approve konkuren
+	// beda akta bisa membaca MAX yang sama — kunci baris kantor antrekan
+	// mereka; uq_repert(office_id, entry_no) + retry di Approve tetap jadi
+	// jaring pengaman bila kunci lolos (mis. isolasi lebih longgar).
+	var lockID int64
+	if err := tx.QueryRow(`SELECT id FROM offices WHERE id=? FOR UPDATE`, officeID).Scan(&lockID); err != nil {
+		return err
+	}
 	var dup int
 	_ = tx.QueryRow(`SELECT COUNT(*) FROM deed_drafts WHERE office_id=? AND number=? AND id<>?`, officeID, number, deedID).Scan(&dup)
 	if dup > 0 {
@@ -172,6 +188,18 @@ func (s *Store) approveOnce(deedID int64, number string, approverID int64) error
 }
 
 func errDupNumber() error { return errors.New("nomor akta sudah dipakai di kantor ini") }
+
+// isDeedNumberConflict reports a user-number clash (uq_deed_number), either as
+// our friendly errDupNumber or a raw MySQL 1062 naming that key. Such errors
+// must NEVER trigger a retry-with-fresh-number: the number belongs to the user.
+func isDeedNumberConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "uq_deed_number") ||
+		strings.Contains(msg, "nomor akta sudah dipakai")
+}
 
 func isDupEntry(err error) bool {
 	if err == nil {

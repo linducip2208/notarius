@@ -6,6 +6,7 @@ package app
 
 import (
 	"archive/zip"
+	"compress/gzip"
 	"database/sql"
 	"encoding/csv"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -543,9 +545,22 @@ func (a *App) backupNow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "mysqldump tidak ditemukan di server — backup manual via skrip deploy", http.StatusServiceUnavailable)
 		return
 	}
+	// Tanpa gpg / GPG_RECIPIENT backup DITOLAK: dump plaintext tidak boleh dibuat.
+	gpgBin, err := exec.LookPath("gpg")
+	if err != nil {
+		http.Error(w, "gpg tidak ditemukan di server — backup dibatalkan agar tidak menghasilkan file plaintext", http.StatusServiceUnavailable)
+		return
+	}
+	recipient := strings.TrimSpace(os.Getenv("GPG_RECIPIENT"))
+	if recipient == "" {
+		http.Error(w, "GPG_RECIPIENT belum dikonfigurasi — backup plaintext ditolak demi keamanan", http.StatusInternalServerError)
+		return
+	}
 	dir := "storage/backups"
 	_ = os.MkdirAll(dir, 0o750)
-	name := fmt.Sprintf("%s/backup-%s.sql", dir, time.Now().Format("20060102-150405"))
+	// Pola sama seperti deploy/backup/backup.sh: mysqldump | gzip | gpg --encrypt.
+	// Streaming langsung ke gpg — tidak ada file plaintext di disk.
+	name := fmt.Sprintf("%s/backup-%s.sql.gz.gpg", dir, time.Now().Format("20060102-150405"))
 	host := getenv("DB_HOST", "127.0.0.1")
 	user := getenv("DB_USER", "notaryos")
 	pass := os.Getenv("DB_PASS")
@@ -560,23 +575,83 @@ func (a *App) backupNow(w http.ResponseWriter, r *http.Request) {
 	_ = os.Chmod(cnf.Name(), 0o600)
 	fmt.Fprintf(cnf, "[client]\nhost=%s\nuser=%s\npassword=%s\n", host, user, strings.ReplaceAll(pass, "\n", ""))
 	_ = cnf.Close()
-	cmd := exec.Command(mysqldump, "--defaults-extra-file="+cnf.Name(), "--single-transaction", "--routines", dbname)
-	out, err := os.Create(name)
+	dump := exec.Command(mysqldump, "--defaults-extra-file="+cnf.Name(), "--single-transaction", "--routines", dbname)
+	crypt := exec.Command(gpgBin, "--batch", "--yes", "--encrypt", "--recipient", recipient, "-o", name)
+	gpgIn, err := crypt.StdinPipe()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer out.Close()
-	cmd.Stdout = out
+	gz := gzip.NewWriter(gpgIn)
+	dump.Stdout = gz
+	var dumpErr, cryptErr strings.Builder
+	dump.Stderr = &dumpErr
+	crypt.Stderr = &cryptErr
 	start := time.Now()
-	if err := cmd.Run(); err != nil {
-		_ = os.Remove(name)
+	if err := crypt.Start(); err != nil {
+		_ = gz.Close()
 		http.Error(w, "backup gagal: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := dump.Start(); err != nil {
+		_ = gz.Close()
+		_ = gpgIn.Close()
+		_ = crypt.Wait()
+		http.Error(w, "backup gagal: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	dumpWait := dump.Wait()
+	_ = gz.Close()
+	_ = gpgIn.Close()
+	cryptWait := crypt.Wait()
+	if dumpWait != nil || cryptWait != nil {
+		_ = os.Remove(name)
+		http.Error(w, "backup gagal: "+strings.TrimSpace(dumpErr.String()+" "+cryptErr.String()), http.StatusInternalServerError)
 		return
 	}
 	dur := time.Since(start).Round(time.Second)
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "backup.now", Entity: "office", EntityID: "self", Detail: name + " " + dur.String()})
-	http.Redirect(w, r, "/office?flash=Backup+selesai+"+dur.String(), http.StatusSeeOther)
+	flash := "Backup+terenkripsi+selesai+" + dur.String()
+	if n := countLegacyPlaintextBackups(dir); n > 0 {
+		flash += "+--+PERINGATAN:+masih+ada+" + strconv.Itoa(n) + "+file+backup+plaintext+lama+(backup-*.sql)+yang+harus+dihapus+manual+di+bawah"
+	}
+	http.Redirect(w, r, "/office?flash="+flash, http.StatusSeeOther)
+}
+
+// countLegacyPlaintextBackups menghitung dump plaintext lawas (backup-*.sql)
+// yang pernah ditulis sebelum backup terenkripsi. File .sql.gz.gpg tidak dihitung.
+func countLegacyPlaintextBackups(dir string) int {
+	matches, _ := filepath.Glob(filepath.Join(dir, "backup-*.sql"))
+	n := 0
+	for _, m := range matches {
+		if strings.HasSuffix(m, ".sql") && !strings.Contains(filepath.Base(m), ".gpg") {
+			n++
+		}
+	}
+	return n
+}
+
+// backupPurgePlaintext menghapus dump plaintext lawas (backup-*.sql) setelah
+// konfirmasi ganda (confirm dialog + tombol khusus). File terenkripsi
+// .sql.gz.gpg tidak pernah disentuh.
+func (a *App) backupPurgePlaintext(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermManageOffice) {
+		a.forbidden(w, r)
+		return
+	}
+	dir := "storage/backups"
+	matches, _ := filepath.Glob(filepath.Join(dir, "backup-*.sql"))
+	removed := 0
+	for _, m := range matches {
+		if !strings.HasSuffix(m, ".sql") || strings.Contains(filepath.Base(m), ".gpg") {
+			continue
+		}
+		if err := os.Remove(m); err == nil {
+			removed++
+		}
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "backup.purge-plaintext", Entity: "office", EntityID: "self", Detail: strconv.Itoa(removed) + " file plaintext dihapus"})
+	http.Redirect(w, r, "/office?flash="+strconv.Itoa(removed)+"+file+backup+plaintext+lama+dihapus", http.StatusSeeOther)
 }
 
 // ---- read-only emergency mode ----

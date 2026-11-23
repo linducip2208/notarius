@@ -28,17 +28,19 @@ var db *sql.DB
 func TestMain(m *testing.M) {
 	dsn := os.Getenv("NOTARYOS_TEST_DSN")
 	if dsn == "" {
-		fmt.Println("SKIP: NOTARYOS_TEST_DSN not set")
+		fmt.Println("SKIP: NOTARYOS_TEST_DSN tidak diset — uji integrasi MySQL asli DILEWATI, " +
+			"BUKAN bukti hijau. Lihat docs/TEST_STRATEGY.md tabel CI-vs-lokal. " +
+			"Set NOTARYOS_TEST_DSN untuk menjalankannya.")
 		os.Exit(0)
 	}
 	var err error
 	db, err = sql.Open("mysql", dsn)
 	if err != nil {
-		fmt.Println("SKIP: cannot open test db:", err)
+		fmt.Println("SKIP: cannot open test db (BUKAN bukti hijau, lihat docs/TEST_STRATEGY.md):", err)
 		os.Exit(0)
 	}
 	if err := db.Ping(); err != nil {
-		fmt.Println("SKIP: cannot ping test db:", err)
+		fmt.Println("SKIP: cannot ping test db (BUKAN bukti hijau, lihat docs/TEST_STRATEGY.md):", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -195,10 +197,10 @@ func TestFinanceOverpay(t *testing.T) {
 		t.Fatal(err)
 	}
 	// subtotal 2.5jt, PPN 275rb, total 2.775jt
-	if err := fs.RecordPayment(invid, 2775000, "TRANSFER", "R1", nil); err != nil {
+	if err := fs.RecordPayment(office, invid, 2775000, "TRANSFER", "R1", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := fs.RecordPayment(invid, 1, "CASH", "R2", nil); err == nil {
+	if err := fs.RecordPayment(office, invid, 1, "CASH", "R2", nil); err == nil {
 		t.Fatal("overpay must fail")
 	}
 	out, err := fs.Outstanding(office)

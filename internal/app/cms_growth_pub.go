@@ -223,11 +223,29 @@ func (a *App) pubBookingSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Kuota per slot harian: hitung booking aktif pada tanggal+jam yang sama.
+	// Atomik: seluruh cek-kuota + insert berjalan dalam satu transaksi yang
+	// memegang kunci baris kantor (SELECT ... FOR UPDATE). Tanpa ini dua
+	// request konkuren sama-sama membaca used < quota lalu double-booking.
+	// Kunci selevel kantor aman karena QPS booking publik rendah; tidak perlu
+	// migrasi (kuota berbasis hitung, tak bisa diwakili UNIQUE KEY).
+	tx, err := a.db.Begin()
+	if err != nil {
+		fail("gagal+menyimpan")
+		return
+	}
+	defer tx.Rollback()
+	// Serialisasi per kantor; abaikan ErrNoRows agar perilaku lama untuk
+	// kantor tak terkonfigurasi (office==0) tidak berubah di sini.
+	var lockID int64
+	if lerr := tx.QueryRow(`SELECT id FROM offices WHERE id=? FOR UPDATE`, office).Scan(&lockID); lerr != nil && lerr != sql.ErrNoRows {
+		fail("gagal+menyimpan")
+		return
+	}
 	var used int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM website_bookings WHERE office_id=? AND book_date=? AND start_time=? AND status IN ('MENUNGGU','DISETUJUI')`,
+	_ = tx.QueryRow(`SELECT COUNT(*) FROM website_bookings WHERE office_id=? AND book_date=? AND start_time=? AND status IN ('MENUNGGU','DISETUJUI')`,
 		office, date, start).Scan(&used)
 	var quota int
-	_ = a.db.QueryRow(`SELECT COALESCE(MAX(quota),4) FROM website_slots WHERE office_id=? AND is_active=1 AND weekday=DAYOFWEEK(?)-1`, office, date).Scan(&quota)
+	_ = tx.QueryRow(`SELECT COALESCE(MAX(quota),4) FROM website_slots WHERE office_id=? AND is_active=1 AND weekday=DAYOFWEEK(?)-1 FOR UPDATE`, office, date).Scan(&quota)
 	if quota < 1 {
 		quota = 4
 	}
@@ -235,8 +253,12 @@ func (a *App) pubBookingSave(w http.ResponseWriter, r *http.Request) {
 		fail("slot+penuh,+pilih+jam+lain")
 		return
 	}
-	if _, err := a.db.Exec(`INSERT INTO website_bookings(office_id, book_date, start_time, name, contact, purpose) VALUES(?,?,?,?,?,?)`,
+	if _, err := tx.Exec(`INSERT INTO website_bookings(office_id, book_date, start_time, name, contact, purpose) VALUES(?,?,?,?,?,?)`,
 		office, date, start, name, contact, purpose); err != nil {
+		fail("gagal+menyimpan")
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		fail("gagal+menyimpan")
 		return
 	}

@@ -727,6 +727,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/office/mandates", a.mandateSave)
 		p.Post("/office/mandates/{id}/delete", a.mandateDelete)
 		p.Post("/office/backup", a.backupNow)
+		p.Post("/office/backup/purge-plaintext", a.backupPurgePlaintext)
 		p.Get("/portal/invoices/{id}/receipt", a.portalReceipt)
 		p.Post("/cms/inquiries/{id}/convert", a.inquiryToRequest)
 		p.Get("/tasks", a.tasksPage)
@@ -2375,8 +2376,10 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	office := a.officeOf(r)
 	var cur string
-	_ = a.db.QueryRow(`SELECT status FROM ppat_register WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&cur)
+	var deedID sql.NullInt64
+	_ = a.db.QueryRow(`SELECT status, deed_id FROM ppat_register WHERE id=? AND office_id=?`, id, office).Scan(&cur, &deedID)
 	next := map[string]string{
 		"DRAFT_AKTA": "AKTA_JADI", "AKTA_JADI": "LAPOR_BPN", "LAPOR_BPN": "SERTIFIKAT_TERBIT",
 	}[cur]
@@ -2384,12 +2387,38 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "status sudah final", http.StatusBadRequest)
 		return
 	}
-	bpn := r.FormValue("bpn_receipt")
-	if next == "LAPOR_BPN" && strings.TrimSpace(bpn) == "" {
-		bpn = "-"
+	// Gate checklist mode ketat (tiru requestMove/deedApprove): PPAT yang
+	// tertaut ke permohonan via deed_drafts.request_id wajib VERIFIED/
+	// RECEIVED semua sebelum boleh maju ke AKTA_JADI/LAPOR_BPN. Tanpa
+	// tautan permohonan, gate dilewati (resi asli tetap wajib di bawah).
+	if (next == "AKTA_JADI" || next == "LAPOR_BPN") && deedID.Valid && deedID.Int64 > 0 &&
+		a.strictChecklistEnabled(office) && a.dms != nil {
+		var reqID sql.NullInt64
+		_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=? AND office_id=?`, deedID.Int64, office).Scan(&reqID)
+		if reqID.Valid {
+			if items, err := a.dms.ChecklistForRequest(office, reqID.Int64); err == nil {
+				bad := 0
+				for _, it := range items {
+					if it.Status != "VERIFIED" && it.Status != "RECEIVED" {
+						bad++
+					}
+				}
+				if bad > 0 {
+					http.Error(w, fmt.Sprintf("mode ketat checklist aktif: masih ada %d syarat permohonan #%d belum terverifikasi (wajib VERIFIED/RECEIVED) — selesaikan checklist dulu", bad, reqID.Int64), http.StatusConflict)
+					return
+				}
+			}
+		}
+	}
+	// Larang resi fiktif: naik ke LAPOR_BPN wajib nomor resi BPN asli.
+	// Kosong maupun tanda "-" (perilaku lama) ditolak 400.
+	bpn := strings.TrimSpace(r.FormValue("bpn_receipt"))
+	if next == "LAPOR_BPN" && (bpn == "" || bpn == "-") {
+		http.Error(w, `nomor resi BPN asli wajib diisi sebelum lapor BPN — tanda "-" tidak diterima sebagai resi`, http.StatusBadRequest)
+		return
 	}
 	_, err := a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END WHERE id=? AND office_id=?`,
-		next, bpn, bpn, id, a.officeOf(r))
+		next, bpn, bpn, id, office)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2603,7 +2632,7 @@ func (a *App) paymentCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nominal tidak valid", http.StatusBadRequest)
 		return
 	}
-	if err := a.fin.RecordPayment(invID, amount, r.FormValue("method"), r.FormValue("reference"), a.uid(r)); err != nil {
+	if err := a.fin.RecordPayment(a.officeOf(r), invID, amount, r.FormValue("method"), r.FormValue("reference"), a.uid(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

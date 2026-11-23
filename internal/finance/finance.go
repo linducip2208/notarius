@@ -130,8 +130,8 @@ func isDupErr(err error) bool {
 	return strings.Contains(msg, "1062") || strings.Contains(msg, "Duplicate entry")
 }
 
-// RecordPayment applies a payment and updates invoice status.
-func (s *Store) RecordPayment(invoiceID, amount int64, method, ref string, receivedBy *int64) error {
+// RecordPayment applies a payment and updates invoice status (office-scoped).
+func (s *Store) RecordPayment(officeID, invoiceID, amount int64, method, ref string, receivedBy *int64) error {
 	if amount <= 0 {
 		return errors.New("nominal pembayaran harus positif")
 	}
@@ -142,8 +142,11 @@ func (s *Store) RecordPayment(invoiceID, amount int64, method, ref string, recei
 	defer tx.Rollback()
 	var stotal, spaid string
 	var status string
-	if err := tx.QueryRow(`SELECT total, paid, status FROM invoices WHERE id=? FOR UPDATE`, invoiceID).
+	if err := tx.QueryRow(`SELECT total, paid, status FROM invoices WHERE id=? AND office_id=? FOR UPDATE`, invoiceID, officeID).
 		Scan(&stotal, &spaid, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("invoice tidak ditemukan")
+		}
 		return err
 	}
 	total, paid := deci(stotal), deci(spaid)
@@ -162,8 +165,12 @@ func (s *Store) RecordPayment(invoiceID, amount int64, method, ref string, recei
 	if newPaid == total {
 		newStatus = "PAID"
 	}
-	if _, err := tx.Exec(`UPDATE invoices SET paid=?, status=? WHERE id=?`, newPaid, newStatus, invoiceID); err != nil {
+	res, err := tx.Exec(`UPDATE invoices SET paid=?, status=? WHERE id=? AND office_id=?`, newPaid, newStatus, invoiceID, officeID)
+	if err != nil {
 		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return errors.New("invoice tidak ditemukan")
 	}
 	return tx.Commit()
 }
