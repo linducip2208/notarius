@@ -23,6 +23,9 @@ type Invoice struct {
 	Status      string
 	DueDate     string
 	Outstanding int64
+	// QuotationID terisi bila invoice lahir dari penawaran (migrasi 030,
+	// NULLABLE — invoice manual existing tidak tersentuh).
+	QuotationID *int64
 }
 
 // Line is one invoice line.
@@ -207,7 +210,7 @@ func (s *Store) Revenue(officeID int64, month string) (int64, error) {
 
 // List lists invoices newest first.
 func (s *Store) List(officeID int64) ([]Invoice, error) {
-	rows, err := s.db.Query(`SELECT id, office_id, client_id, number, subtotal, tax, total, paid, status, due_date
+	rows, err := s.db.Query(`SELECT id, office_id, client_id, number, subtotal, tax, total, paid, status, due_date, quotation_id
 		FROM invoices WHERE office_id=? ORDER BY id DESC LIMIT 200`, officeID)
 	if err != nil {
 		return nil, err
@@ -217,14 +220,18 @@ func (s *Store) List(officeID int64) ([]Invoice, error) {
 	for rows.Next() {
 		var iv Invoice
 		var due sql.NullString
+		var qid sql.NullInt64
 		var ssub, stax, stotal, spaid string
 		if err := rows.Scan(&iv.ID, &iv.OfficeID, &iv.ClientID, &iv.Number, &ssub,
-			&stax, &stotal, &spaid, &iv.Status, &due); err != nil {
+			&stax, &stotal, &spaid, &iv.Status, &due, &qid); err != nil {
 			return nil, err
 		}
 		iv.Subtotal, iv.Tax, iv.Total, iv.Paid = deci(ssub), deci(stax), deci(stotal), deci(spaid)
 		if due.Valid {
 			iv.DueDate = due.String
+		}
+		if qid.Valid {
+			iv.QuotationID = &qid.Int64
 		}
 		iv.Outstanding = money.Sub(iv.Total, iv.Paid)
 		out = append(out, iv)

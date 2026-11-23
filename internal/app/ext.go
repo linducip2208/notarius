@@ -25,6 +25,7 @@ import (
 	"notaryos/internal/docengine"
 	"notaryos/internal/doctpl"
 	"notaryos/internal/docx"
+	"notaryos/internal/finance"
 	"notaryos/internal/gov"
 	"notaryos/internal/mfa"
 	mw "notaryos/internal/middleware"
@@ -538,6 +539,14 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	partyClients, _ := a.clients.List(a.officeOf(r), "", 200)
 	wfSteps, wfCur, wfStatus, wfHas := a.workflowView(a.officeOf(r), id)
+	// Penawaran resmi terikat permohonan (migrasi 030): daftar + prefill tarif.
+	var quots []finance.Quotation
+	var quotSvc string
+	var quotPrice int64
+	if a.db != nil {
+		quots, _ = a.fin.QuotationsForRequest(a.officeOf(r), id)
+		quotSvc, quotPrice = a.quotationPrefill(r, id)
+	}
 	a.render(w, r, "request_detail", "Detail Permohonan", map[string]any{
 		"Req": d, "Company": co, "Legal": legal, "Shareholders": shs, "Officers": offs, "BOs": bos, "Gov": subs, "CorpWarn": corpWarn,
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
@@ -546,6 +555,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		"Ppat": ppatRefs,
 		"Parties": parties, "PartyClients": partyClients, "PartyRoles": partyRoles,
 		"WF": wfSteps, "WFHas": wfHas, "WFCur": wfCur, "WFStatus": wfStatus,
+		"Quotations": quots, "QuotSvc": quotSvc, "QuotPrice": quotPrice, "QuotDue": quotDefaultDue(),
 	})
 }
 
@@ -1241,6 +1251,9 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	if reqID.Valid {
 		aid, aname := a.workflowActorName(r)
 		a.autoWorkflowStep(office, reqID.Int64, aid, aname, "akta #"+strconv.FormatInt(id, 10)+" disahkan", "sah")
+		// Status mengikuti kejadian: APPROVED → IN_PROGRESS bila CanMove
+		// mengizinkan, else diam (tetap manual). Fail-open: tak blokir alur.
+		advanceOnEvent(a.db, office, reqID.Int64, "deed_approved", uid, a.audit)
 	}
 	var entryNo int64
 	_ = a.db.QueryRow(`SELECT entry_no FROM repertorium WHERE office_id=? AND deed_id=?`, office, id).Scan(&entryNo)
@@ -1304,6 +1317,85 @@ func (a *App) deedSign(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit.Record(audit.Entry{ActorID: uid, Action: "deed.sign", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: "hash:" + hash[:16] + " segel:" + seal, OfficeID: officePtr(office)})
 	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Tanda+tangan+internal+tercatat", http.StatusSeeOther)
+}
+
+// deedHandover records serah dokumen akta ke klien (tanda terima serah dokumen).
+// Guard: PermApproveDeed, BUKAN PermEditDeed — serah minuta/salinan/grosse
+// melepas dokumen otentik dari penyimpanan notaris sehingga sensitivitasnya
+// setara pengesahan & TTE internal (deedApprove/deedSign memakai izin yang
+// sama) dan meniru willHandover yang notaris-only. Staf/operator dokumen
+// (pemegang PermEditDeed) boleh menyiapkan draf, tetapi tidak boleh
+// menyerahkan minuta. PermApproveDeed dipegang Notary + Substitute +
+// SuperAdmin (rbac.rolePerms), persis set peran willHandover.
+func (a *App) deedHandover(w http.ResponseWriter, r *http.Request) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) {
+		a.forbidden(w, r)
+		return
+	}
+	_ = r.ParseForm()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	office := a.officeOf(r)
+	var oid int64
+	if err := a.db.QueryRow(`SELECT office_id FROM deed_drafts WHERE id=?`, id).Scan(&oid); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if oid != office {
+		http.NotFound(w, r)
+		return
+	}
+	to := strings.TrimSpace(r.FormValue("handed_to"))
+	if to == "" {
+		http.Error(w, "nama penerima serah-terima wajib diisi", http.StatusBadRequest)
+		return
+	}
+	var creator any
+	if uid := a.uid(r); uid != nil {
+		creator = *uid
+	}
+	if _, err := a.db.Exec(`INSERT INTO deed_handovers(office_id, deed_id, handed_to, handed_at, note, created_by)
+		VALUES(?,?,?,UTC_TIMESTAMP(),?,?)`, office, id, to, nullStrOpt(r.FormValue("note")), creator); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "deed.handover", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: to, OfficeID: officePtr(office)})
+	// Status mengikuti kejadian + tutup loop workflow engine (keduanya
+	// best-effort, fail-open, meniru deedApprove): step "Serah" DONE bila
+	// akta tertaut permohonan, dan permohonan IN_PROGRESS → COMPLETED bila
+	// CanMove mengizinkan (else diam, tetap manual).
+	if reqID := deedRequestID(a.db, id); reqID != 0 {
+		aid, aname := a.workflowActorName(r)
+		a.autoWorkflowStep(office, reqID, aid, aname, "akta #"+strconv.FormatInt(id, 10)+" diserahkan ke "+to, "serah")
+		advanceOnEvent(a.db, office, reqID, "handover_done", a.uid(r), a.audit)
+	}
+	http.Redirect(w, r, "/deeds/"+strconv.FormatInt(id, 10)+"?flash=Serah-terima+akta+dicatat", http.StatusSeeOther)
+}
+
+// deedHandoverView adalah satu baris riwayat serah dokumen untuk deed_detail.
+type deedHandoverView struct {
+	To, At, Note, By string
+}
+
+// deedHandovers memuat riwayat serah dokumen satu akta (office-scoped).
+func (a *App) deedHandovers(officeID, deedID int64) []deedHandoverView {
+	var out []deedHandoverView
+	if a.db == nil {
+		return out
+	}
+	rs, err := a.db.Query(`SELECT h.handed_to, COALESCE(h.handed_at,''), COALESCE(h.note,''), COALESCE(u.name,'')
+		FROM deed_handovers h LEFT JOIN users u ON u.id=h.created_by
+		WHERE h.office_id=? AND h.deed_id=? ORDER BY h.id`, officeID, deedID)
+	if err != nil {
+		return out
+	}
+	defer rs.Close()
+	for rs.Next() {
+		var h deedHandoverView
+		if err := rs.Scan(&h.To, &h.At, &h.Note, &h.By); err == nil {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 func sha256Of(s string) string {
@@ -1679,6 +1771,8 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
 		"Timeline": a.deedTimeline(a.officeOf(r), id),
+		"Handovers":  a.deedHandovers(a.officeOf(r), id),
+		"CanHandover": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
 		"Attached": a.deedFiles(a.officeOf(r), id),
 		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
 		"Parties":  a.matterParties(a.officeOf(r), deedRequestID(a.db, id)),

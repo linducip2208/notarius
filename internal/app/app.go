@@ -576,6 +576,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/deeds/{id}/approve", a.deedApprove)
 		p.Post("/deeds/{id}/review", a.deedToReview)
 		p.Post("/deeds/{id}/sign", a.deedSign)
+		p.Post("/deeds/{id}/handover", a.deedHandover)
 		p.Get("/deeds/{id}/pdf", a.deedPDF)
 		p.Get("/deeds/{id}/docx", a.deedDOCX)
 		p.Post("/deeds/{id}/attach", a.deedAttach)
@@ -605,6 +606,10 @@ func (a *App) Router() http.Handler {
 		p.Get("/finance", a.financePage)
 		p.Post("/invoices", a.invoiceCreate)
 		p.Post("/invoices/{id}/void", a.invoiceVoid)
+		p.Get("/quotations", a.quotationList)
+		p.Post("/quotations", a.quotationCreate)
+		p.Post("/quotations/{id}/status", a.quotationStatus)
+		p.Post("/quotations/{id}/convert", a.quotationConvert)
 		p.Post("/payments", a.paymentCreate)
 		p.Get("/finance/bank", a.bankPage)
 		p.Post("/finance/bank/upload", a.bankUpload)
@@ -2558,12 +2563,28 @@ func (a *App) financePage(w http.ResponseWriter, r *http.Request) {
 		Pct         int
 		Overdue     bool
 		OverdueDays int
+		QuotNumber  string
+	}
+	// Nomor penawaran asal (bila invoice lahir dari penawaran, migrasi 030).
+	quotNum := map[int64]string{}
+	if a.db != nil {
+		if rs, err := a.db.Query(`SELECT i.id, q.number FROM invoices i JOIN quotations q ON q.id=i.quotation_id WHERE i.office_id=?`, a.officeOf(r)); err == nil && rs != nil {
+			defer rs.Close()
+			for rs.Next() {
+				var iid int64
+				var qn string
+				if err := rs.Scan(&iid, &qn); err == nil {
+					quotNum[iid] = qn
+				}
+			}
+		}
 	}
 	views := make([]invView, 0, len(invs))
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	for _, iv := range invs {
 		v := invView{Invoice: iv}
+		v.QuotNumber = quotNum[iv.ID]
 		if iv.Total > 0 && iv.Paid >= 0 {
 			p := iv.Paid * 100 / iv.Total
 			if p < 0 {
