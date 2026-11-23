@@ -1412,6 +1412,7 @@ func (a *App) deedHandover(w http.ResponseWriter, r *http.Request) {
 
 // deedHandoverView adalah satu baris riwayat serah dokumen untuk deed_detail.
 type deedHandoverView struct {
+	ID         int64
 	To, At, Note, By string
 }
 
@@ -1421,7 +1422,7 @@ func (a *App) deedHandovers(officeID, deedID int64) []deedHandoverView {
 	if a.db == nil {
 		return out
 	}
-	rs, err := a.db.Query(`SELECT h.handed_to, COALESCE(h.handed_at,''), COALESCE(h.note,''), COALESCE(u.name,'')
+	rs, err := a.db.Query(`SELECT h.id, h.handed_to, COALESCE(h.handed_at,''), COALESCE(h.note,''), COALESCE(u.name,'')
 		FROM deed_handovers h LEFT JOIN users u ON u.id=h.created_by
 		WHERE h.office_id=? AND h.deed_id=? ORDER BY h.id`, officeID, deedID)
 	if err != nil {
@@ -1430,7 +1431,7 @@ func (a *App) deedHandovers(officeID, deedID int64) []deedHandoverView {
 	defer rs.Close()
 	for rs.Next() {
 		var h deedHandoverView
-		if err := rs.Scan(&h.To, &h.At, &h.Note, &h.By); err == nil {
+		if err := rs.Scan(&h.ID, &h.To, &h.At, &h.Note, &h.By); err == nil {
 			out = append(out, h)
 		}
 	}
@@ -1440,6 +1441,56 @@ func (a *App) deedHandovers(officeID, deedID int64) []deedHandoverView {
 func sha256Of(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
+}
+
+// deedHandoverReceipt renders the printable handover slip (tanda terima
+// serah cetak) for one deed_handovers row. Route:
+// GET /deeds/{id}/handover/{hid} — nested under the deed like the sibling
+// /deeds/{id}/pdf, /deeds/{id}/docx and the invoice /invoices/{id}/receipt.
+//
+// QR decision (honest): NO QR. The QR infra is invoice-specific —
+// /qr/inv/{id} hardcodes kind INV (verify.go:116-136) and /verify only
+// resolves kinds INV + DEED (verify.go:148-183). Minting an HDH/HND code
+// would promise a verification path that does not exist (/verify would
+// answer "jenis dokumen tidak dikenal"). Instead the slip carries a
+// text verification code: first 16 hex chars (upper) of SHA-256 over
+// office|deed|handover|number|recipient|timestamp|note — an internal
+// integrity reference to be matched manually against the handover history
+// on the deed detail page, NOT a /verify code. The slip says so explicitly.
+func (a *App) deedHandoverReceipt(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	hid, _ := strconv.ParseInt(chi.URLParam(r, "hid"), 10, 64)
+	if id <= 0 || hid <= 0 {
+		http.NotFound(w, r)
+		return
+	}
+	if !a.canViewDeed(r, id) {
+		a.forbidden(w, r)
+		return
+	}
+	office := a.officeOf(r)
+	var number, title string
+	if err := a.db.QueryRow(`SELECT COALESCE(number,''), COALESCE(title,'') FROM deed_drafts WHERE id=? AND office_id=?`, id, office).Scan(&number, &title); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	var to, at, note, by string
+	if err := a.db.QueryRow(`SELECT h.handed_to, COALESCE(h.handed_at,''), COALESCE(h.note,''), COALESCE(u.name,'')
+		FROM deed_handovers h LEFT JOIN users u ON u.id=h.created_by
+		WHERE h.id=? AND h.deed_id=? AND h.office_id=?`, hid, id, office).Scan(&to, &at, &note, &by); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	var oname, notary, addr, phone, email string
+	_ = a.db.QueryRow(`SELECT COALESCE(name,''), COALESCE(notary_name,''), COALESCE(address,''), COALESCE(phone,''), COALESCE(email,'') FROM offices WHERE id=?`, office).
+		Scan(&oname, &notary, &addr, &phone, &email)
+	code := strings.ToUpper(sha256Of(fmt.Sprintf("%d|%d|%d|%s|%s|%s|%s", office, id, hid, number, to, at, note))[:16])
+	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "deed.handover.receipt", Entity: "deed", EntityID: strconv.FormatInt(id, 10), Detail: fmt.Sprintf("handover #%d ke %s", hid, to), OfficeID: officePtr(office)})
+	a.render(w, r, "handover_receipt", "Tanda Terima Serah #"+strconv.FormatInt(hid, 10), map[string]any{
+		"DeedID": id, "HandoverID": hid, "Number": number, "Title": title,
+		"To": to, "At": at, "Note": note, "By": by, "Code": code,
+		"Office": oname, "Notary": notary, "Address": addr, "Phone": phone, "Email": email,
+	})
 }
 
 func deedSeal(deedID int64) string {

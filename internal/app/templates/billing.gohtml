@@ -21,6 +21,28 @@
 </div></div>
 {{template "page_close" .}}{{end}}
 
+{{define "handover_receipt"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/deeds/{{.Data.DeedID}}">Akta #{{.Data.DeedID}}</a></li><li class="breadcrumb-item active">Tanda Terima Serah</li></ol></nav>
+<div class="card" style="max-width:680px"><div class="card-body p-4">
+<div class="text-center mb-3">
+<div><strong>{{.Data.Office}}</strong>{{if .Data.Notary}} · Notaris {{.Data.Notary}}{{end}}</div>
+{{if .Data.Address}}<div class="text-secondary small">{{.Data.Address}}</div>{{end}}
+{{if or .Data.Phone .Data.Email}}<div class="text-secondary small">{{.Data.Phone}}{{if and .Data.Phone .Data.Email}} · {{end}}{{.Data.Email}}</div>{{end}}
+</div>
+<h2 class="text-center mb-1">TANDA TERIMA SERAH DOKUMEN</h2>
+<p class="text-center text-secondary small">Akta {{if .Data.Number}}{{.Data.Number}} — {{end}}{{.Data.Title}}</p>
+<dl class="row mt-3"><dt class="col-4">Diserahkan kepada</dt><dd class="col-8"><strong>{{.Data.To}}</strong></dd>
+<dt class="col-4">Tanggal serah</dt><dd class="col-8">{{.Data.At}}</dd>
+<dt class="col-4">Dicatat oleh</dt><dd class="col-8">{{if .Data.By}}{{.Data.By}}{{else}}<span class="text-secondary">—</span>{{end}}</dd>
+{{if .Data.Note}}<dt class="col-4">Catatan</dt><dd class="col-8">{{.Data.Note}}</dd>{{end}}
+<dt class="col-4">Kode verifikasi</dt><dd class="col-8"><code>{{.Data.Code}}</code></dd></dl>
+<p class="text-secondary small">Kode di atas adalah referensi integritas internal (16 karakter pertama SHA-256 atas kantor|akta|serah|nomor|penerima|waktu|catatan). <strong>Tanpa QR</strong> — infrastruktur QR hanya untuk kuitansi invoice (<code>/qr/inv</code>) dan halaman <code>/verify</code> hanya mengenal kode INV/DEED, sehingga kode serah ini <strong>belum dapat dicek via <code>/verify</code></strong>. Keaslian dicocokkan manual dengan riwayat serah di halaman detail akta.</p>
+<div class="row mt-4"><div class="col-6 text-center"><br/><br/><br/>_________________________<br/><span class="text-secondary small">Yang menyerahkan (kantor)</span></div>
+<div class="col-6 text-center"><br/><br/><br/>_________________________<br/><span class="text-secondary small">Penerima ({{.Data.To}})</span></div></div>
+<div class="d-flex gap-2 mt-4 no-print"><button class="btn btn-primary" type="button" onclick="window.print()">Cetak</button><a class="btn btn-outline-primary" href="/deeds/{{.Data.DeedID}}">Kembali ke akta</a></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
 {{define "verify"}}{{template "head" .}}
 <body class="d-flex flex-column"><div class="page page-center"><div class="container container-tight py-4">
 <div class="text-center mb-4"><h1>{{.Brand.AppName}}</h1><p class="text-secondary">Verifikasi keaslian kuitansi — tanpa login</p></div>

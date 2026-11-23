@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.5 (2026-11-24) — TUTUP LIFECYCLE AKTA + UJI INTEGRASI LIVE 23/23
+Ringkasan: sejak v0.5.4 ada 1 commit (a325833, 2026-11-24): (1) arsip minuta final POST /deeds/{id}/archive SIGNED→ARCHIVED (guard notaris, anti-race, audit deed.archive, kartu Arsip Minuta Final hanya untuk SIGNED, tanpa hapus data/ubah minuta) — menutup lifecycle IN_REVIEW→APPROVED→IN_PROGRESS→SIGNED→ARCHIVED di atas advance auto-step/rantai status, serah terima, penawaran→invoice, export/import, jadwal baca, dan widget serah dari v0.5.3–v0.5.4; (2) migrasi 026+029+030+031 terverifikasi di test DB + suite integrasi 23 PASS 0 FAIL live; (3) docs v0.5.4.
+Go-Live: seperti v0.5.4 + arsipkan 1 akta SIGNED → ARCHIVED, verifikasi tolak arsip non-SIGNED (400) + arsip ganda (409), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.4 (2026-11-24) — RANTAI STATUS + SERAH TERIMA + PENAWARAN→INVOICE
 Ringkasan: sejak v0.5.3 ada 3 commit (cabdf99, 670850d, d4bbf98; 2026-11-24): (1) kunci unik template 029 (12 PT-DIRIAN ganda → 1, refresh 8 item + isi ulang 13 permohonan); (2) status otomatis + serah terima 031 (akta sah → IN_PROGRESS, serah → COMPLETED) + penawaran resmi 030 (→ invoice ISSUED PPN 11%, kartu di permohonan); (3) rantai IN_REVIEW→APPROVED→IN_PROGRESS saat akta disahkan + jadwal pembacaan terikat akta (lunak) + widget serah dashboard + rekap bulan di laporan + verifikasi alur docs/ops/ALUR_UJI_REALITA.md (352 baris).
 Go-Live: seperti v0.5.3 + pastikan migrasi 029–031 jalan otomatis (cek schema_migrations), verifikasi rantai status + serah 1 akta + penawaran → invoice, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

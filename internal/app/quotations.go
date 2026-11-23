@@ -7,6 +7,7 @@ package app
 // jalur invoiceCreate (ISSUED, paid=0) sehingga anti-overpay tak berubah.
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,15 @@ func (a *App) quotationList(w http.ResponseWriter, r *http.Request) {
 	if !rbac.Has(mw.RoleOf(r), rbac.PermViewFinance) {
 		a.forbidden(w, r)
 		return
+	}
+	// Lazy-expiry di titik list (BUKAN di convert): convertOnce sudah punya
+	// guard per-baris yang menandai EXPIRED + menolak konversi, jadi bulk
+	// UPDATE di convert juga akan dobel catat. List = satu-satunya penulis
+	// bulk; audit agregat satu baris bila ada yang kedaluwarsa.
+	if n, err := a.fin.ExpireOverdueQuotations(a.officeOf(r)); err == nil && n > 0 {
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "quotation.expire", Entity: "quotation",
+			EntityID: "overdue", Detail: fmt.Sprintf("%d penawaran SENT kedaluwarsa otomatis", n),
+			OfficeID: officePtr(a.officeOf(r))})
 	}
 	list, _ := a.fin.ListQuotations(a.officeOf(r))
 	a.render(w, r, "quotations", "Penawaran", map[string]any{"Quotations": list})

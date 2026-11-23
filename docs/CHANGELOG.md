@@ -1,4 +1,9 @@
 # CHANGELOG
+## [0.5.5] — 2026-11-24 — Tutup lifecycle akta SIGNED→ARCHIVED + uji integrasi live 23/23
+- Cakupan: 1 commit sejak v0.5.4 (a325833 "v0.5.5: tutup lifecycle akta + uji integrasi live 23/23", 5 files, +59/-3); tanggal dari git log (2026-11-24).
+- Arsip minuta final (tutup lifecycle): POST /deeds/{id}/archive SIGNED→ARCHIVED (route app.go + handler deedArchive di ext.go + CanArchive + kartu "Arsip Minuta Final" di app2.gohtml hanya untuk SIGNED); guard PermApproveDeed, hanya dari SIGNED (ARCHIVED yang sudah arsip → 409, selain itu → 400), UPDATE … WHERE status='SIGNED' anti-race (RowsAffected 0 → 409), audit deed.archive; tanpa hapus data, tanpa ubah minuta (hanya kolom status); menutup rantai lifecycle IN_REVIEW→APPROVED→IN_PROGRESS→SIGNED→ARCHIVED di atas advance auto-step/rantai status, serah terima, penawaran, jadwal baca, dan widget serah dari v0.5.3–v0.5.4.
+- Verifikasi live + docs: migrasi 026+029+030+031 terverifikasi di test DB; suite integrasi 23 PASS 0 FAIL live; Docs v0.5.4 (entri CHANGELOG + RELEASE_NOTES).
+- Go-Live: seperti v0.5.4 + arsipkan 1 akta SIGNED → ARCHIVED via kartu Arsip Minuta Final, verifikasi tolak arsip non-SIGNED (400) + arsip ganda (409), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.4] — 2026-11-24 — Rantai status IN_REVIEW→APPROVED→IN_PROGRESS + serah terima + penawaran→invoice
 - Cakupan: 3 commit sejak v0.5.3 (7a0923f "v0.5.3: auto-step instances, export/import template, docs rilis"; cabdf99, 670850d, d4bbf98; 21 files, +1730/-7); tanggal dari git log (2026-11-24).
 - Kebersihan template + kunci unik (cabdf99): bersihkan 12 template PT-DIRIAN ganda → 1 (semua records MISSING, aman), refresh ke 8 item standar + isi ulang records 13 permohonan; migrasi 029 UNIQUE KEY (office_id, service_code) cegah kambuh; test dms_checklist_port + workflow_match baru.

@@ -43,6 +43,22 @@ var quotTransitions = map[string][]string{
 	"SENT":  {"ACCEPTED", "REJECTED", "EXPIRED"},
 }
 
+// IsExpired menilai apakah penawaran lewat tanggal berlaku.
+// Format: YYYY-MM-DD untuk validUntil & today; kosong/tak valid = false.
+// Batas hari-H belum kedaluwarsa (validUntil < today), selaras dengan
+// klausul SQL `valid_until < CURDATE()` di ExpireOverdueQuotations.
+func IsExpired(validUntil, today string) bool {
+	vu, err := time.Parse("2006-01-02", strings.TrimSpace(validUntil))
+	if err != nil {
+		return false
+	}
+	t, err := time.Parse("2006-01-02", strings.TrimSpace(today))
+	if err != nil {
+		return false
+	}
+	return vu.Before(t)
+}
+
 // nextQuotationNumber mengalokasi nomor Q-{office}-{YYYY}-{NNN} via MAX+1.
 // JUJUR: tanpa klaim anti-race sempurna — tidak ada lock gap untuk suffix
 // berikutnya (kunci baris kantor seperti repertorium tidak dipakai agar
@@ -193,6 +209,21 @@ func (s *Store) GetQuotation(officeID, id int64) (Quotation, error) {
 	}
 	q.Total = quotationTotal(q.Lines)
 	return q, nil
+}
+
+// ExpireOverdueQuotations menandai SENT yang lewat valid_until menjadi
+// EXPIRED (office-scoped, satu UPDATE bulk). Hanya SENT yang disentuh —
+// DRAFT dibiarkan agar keputusan manual tak tertimpa otomatisasi, dan
+// transisi SENT->EXPIRED valid menurut quotTransactions. Audit dicatat
+// agregat (satu baris) oleh pemanggil bila n > 0, bukan per baris.
+func (s *Store) ExpireOverdueQuotations(officeID int64) (int64, error) {
+	res, err := s.db.Exec(`UPDATE quotations SET status='EXPIRED'
+		WHERE office_id=? AND status='SENT' AND valid_until IS NOT NULL AND valid_until < CURDATE()`, officeID)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // ListQuotations mendaftar penawaran terbaru (maks 200) beserta totalnya.
