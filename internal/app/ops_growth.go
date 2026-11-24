@@ -203,7 +203,7 @@ func (a *App) bankMatch(w http.ResponseWriter, r *http.Request) {
 				AND NOT EXISTS (SELECT 1 FROM bank_mutations m WHERE m.matched_invoice_id=i.id)
 				ORDER BY i.id LIMIT 1`, a.officeOf(r), amt, date, date).Scan(&invID)
 			if err == nil {
-				if _, err := a.db.Exec(`UPDATE bank_mutations SET matched_invoice_id=? WHERE id=?`, invID, id); err == nil {
+				if _, err := a.db.Exec(`UPDATE bank_mutations SET matched_invoice_id=? WHERE id=? AND office_id=?`, invID, id, a.officeOf(r)); err == nil {
 					matched++
 				}
 			}

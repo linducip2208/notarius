@@ -401,10 +401,10 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var stored string
-		_ = a.db.QueryRow(`SELECT sha256 FROM files WHERE id=?`, id).Scan(&stored)
+		_ = a.db.QueryRow(`SELECT sha256 FROM files WHERE id=? AND office_id=?`, id, a.officeOf(r)).Scan(&stored)
 		got := fmt.Sprintf("%x", h.Sum(nil))
 		if stored != "" && stored != got {
-			_, _ = a.db.Exec(`UPDATE files SET verification_status='REJECTED' WHERE id=?`, id)
+			_, _ = a.db.Exec(`UPDATE files SET verification_status='REJECTED' WHERE id=? AND office_id=?`, id, a.officeOf(r))
 			a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.hash.mismatch", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "db=" + stored + " got=" + got})
 			http.Error(w, "hash berkas tidak cocok dengan catatan (dikarantina sebagai REJECTED)", http.StatusConflict)
 			return
@@ -1173,7 +1173,7 @@ func (a *App) deedToReview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "hanya draf DRAFT yang dapat dikirim ke review", http.StatusBadRequest)
 		return
 	}
-	if _, err := a.db.Exec(`UPDATE deed_drafts SET status='IN_REVIEW' WHERE id=?`, id); err != nil {
+	if _, err := a.db.Exec(`UPDATE deed_drafts SET status='IN_REVIEW' WHERE id=? AND office_id=?`, id, office); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -1235,14 +1235,14 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "formalitas belum lengkap: dua saksi + tempat pembacaan wajib diisi", http.StatusBadRequest)
 		return
 	}
-	_, _ = a.db.Exec(`UPDATE deed_drafts SET witness1_name=?, witness1_id=?, witness2_name=?, witness2_id=?, read_at=NOW(), read_place=?, renvoi_note=? WHERE id=?`,
-		w1, nullStrOpt(r.FormValue("witness1_id")), w2, nullStrOpt(r.FormValue("witness2_id")), rdPlace, nullStrOpt(r.FormValue("renvoi_note")), id)
+	_, _ = a.db.Exec(`UPDATE deed_drafts SET witness1_name=?, witness1_id=?, witness2_name=?, witness2_id=?, read_at=NOW(), read_place=?, renvoi_note=? WHERE id=? AND office_id=?`,
+		w1, nullStrOpt(r.FormValue("witness1_id")), w2, nullStrOpt(r.FormValue("witness2_id")), rdPlace, nullStrOpt(r.FormValue("renvoi_note")), id, office)
 	// Aturan workflow per layanan (menggantikan cek checklist manual):
 	// checklist, identitas pihak, jumlah pihak, dan kesesuaian jenis akta
 	// dinilai engine dari service_workflow_rules. Syarat saksi + tempat
 	// pembacaan + isi + hash + mandat di sekitar blok ini TETAP berlaku.
 	var reqID sql.NullInt64
-	_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=?`, id).Scan(&reqID)
+	_ = a.db.QueryRow(`SELECT request_id FROM deed_drafts WHERE id=? AND office_id=?`, id, office).Scan(&reqID)
 	if reqID.Valid {
 		if blocks := workflowGate(a.db, office, reqID.Int64, "", "approve"); len(blocks) > 0 {
 			http.Error(w, "aturan workflow permohonan #"+strconv.FormatInt(reqID.Int64, 10)+": "+strings.Join(blocks, "; "), http.StatusConflict)
@@ -1252,10 +1252,10 @@ func (a *App) deedApprove(w http.ResponseWriter, r *http.Request) {
 	// Integritas: bandingkan hash isi (docengine, 16 hex) dengan yang tersimpan.
 	// Self-heal hanya bila kolom kosong (draf lama); mismatch nyata ditolak.
 	var stored string
-	_ = a.db.QueryRow(`SELECT COALESCE(content_hash,'') FROM deed_drafts WHERE id=?`, id).Scan(&stored)
+	_ = a.db.QueryRow(`SELECT COALESCE(content_hash,'') FROM deed_drafts WHERE id=? AND office_id=?`, id, office).Scan(&stored)
 	fresh := docengine.VersionHash(body, nil)
 	if stored == "" {
-		_, _ = a.db.Exec(`UPDATE deed_drafts SET content_hash=? WHERE id=?`, fresh, id)
+		_, _ = a.db.Exec(`UPDATE deed_drafts SET content_hash=? WHERE id=? AND office_id=?`, fresh, id, office)
 	} else if stored != fresh {
 		http.Error(w, "hash isi tidak cocok dengan tersimpan — kemungkinan perubahan di luar versi; hubungi administrator", http.StatusConflict)
 		return

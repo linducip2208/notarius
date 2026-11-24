@@ -1,4 +1,8 @@
 # CHANGELOG
+## [0.5.15] — 2026-11-24 — Ingat tab + UPDATE atomik office-scope
+- UX: `ui.js` mengingat tab aktif per halaman (sessionStorage + restore saat load; berlaku semua halaman bertab incl. client_detail) — P1 backlog tertutup.
+- Hardening LOW: predikat `AND office_id=?` pada tulis sensitif — dmsSaveMeta, dmsVerify, karantina hash fileDownload, deed review (IN_REVIEW), deedApprove (saksi + request_id + content_hash), bankMatch. Perilaku sama bila check lolos (fail-closed atomik).
+- Go-Live: seperti v0.5.14 + verifikasi tab bertahan setelah submit + uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.14] — 2026-11-24 — Badge tugas sidebar (P1 backlog)
 - `render()`: `PendingTasks` = COUNT tugas OPEN per kantor (1 query, fail-open 0); badge kuning di menu Tugas sidebar; halaman /tasks tetap guard `PermViewClient`. Backlog P1 tertutup di `UI_UX_BACKLOG.md`.
 - Go-Live: seperti v0.5.13 + verifikasi badge Tugas muncul (= tugas OPEN) dan hilang saat 0. Detail: docs/DEPLOYMENT_GUIDE.md.

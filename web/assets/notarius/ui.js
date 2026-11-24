@@ -63,8 +63,36 @@
       var panes = pane.parentElement ? pane.parentElement.querySelectorAll('.tab-pane') : [pane];
       panes.forEach(function (x) { x.classList.remove('active', 'show'); });
       pane.classList.add('active', 'show');
+      try { sessionStorage.setItem('sn-tab:' + location.pathname, href); } catch (e) {}
     }
   });
+
+  // Ingat tab aktif per halaman (kembali ke tab yang sama setelah submit/redirect).
+  function restoreTab() {
+    var href = null;
+    try { href = sessionStorage.getItem('sn-tab:' + location.pathname); } catch (e) {}
+    if (!href || href.charAt(0) !== '#') return;
+    var link = document.querySelector('.nav [data-bs-toggle="tab"][href="' + href + '"]');
+    var pane = document.querySelector(href);
+    if (!link || !pane || !pane.classList.contains('tab-pane')) return;
+    var nav = link.closest('.nav');
+    if (nav) {
+      nav.querySelectorAll('.nav-link').forEach(function (a) {
+        a.classList.remove('active');
+        a.removeAttribute('aria-selected');
+      });
+    }
+    link.classList.add('active');
+    link.setAttribute('aria-selected', 'true');
+    var panes = pane.parentElement ? pane.parentElement.querySelectorAll('.tab-pane') : [pane];
+    panes.forEach(function (x) { x.classList.remove('active', 'show'); });
+    pane.classList.add('active', 'show');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreTab, { once: true });
+  } else {
+    restoreTab();
+  }
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAllDrops(null);

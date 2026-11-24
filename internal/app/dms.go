@@ -472,9 +472,9 @@ func (a *App) dmsSaveMeta(w http.ResponseWriter, r *http.Request) {
 	default:
 		conf = "INTERNAL"
 	}
-	_, err := a.db.Exec(`UPDATE files SET display_name=?, doc_number=?, category_id=?, doc_date=?, expiry_date=?, confidentiality=? WHERE id=?`,
+	_, err := a.db.Exec(`UPDATE files SET display_name=?, doc_number=?, category_id=?, doc_date=?, expiry_date=?, confidentiality=? WHERE id=? AND office_id=?`,
 		nullStrOpt(r.FormValue("display_name")), nullStrOpt(r.FormValue("doc_number")), cat,
-		nullStrOpt(r.FormValue("doc_date")), nullStrOpt(r.FormValue("expiry_date")), conf, id)
+		nullStrOpt(r.FormValue("doc_date")), nullStrOpt(r.FormValue("expiry_date")), conf, id, a.officeOf(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -508,7 +508,7 @@ func (a *App) dmsVerify(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := a.db.Exec(`UPDATE files SET verification_status=? WHERE id=?`, to, id); err != nil {
+	if _, err := a.db.Exec(`UPDATE files SET verification_status=? WHERE id=? AND office_id=?`, to, id, a.officeOf(r)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

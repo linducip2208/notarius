@@ -95,5 +95,5 @@ tetapi lockout akun mengkompensasi (LOW).
 | 3 | `dmsBulk verify` lewati `PermVerifyIdentity` | MEDIUM | TERTUTUP v0.5.12 |
 | 4 | Upload tanpa auto malware-scan | MEDIUM | TERTUTUP v0.5.13 (best-effort, fail-open) |
 | 5 | Masking PII belum menyeluruh (UU PDP) | MEDIUM | NEEDS_LEGAL_REVIEW |
-| 6 | `RequirePerm` tak dipakai; UPDATE tanpa `AND office_id=?` | LOW | IMPLEMENTED_BUT_BROKEN |
+| 6 | `RequirePerm` tak dipakai; UPDATE tanpa `AND office_id=?` | LOW | SEBAGIAN TERTUTUP v0.5.15: predikat `AND office_id=?` ditambahkan pada tulis sensitif (dmsSaveMeta/dmsVerify/file-hash-quarantine/deed review+approve witness/hash/bankMatch); pola check-then-act + `RequirePerm` tetap utang LOW |
 | 7 | CSP `unsafe-inline`; login 20/mnt; stub `clients.gohtml` | LOW | IMPLEMENTED_AND_VERIFIED |
