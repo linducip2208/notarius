@@ -35,7 +35,7 @@
 <li class="nav-item"><span class="nav-link disabled text-uppercase small">Workspace</span></li>
 <li class="nav-item"><a class="nav-link" href="/app">🏠 Dashboard</a></li>
 <li class="nav-item"><a class="nav-link" href="/appointments">📅 Janji Temu</a></li>
-<li class="nav-item"><a class="nav-link" href="/tasks">☰ Tugas</a></li>
+<li class="nav-item"><a class="nav-link" href="/tasks">☰ Tugas{{if .PendingTasks}}<span class="badge bg-yellow text-dark ms-auto">{{.PendingTasks}}</span>{{end}}</a></li>
 <li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Dokumen (DMS)</span></li>
 <li class="nav-item"><a class="nav-link" href="/dms">📊 Overview DMS</a></li>
 <li class="nav-item"><a class="nav-link" href="/dms/library">📁 Library</a></li>

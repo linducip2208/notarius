@@ -7,7 +7,7 @@ P0 (fungsional):
 - [ ] Alur komparasi akta + sisip klausul klik-penuh.
 
 P1 (pengalaman):
-- [ ] Badge angka sidebar: kini hanya Permohonan; tambah tugas terbuka bila relevan.
+- [x] Badge angka sidebar: kini hanya Permohonan; tambah tugas terbuka bila relevan. → SELESAI v0.5.14: `PendingTasks` (COUNT OPEN) di `render()` + badge di Tugas (gated: halaman /tasks tetap PermViewClient).
 - [ ] Grafik: tooltip titik sudah ada (title); tambah label nilai bila diminta.
 - [ ] Tab client_detail: ingat tab aktif setelah submit (kini kembali ke tab pertama).
 - [ ] Waarmeking terpisah, Dokumen Masuk/Keluar, Estimasi, Laporan khusus (atau putuskan: cakupan kini cukup).

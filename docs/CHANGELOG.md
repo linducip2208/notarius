@@ -1,4 +1,7 @@
 # CHANGELOG
+## [0.5.14] — 2026-11-24 — Badge tugas sidebar (P1 backlog)
+- `render()`: `PendingTasks` = COUNT tugas OPEN per kantor (1 query, fail-open 0); badge kuning di menu Tugas sidebar; halaman /tasks tetap guard `PermViewClient`. Backlog P1 tertutup di `UI_UX_BACKLOG.md`.
+- Go-Live: seperti v0.5.13 + verifikasi badge Tugas muncul (= tugas OPEN) dan hilang saat 0. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.13] — 2026-11-24 — Kunci guard tugas + auto-scan ClamAV + sinkron audit
 - Guard: `taskCreate`/`taskDone` beralih ke `requireWrite` (auditor tertutup; GET /tasks tetap 200 sesuai matriks izin — yang dikunci hanya POST tulis).
 - Upload: auto-scan ClamAV best-effort di `fileUpload` bila `CLAMAV_ADDR` diset (timeout 5 dtk, cap 64MB, fail-open; TERINFEKSI → audit `file.upload.infected` + flash karantina manual, tanpa hapus otomatis); komentar paket `malware` diluruskan.

@@ -1,4 +1,4 @@
-# SALES_READINESS — SaktiNotaris v0.5.13 (2026-11-24)
+# SALES_READINESS — SaktiNotaris v0.5.14 (2026-11-24)
 
 Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penahan di bawah ditutup.
 
@@ -23,6 +23,7 @@ Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penah
   dmsRestoreVersion; bulk-verify wajib `PermVerifyIdentity` (unit hijau).
 - Upload: auto-scan ClamAV best-effort bila `CLAMAV_ADDR` diset (cap 64MB,
   fail-open; TERINFEKSI → audit + flash karantina, tanpa hapus otomatis).
+- v0.5.14: badge tugas OPEN di sidebar (`PendingTasks`, fail-open).
 
 ## 2. Tier jualan (sudah di-enforce di kode `internal/plan`)
 

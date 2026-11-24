@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.14 (2026-11-24) — BADGE TUGAS SIDEBAR
+Ringkasan: badge jumlah tugas OPEN di menu Tugas sidebar (1 query fail-open; guard halaman tak berubah) + metadata 0.5.14.
+Go-Live: seperti v0.5.13 + cek badge Tugas. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.13 (2026-11-24) — KUNCI GUARD TUGAS + AUTO-SCAN CLAMAV
 Ringkasan: taskCreate/taskDone ke requireWrite (auditor 403, GET tetap 200) + auto-scan ClamAV best-effort saat unggah (fail-open, tanpa hapus otomatis) + SECURITY_AUDIT temuan 1–4 TERTUTUP + metadata 0.5.13.
 Go-Live: seperti v0.5.12 + verifikasi tolak auditor POST tugas + unggah dengan CLAMAV_ADDR, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

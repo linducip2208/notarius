@@ -100,19 +100,20 @@ type App struct {
 
 // Page is template data for every Tabler page.
 type Page struct {
-	Title      string
-	Role       string
-	UserName   string
-	OfficeName string
-	Acting     bool
-	WIBDate    string
-	Pending    int
-	Unread     int
-	TopNotifs  []map[string]any
-	Flash      string
-	CSRF       string
-	Data       any
-	Brand      BrandingView
+	Title        string
+	Role         string
+	UserName     string
+	OfficeName   string
+	Acting       bool
+	WIBDate      string
+	Pending      int
+	PendingTasks int
+	Unread       int
+	TopNotifs    []map[string]any
+	Flash        string
+	CSRF         string
+	Data         any
+	Brand        BrandingView
 }
 
 // BrandingView carries white-label values into every template (safe, validated).
@@ -370,12 +371,13 @@ func (a *App) requirePlan(w http.ResponseWriter, r *http.Request, feature string
 func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title string, data any) {
 	role := mw.RoleOf(r)
 	username, officeName := "", ""
-	pending, unread := 0, 0
+	pending, pendingTasks, unread := 0, 0, 0
 	var topNotifs []map[string]any
 	if id := a.uid(r); id != nil && a.db != nil {
 		_ = a.db.QueryRow(`SELECT u.name, COALESCE(o.name,'') FROM users u LEFT JOIN offices o ON o.id=u.office_id WHERE u.id=?`, *id).Scan(&username, &officeName)
 		office := a.officeOf(r)
 		pending, _, _, _ = a.reqs.Counts(office)
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN'`, office).Scan(&pendingTasks)
 		unread = notify.Unread(a.db, *id)
 		topNotifs, _ = notify.List(a.db, *id)
 		if len(topNotifs) > 5 {
@@ -396,7 +398,7 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 		officeName = actName + " (bertindak)"
 	}
 	brand := a.brandView(a.officeOf(r))
-	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data, Brand: brand}); err != nil {
+	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, PendingTasks: pendingTasks, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data, Brand: brand}); err != nil {
 		a.log.Error("render", "page", name, "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
