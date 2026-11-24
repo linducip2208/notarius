@@ -1,4 +1,8 @@
 # CHANGELOG
+## [0.5.16] — 2026-11-24 — Mode ringkas sidebar + putusan P1
+- Sidebar: tombol "⫷ Ringkas" + tombol ☰ floating; preferensi localStorage. P2 tertutup.
+- Putusan P1 terdokumentasi: label nilai grafik + modul Waarmeking/Masuk-Keluar/Estimasi/Laporan-khusus dinyatakan CUKUP dengan modul kini.
+- Go-Live: seperti v0.5.15 + verifikasi ringkas/buka sidebar bertahan antar-halaman. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.15] — 2026-11-24 — Ingat tab + UPDATE atomik office-scope
 - UX: `ui.js` mengingat tab aktif per halaman (sessionStorage + restore saat load; berlaku semua halaman bertab incl. client_detail) — P1 backlog tertutup.
 - Hardening LOW: predikat `AND office_id=?` pada tulis sensitif — dmsSaveMeta, dmsVerify, karantina hash fileDownload, deed review (IN_REVIEW), deedApprove (saksi + request_id + content_hash), bankMatch. Perilaku sama bila check lolos (fail-closed atomik).

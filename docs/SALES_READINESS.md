@@ -1,4 +1,4 @@
-# SALES_READINESS — SaktiNotaris v0.5.15 (2026-11-24)
+# SALES_READINESS — SaktiNotaris v0.5.16 (2026-11-24)
 
 Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penahan di bawah ditutup.
 
@@ -25,6 +25,7 @@ Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penah
   fail-open; TERINFEKSI → audit + flash karantina, tanpa hapus otomatis).
 - v0.5.14: badge tugas OPEN di sidebar (`PendingTasks`, fail-open).
 - v0.5.15: tab aktif diingat per halaman; 7 predikat `AND office_id=?` atomik pada tulis sensitif.
+- v0.5.16: mode ringkas sidebar persisten; putusan P1 (grafik + cakupan modul) terdokumentasi di `UI_UX_BACKLOG.md`.
 
 ## 2. Tier jualan (sudah di-enforce di kode `internal/plan`)
 

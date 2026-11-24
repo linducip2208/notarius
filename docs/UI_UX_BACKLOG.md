@@ -7,15 +7,17 @@ P0 (fungsional):
 - [ ] Alur komparasi akta + sisip klausul klik-penuh.
 
 P1 (pengalaman):
-- [x] Badge angka sidebar: kini hanya Permohonan; tambah tugas terbuka bila relevan. → SELESAI v0.5.14: `PendingTasks` (COUNT OPEN) di `render()` + badge di Tugas (gated: halaman /tasks tetap PermViewClient).
-- [x] Tab client_detail: ingat tab aktif setelah submit (kini kembali ke tab pertama). → SELESAI v0.5.15: `ui.js` simpan tab aktif per-path di sessionStorage + restore saat load (berlaku semua halaman bertab, tanpa ubah server).
+- [x] Badge angka sidebar: kini hanya Permohonan; tambah tugas terbuka bila relevan. → SELESAI v0.5.14.
+- [x] Tab client_detail: ingat tab aktif setelah submit. → SELESAI v0.5.15 (sessionStorage).
+- [x] Grafik: tooltip titik sudah ada (title); tambah label nilai bila diminta. → DIPUTUSKAN CUKUP v0.5.16: tooltip + sumbu bulan + legenda memadai; label angka di tiap titik membuat grafik sesak di mobile.
+- [x] Waarmeking terpisah, Dokumen Masuk/Keluar, Estimasi, Laporan khusus. → DIPUTUSKAN CUKUP v0.5.16: kebutuhan terpenuhi modul kini (peringatan=notifikasi+SLA+retensi, arsip=arsip fisik+DMS classification, estimasi=kalkulator+quotation, laporan=/reports+/metrics+/audit/export).
 - [ ] Grafik: tooltip titik sudah ada (title); tambah label nilai bila diminta.
 - [ ] Tab client_detail: ingat tab aktif setelah submit (kini kembali ke tab pertama).
 - [ ] Waarmeking terpisah, Dokumen Masuk/Keluar, Estimasi, Laporan khusus (atau putuskan: cakupan kini cukup).
 
 P2 (polish):
 - [ ] Avatar foto profil (kini inisial); upload + crop bila diminta.
-- [ ] Mode ringkas sidebar (collapse) — kini drawer responsif saja.
+- [x] Mode ringkas sidebar (collapse) — kini drawer responsif saja. → SELESAI v0.5.16: tombol "⫷ Ringkas" sembunyikan sidebar + tombol ☰ floating untuk membuka; preferensi tersimpan di localStorage per browser.
 - [ ] Audit pembaca layar + keyboard penuh.
 
 BLOCKED:

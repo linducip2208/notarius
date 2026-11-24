@@ -81,7 +81,8 @@
 {{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">🔑 Role & Permission</a></li>{{end}}
 </ul>
 <div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>
-<form method="post" action="/logout" class="px-3 pb-3">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>
+<form method="post" action="/logout" class="px-3 pb-2">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>
+<div class="px-3 pb-3"><button class="btn btn-ghost-secondary w-100" id="sn-mini-btn" type="button" title="Ringkas sidebar">⫷ Ringkas</button></div>
 </div>
 </div>
 </aside>{{end}}
@@ -92,6 +93,8 @@
 
 {{define "page_open"}}<body>
 <a class="skip-link btn btn-primary" href="#konten">Lewati ke konten utama</a>
+<style>#sn-open{display:none;position:fixed;left:12px;top:12px;z-index:1060;border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;font-size:1rem;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12)}body.sn-mini #sn-open{display:block}body.sn-mini .navbar-vertical{display:none}@media print{#sn-open{display:none!important}}</style>
+<button id="sn-open" type="button" title="Buka menu" aria-label="Buka menu navigasi">☰</button>
 <div class="page">
 {{template "sidebar" .}}
 <div class="page-wrapper">

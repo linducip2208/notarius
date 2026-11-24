@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.16 (2026-11-24) — SIDEBAR RINGKAS + PUTUSAN P1
+Ringkasan: mode ringkas sidebar persisten + 2 putusan P1 terdokumentasi + metadata 0.5.16.
+Go-Live: seperti v0.5.15 + cek preferensi sidebar. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.15 (2026-11-24) — INGAT TAB + UPDATE ATOMIK
 Ringkasan: tab aktif diingat per halaman (P1) + 7 predikat office atomik pada tulis sensitif + metadata 0.5.15.
 Go-Live: seperti v0.5.14 + cek tab bertahan + uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.

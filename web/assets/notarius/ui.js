@@ -97,4 +97,26 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAllDrops(null);
   });
+
+  // Mode ringkas sidebar (persist per browser).
+  function applyMini() {
+    var mini = false;
+    try { mini = localStorage.getItem('sn-mini') === '1'; } catch (e) {}
+    document.body.classList.toggle('sn-mini', mini);
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('#sn-mini-btn,#sn-open') : null;
+    if (!b) return;
+    var mini = !document.body.classList.contains('sn-mini');
+    document.body.classList.toggle('sn-mini', mini);
+    try {
+      if (mini) localStorage.setItem('sn-mini', '1');
+      else localStorage.removeItem('sn-mini');
+    } catch (e) {}
+  });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyMini, { once: true });
+  } else {
+    applyMini();
+  }
 })();
