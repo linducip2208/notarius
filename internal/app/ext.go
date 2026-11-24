@@ -1609,7 +1609,7 @@ func (a *App) protocolCreate(w http.ResponseWriter, r *http.Request) {
 
 // protocolStatus records location/status/holder movements (in/out/return audit trail).
 func (a *App) protocolStatus(w http.ResponseWriter, r *http.Request) {
-	if !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewProtocol) || rbac.ReadOnly(mw.RoleOf(r)) {
 		a.forbidden(w, r)
 		return
 	}

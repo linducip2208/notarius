@@ -1433,6 +1433,231 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			pendingWork = append(pendingWork, work{"Serah", h.Title + " — menunggu serah ke klien", "/deeds/" + strconv.FormatInt(h.ID, 10)})
 		}
 	}
+	// ---- Widget gaya Seven (best-effort, query nyata, fail-open) ----
+	// Strip kalender minggu berjalan (Senin–Minggu, WIB).
+	type weekDay struct {
+		DName, DNum string
+		IsToday     bool
+	}
+	var week []weekDay
+	nowWIB := wib.InWIB(time.Now())
+	wd := int(nowWIB.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	monday := nowWIB.AddDate(0, 0, -(wd - 1))
+	idDays := []string{"Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"}
+	todayKey := nowWIB.Format("2006-01-02")
+	for i := 0; i < 7; i++ {
+		d := monday.AddDate(0, 0, i)
+		week = append(week, weekDay{DName: idDays[int(d.Weekday())], DNum: d.Format("02"), IsToday: d.Format("2006-01-02") == todayKey})
+	}
+	// Baris permohonan untuk daftar Projects + tabel statistik + kartu unggulan.
+	// Budget = total invoice non-VOID; bila belum ada, pakai tarif dasar layanan.
+	type projRow struct {
+		ID                                       int64
+		Title, Client, Service, Status, Assignee string
+		Initial, Color                           string
+		Budget                                   int64
+		BasePrice                                int64
+		Progress                                 int
+		Created                                  string
+	}
+	palette := []string{"#7c3aed", "#0ea5e9", "#16a37b", "#eab308", "#f43f5e", "#f97316"}
+	var projs []projRow
+	activeCount := active
+	if activeCount == 0 {
+		activeCount = pending
+	}
+	if a.db != nil {
+		if rows, err := a.db.Query(`SELECT r.id, r.title, cf.full_name, COALESCE(sv.name,''),
+				r.status, COALESCE(u.name,''), r.created_at, COALESCE(sv.base_price,0)
+			FROM service_requests r
+			JOIN clients cf ON cf.id=r.client_id
+			LEFT JOIN services sv ON sv.id=r.service_id
+			LEFT JOIN users u ON u.id=r.assignee_id
+			WHERE r.office_id=? ORDER BY r.id DESC LIMIT 7`, office); err == nil && rows != nil {
+			func() {
+				defer rows.Close()
+				for rows.Next() {
+					var p projRow
+					var created time.Time
+					var base string
+					if err := rows.Scan(&p.ID, &p.Title, &p.Client, &p.Service, &p.Status, &p.Assignee, &created, &base); err != nil {
+						continue
+					}
+					p.Created = wib.Date(created)
+					var bf float64
+					fmt.Sscanf(base, "%f", &bf)
+					p.BasePrice = int64(bf)
+					t := strings.TrimSpace(p.Title)
+					if t == "" {
+						t = "?"
+					}
+					p.Initial = strings.ToUpper(string([]rune(t)[0]))
+					p.Color = palette[int(p.ID)%len(palette)]
+					_ = a.db.QueryRow(`SELECT COALESCE(SUM(total),0) FROM invoices WHERE office_id=? AND request_id=? AND status<>'VOID'`, office, p.ID).Scan(&p.Budget)
+					var tot, ver int
+					if err := a.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(status='VERIFIED'),0) FROM doc_checklist_records WHERE request_id=?`, p.ID).Scan(&tot, &ver); err == nil && tot > 0 {
+						p.Progress = ver * 100 / tot
+					}
+					projs = append(projs, p)
+				}
+			}()
+		}
+	}
+	var featured *projRow
+	if len(projs) > 0 {
+		featured = &projs[0]
+	}
+	// Tugas aktif untuk peta Gantt: bentang created_at → due_date pada jendela ?trange=.
+	trange := r.URL.Query().Get("trange")
+	winDays := 7
+	if trange == "day" {
+		winDays = 1
+	} else if trange == "month" {
+		winDays = 30
+	}
+	type taskBar struct {
+		ID                int64
+		Title, Due, Range string
+		Left, Width       int
+		Late              bool
+	}
+	var taskBars []taskBar
+	if a.db != nil {
+		winStart := monday
+		if trange == "day" {
+			winStart = nowWIB
+		} else if trange == "month" {
+			winStart = nowWIB.AddDate(0, 0, -15)
+		}
+		ws := time.Date(winStart.Year(), winStart.Month(), winStart.Day(), 0, 0, 0, 0, winStart.Location())
+		we := ws.AddDate(0, 0, winDays)
+		span := we.Sub(ws).Hours()
+		if rows, err := a.db.Query(`SELECT id, title, due_date, created_at FROM tasks WHERE office_id=? AND status='OPEN' ORDER BY due_date IS NULL, due_date LIMIT 8`, office); err == nil && rows != nil {
+			func() {
+				defer rows.Close()
+				for rows.Next() {
+					var tb taskBar
+					var due sql.NullString
+					var created time.Time
+					if err := rows.Scan(&tb.ID, &tb.Title, &due, &created); err != nil {
+						continue
+					}
+					cs := wib.InWIB(created)
+					if cs.Before(ws) {
+						cs = ws
+					}
+					de := we
+					if due.Valid && due.String != "" {
+						if dt, err := time.Parse("2006-01-02", due.String); err == nil {
+							de = time.Date(dt.Year(), dt.Month(), dt.Day(), 23, 59, 59, 0, ws.Location())
+							tb.Due = dt.Format("02 Jan 2006")
+						}
+					}
+					if de.After(we) {
+						de = we
+					}
+					left := int(cs.Sub(ws).Hours() * 100 / span)
+					width := int(de.Sub(cs).Hours() * 100 / span)
+					if left < 0 {
+						left = 0
+					}
+					if left > 100 {
+						left = 100
+					}
+					if width < 3 {
+						width = 3
+					}
+					if left+width > 100 {
+						width = 100 - left
+					}
+					tb.Left, tb.Width = left, width
+					if due.Valid && due.String != "" && due.String < todayKey {
+						tb.Late = true
+					}
+					if tb.Due == "" {
+						tb.Due = "tanpa tenggat"
+					}
+					tb.Range = tb.Due
+					taskBars = append(taskBars, tb)
+				}
+			}()
+		}
+	}
+	// Staf kantor untuk avatar "Today's Heroes".
+	type hero struct{ Name, Initial, Color string }
+	var heroes []hero
+	heroCount := 0
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM users WHERE office_id=?`, office).Scan(&heroCount)
+		if rows, err := a.db.Query(`SELECT name FROM users WHERE office_id=? ORDER BY id LIMIT 6`, office); err == nil && rows != nil {
+			func() {
+				defer rows.Close()
+				i := 0
+				for rows.Next() {
+					var n string
+					if err := rows.Scan(&n); err != nil {
+						continue
+					}
+					init := "?"
+					if t := strings.TrimSpace(n); t != "" {
+						init = strings.ToUpper(string([]rune(t)[0]))
+					}
+					heroes = append(heroes, hero{Name: n, Initial: init, Color: palette[i%len(palette)]})
+					i++
+				}
+			}()
+		}
+	}
+	// Sorotan jujur: selesai bulan ini + rata-rata hari penyelesaian + piutang + pendapatan.
+	var doneMonth, avgDays int
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT COUNT(*), COALESCE(AVG(DATEDIFF(updated_at, created_at)),0) FROM service_requests WHERE office_id=? AND status='COMPLETED' AND DATE_FORMAT(updated_at,'%Y-%m')=?`, office, month).Scan(&doneMonth, &avgDays)
+	}
+	// Invoice terbaru (non-draf) untuk kartu pendapatan.
+	type invLine struct{ Number, Total, At string }
+	var invLines []invLine
+	if a.db != nil {
+		if rows, err := a.db.Query(`SELECT number, total, created_at FROM invoices WHERE office_id=? AND status<>'DRAFT' ORDER BY id DESC LIMIT 3`, office); err == nil && rows != nil {
+			func() {
+				defer rows.Close()
+				for rows.Next() {
+					var il invLine
+					var tot string
+					var at time.Time
+					if err := rows.Scan(&il.Number, &tot, &at); err != nil {
+						continue
+					}
+					var f float64
+					fmt.Sscanf(tot, "%f", &f)
+					il.Total = fmt.Sprintf("%.0f", f)
+					il.At = wib.InWIB(at).Format("15:04")
+					invLines = append(invLines, il)
+				}
+			}()
+		}
+	}
+	// Paket kantor untuk kartu Upgrade.
+	heroExtra := heroCount - len(heroes)
+	if heroExtra < 0 {
+		heroExtra = 0
+	}
+	pendPct := 0
+	if denom := activeCount; denom > 0 {
+		pendPct = pending * 100 / denom
+		if pendPct > 100 {
+			pendPct = 100
+		}
+	}
+	planName := "LITE"
+	if a.db != nil {
+		_ = a.db.QueryRow(`SELECT plan FROM offices WHERE id=?`, office).Scan(&planName)
+		if planName != "LITE" && planName != "PRO" && planName != "ENTERPRISE" {
+			planName = "LITE"
+		}
+	}
 	a.render(w, r, "dashboard", "Dashboard", map[string]any{
 		"Pending": pending, "Active": active, "Completed": completed,
 		"Outstanding": outstanding, "Revenue": monthRev, "Recent": recent,
@@ -1445,6 +1670,10 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"SLAOverdue": slaTop, "DocOverdue": docOver, "MFAWarn": mfaWarn,
 		"WFOverdue":       wfOver,
 		"PendingHandover": pendingHandover, "HandoverToday": handoverToday,
+		"Week": week, "Projs": projs, "Featured": featured, "TaskBars": taskBars, "Trange": trange,
+		"Heroes": heroes, "HeroCount": heroCount, "DoneMonth": doneMonth, "AvgDays": avgDays,
+		"InvLines": invLines, "PlanName": planName, "ActiveCount": activeCount,
+		"HeroExtra": heroExtra, "PendPct": pendPct,
 	})
 }
 

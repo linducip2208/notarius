@@ -472,7 +472,7 @@ func (a *App) portalReceipt(w http.ResponseWriter, r *http.Request) {
 // Dibatasi 50 baris per jenis; tugas file bertaut ref_type='file' dan tidak
 // diduplikasi bila masih ada yang OPEN untuk ref yang sama.
 func (a *App) retentionTask(w http.ResponseWriter, r *http.Request) {
-	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) {
+	if !rbac.Has(mw.RoleOf(r), rbac.PermViewClient) || rbac.ReadOnly(mw.RoleOf(r)) {
 		a.forbidden(w, r)
 		return
 	}

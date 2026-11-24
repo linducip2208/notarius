@@ -146,7 +146,7 @@ func dmsFieldOf(r *http.Request, pos int) dms.CustomField {
 // ---- bulk ops ----
 
 func (a *App) dmsBulk(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+	if !a.requireWrite(w, r) {
 		return
 	}
 	_ = r.ParseForm()
@@ -154,6 +154,12 @@ func (a *App) dmsBulk(w http.ResponseWriter, r *http.Request) {
 	ids := r.Form["ids"]
 	if len(ids) == 0 || (action != "verify" && action != "approve") {
 		http.Error(w, "pilih berkas dan aksi yang valid", http.StatusBadRequest)
+		return
+	}
+	// Jalur verify massal wajib izin verifikasi identitas — setara dengan
+	// tombol verifikasi per-berkas (dms.go dmsVerify memakai PermVerifyIdentity).
+	if action == "verify" && !rbac.Has(mw.RoleOf(r), rbac.PermVerifyIdentity) {
+		a.forbidden(w, r)
 		return
 	}
 	n := 0

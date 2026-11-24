@@ -102,6 +102,13 @@ var rolePerms = map[string][]string{
 	RoleAuditor: {PermViewClient, PermViewFinance, PermViewProtocol, PermViewReports, PermWebsiteView, PermWebAudit, PermAuditView, PermLCCView},
 }
 
+// ReadOnly reports whether role must never mutate operational data.
+// Auditor and client are read-only by design: auditor supervises,
+// client acts only via service requests and portal payments.
+func ReadOnly(role string) bool {
+	return role == RoleAuditor || role == RoleClient
+}
+
 // Has reports whether role grants permission.
 func Has(role, perm string) bool {
 	perms, ok := rolePerms[role]

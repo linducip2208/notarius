@@ -48,6 +48,17 @@ func (a *App) requireStaff(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// requireWrite guards mutating endpoints: requireStaff passes the auditor
+// (auditor holds PermViewClient for supervision), so write paths must also
+// reject read-only roles explicitly.
+func (a *App) requireWrite(w http.ResponseWriter, r *http.Request) bool {
+	if rbac.ReadOnly(mw.RoleOf(r)) {
+		a.forbidden(w, r)
+		return false
+	}
+	return a.requireStaff(w, r)
+}
+
 // ---- dashboard ----
 
 func (a *App) dmsDashboard(w http.ResponseWriter, r *http.Request) {
@@ -673,7 +684,7 @@ func (a *App) dmsDownloadVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) dmsRestoreVersion(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+	if !a.requireWrite(w, r) {
 		return
 	}
 	_ = r.ParseForm()
@@ -1053,7 +1064,7 @@ func (a *App) dmsDuplicates(w http.ResponseWriter, r *http.Request) {
 // dmsMerge links a duplicate group into its smallest-ID canonical record.
 // Bytes are never deleted; relations record the merge (audit trail kept).
 func (a *App) dmsMerge(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+	if !a.requireWrite(w, r) {
 		return
 	}
 	_ = r.ParseForm()

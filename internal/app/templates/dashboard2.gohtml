@@ -1,73 +1,170 @@
 {{define "dashboard"}}{{template "head" .}}{{template "page_open" .}}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-<div><h2 class="page-title mb-0">Selamat datang kembali, {{.UserName}}</h2><p class="text-secondary mb-0">{{.OfficeName}} · {{.WIBDate}} · {{len .Data.Today}} janji hari ini, {{.Pending}} antrean menunggu</p></div><div class="dropdown">
-<button class="btn btn-primary" type="button" data-bs-toggle="dropdown">+ Aksi Cepat</button>
-<div class="dropdown-menu dropdown-menu-end">
-{{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Tambah Klien</a>{{end}}
-<a class="dropdown-item" href="/requests">🧾 Buat Permohonan</a>
-{{if can .Role "deed.draft"}}<a class="dropdown-item" href="/deeds">📝 Buat Draft Akta</a>{{end}}
-{{if can .Role "legalization.process"}}<a class="dropdown-item" href="/legalisasi">✅ Catat Register</a>{{end}}
-{{if can .Role "finance.manage"}}<a class="dropdown-item" href="/finance">💰 Buat Invoice</a>{{end}}
-</div>
-</div>
+<style>
+.sv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.sv-crumb{font-size:.8rem;color:#7a8699}.sv-crumb b{color:#101f3c}.sv-title{font-size:1.4rem;font-weight:800;color:#101f3c;margin:0}
+.sv-actions{display:flex;gap:8px}
+.sv-btn{display:inline-block;padding:9px 18px;border-radius:10px;font-weight:700;font-size:.85rem;text-decoration:none;border:1px solid #e2e8f0;background:#fff;color:#101f3c}
+.sv-btn.primary{background:#2f6fed;border-color:#2f6fed;color:#fff}
+.sv-grid{display:grid;grid-template-columns:280px 1fr 1fr 330px;gap:16px;align-items:start}
+.sv-card{background:#fff;border:1px solid #edf0f5;border-radius:16px;padding:18px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.sv-card h3{font-size:1rem;font-weight:800;color:#101f3c;margin:0 0 4px}
+.sv-sub{font-size:.78rem;color:#7a8699;margin:0 0 12px}
+.sv-projects{grid-row:span 2}
+.sv-today{grid-row:span 2}
+.sv-proj{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #f2f4f7;text-decoration:none;color:inherit}
+.sv-proj:last-child{border-bottom:0}
+.sv-av{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;flex:none}
+.sv-proj b{display:block;font-size:.85rem;color:#101f3c}.sv-proj span{font-size:.75rem;color:#7a8699}
+.sv-dark{background:#0d1440;color:#fff;border:0}
+.sv-dark h3{color:#fff}.sv-dark .sv-sub{color:#a5b0cc}
+.sv-bignum{font-size:2rem;font-weight:800}
+.sv-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.18);margin:10px 0 6px;overflow:hidden}
+.sv-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f43f5e,#f97316)}
+.sv-bar.cool{background:#eef1f6}.sv-bar.cool i{background:#16a37b}
+.sv-rowline{display:flex;justify-content:space-between;font-size:.78rem;color:#a5b0cc}
+.sv-donut{width:120px;height:120px;border-radius:50%;margin:6px auto 10px}
+.sv-legend{font-size:.8rem;color:#3b4763;display:flex;flex-direction:column;gap:5px}
+.sv-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.sv-hl{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-top:1px solid #f2f4f7;font-size:.83rem;color:#3b4763}
+.sv-hl b{color:#101f3c}
+.sv-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0 12px}
+.sv-day{text-align:center;padding:7px 0;border-radius:12px;font-size:.72rem;color:#7a8699}
+.sv-day b{display:block;font-size:.85rem;color:#101f3c}
+.sv-day.on{background:#f43f5e;color:#fff}.sv-day.on b{color:#fff}
+.sv-meet{border-left:3px solid #2f6fed;padding:6px 0 6px 10px;margin-bottom:12px}
+.sv-meet.c2{border-color:#f59e0b}.sv-meet.c3{border-color:#16a37b}
+.sv-meet .t{font-weight:800;font-size:.82rem;color:#101f3c}.sv-meet .d{font-size:.8rem;color:#3b4763}.sv-meet .w{font-size:.75rem;color:#7a8699}
+.sv-view{float:right;font-size:.72rem;background:#f2f4f7;border-radius:8px;padding:4px 10px;text-decoration:none;color:#3b4763}
+.sv-heroes{display:flex;align-items:center;margin-top:8px}
+.sv-hero{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:800;font-size:.75rem;display:flex;align-items:center;justify-content:center;border:2px solid #fff;margin-left:-8px}
+.sv-hero:first-child{margin-left:0}
+.sv-feat{display:grid;grid-template-columns:200px 1fr 180px;gap:16px;align-items:center}
+.sv-featart{border-radius:14px;min-height:210px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sv-kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.sv-kv div{border:1px solid #eef1f6;border-radius:10px;padding:8px 10px;font-size:.78rem;color:#7a8699}
+.sv-kv b{display:block;color:#101f3c;font-size:.85rem}
+.sv-badge{display:inline-block;font-size:.7rem;font-weight:700;border-radius:8px;padding:3px 10px;background:#eef4ff;color:#2f6fed}
+.sv-badge.green{background:#e7f8ef;color:#16a37b}.sv-badge.yellow{background:#fef6e0;color:#b45309}.sv-badge.red{background:#fdecec;color:#dc2626}.sv-badge.gray{background:#eef1f6;color:#5b6478}.sv-badge.purple{background:#f1eaff;color:#7c3aed}
+.sv-up{background:linear-gradient(120deg,#0ea5e9,#2563eb);color:#fff;border:0;position:relative;overflow:hidden}
+.sv-up h3{color:#fff;font-size:1.3rem}.sv-up p{font-size:.85rem;color:#dbeafe}
+.sv-up .sv-btn{border:0}.sv-up .go{background:#22c55e;color:#fff}.sv-up .gd{background:rgba(255,255,255,.25);color:#fff}
+.sv-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.sv-table th{text-align:left;font-size:.68rem;letter-spacing:.06em;color:#98a2b8;font-weight:700;padding:6px 8px;border-bottom:1px solid #eef1f6}
+.sv-table td{padding:10px 8px;border-bottom:1px solid #f2f4f7;vertical-align:middle;color:#3b4763}
+.sv-table tr:last-child td{border-bottom:0}
+.sv-pbar{height:6px;background:#eef1f6;border-radius:99px;overflow:hidden;min-width:90px}.sv-pbar i{display:block;height:100%;background:#16a37b}
+.sv-gantt{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+.sv-grow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:.8rem;color:#3b4763}
+.sv-track{position:relative;height:30px;background:#f4f6fa;border-radius:99px;overflow:hidden}
+.sv-fill{position:absolute;top:0;bottom:0;border-radius:99px;background:#7c3aed;color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;padding:0 10px;white-space:nowrap;overflow:hidden}
+.sv-fill.late{background:#f43f5e}
+.sv-tabs{display:flex;gap:14px;font-size:.8rem}
+.sv-tabs a{color:#7a8699;text-decoration:none;padding:4px 2px}
+.sv-tabs a.on{color:#101f3c;font-weight:800;border-bottom:2px solid #7c3aed}
+.sv-promo{text-align:center;padding:10px 4px}
+.sv-promo h3{font-size:1.05rem}
+.sv-illus{font-size:3rem;margin:8px 0}
+@media(max-width:1280px){.sv-grid{grid-template-columns:1fr 1fr}.sv-projects,.sv-today{grid-row:auto}.sv-feat{grid-template-columns:1fr}}
+@media(max-width:760px){.sv-grid{grid-template-columns:1fr}.sv-feat{grid-template-columns:1fr}.sv-grow{grid-template-columns:1fr}}
+</style>
+<div class="sv-top">
+<div><p class="sv-crumb">Beranda &nbsp;-&nbsp; Dashboard &nbsp;-&nbsp; <b>Permohonan</b></p><h2 class="sv-title">Dashboard</h2></div>
+<div class="sv-actions">{{if can .Role "client.create"}}<a class="sv-btn" href="/clients/new">Klien Baru</a>{{end}}<a class="sv-btn primary" href="/requests">+ Permohonan Baru</a></div>
 </div>
 {{if .Data.PwStale}}<div class="alert alert-warning" role="alert">Kata sandi Anda tidak diganti &gt;180 hari. Minta admin mereset demi keamanan akun.</div>{{end}}
 {{if .Data.MFAWarn}}<div class="alert alert-danger" role="alert">Akun Anda berhak akses wasiat — aktifkan MFA di <a href="/mfa">/mfa</a> demi keamanan register wasiat.</div>{{end}}
-{{if or (eq .Role "notary") (eq .Role "substitute_notary") (eq .Role "super_admin") (eq .Role "office_admin")}}<div class="row row-deck row-cards mb-3">
-<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Menunggu Persetujuan</div><div class="h1 mb-0">{{.Data.ToApprove}}</div><a href="/deeds?status=IN_REVIEW">Review akta →</a></div></div></div>
-<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Siap Tanda Tangan</div><div class="h1 mb-0">{{.Data.ReadySign}}</div><a href="/deeds?status=APPROVED">Akta disetujui →</a></div></div></div>
-<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Permohonan Macet (SLA)</div><div class="h1 mb-0">{{.Data.Stuck}}</div><a href="/requests">Lihat antrean →</a></div></div></div>
-</div>{{end}}
-{{if or .Data.SLAOverdue .Data.DocOverdue .Data.WFOverdue}}<div class="card mb-3 border-danger"><div class="card-header"><h3 class="card-title">⚠ Perlu Perhatian</h3><div class="ms-auto"><a href="/requests">Lihat antrean →</a></div></div>
-<div class="list-group list-group-flush">{{range .Data.SLAOverdue}}<a class="list-group-item" href="/requests/{{.ID}}"><span class="badge bg-red-lt me-2">Izin</span>{{.Service}} — {{.Title}} <span class="text-secondary">· umur {{.AgeDays}} hari (SLA {{.SLADays}} hari)</span></a>{{end}}{{range .Data.DocOverdue}}<a class="list-group-item" href="/documents/{{.ID}}"><span class="badge bg-orange-lt me-2">Dokumen</span>{{.Name}} <span class="text-secondary">· {{.Workflow}} sejak {{.LastActive}} (SLA {{.SLADays}} hari)</span></a>{{end}}{{range .Data.WFOverdue}}<a class="list-group-item" href="/requests/{{.RequestID}}#alurkerja"><span class="badge bg-red-lt me-2">Langkah</span>{{.Service}} — {{.ReqTitle}} <span class="text-secondary">· langkah {{.StepKey}} ({{.Label}}) lewat {{.LateDays}} hari (jatuh tempo {{.DueAt}})</span></a>{{end}}</div>{{if .Data.WFOverdue}}<div class="card-body border-top"><form method="post" action="/workflow/sla-escalate">{{template "csrf" .}}<button class="btn btn-sm btn-outline-danger" type="submit">Buatkan tugas eskalasi ({{len .Data.WFOverdue}} langkah)</button></form><p class="text-secondary small mb-0 mt-1">Satu tugas per langkah, tidak ganda bila masih OPEN — pola yang sama dengan SLA dokumen &amp; retensi.</p></div>{{end}}</div>{{end}}
+{{if or (eq .Role "notary") (eq .Role "substitute_notary") (eq .Role "super_admin") (eq .Role "office_admin") .Data.SLAOverdue .Data.DocOverdue .Data.WFOverdue}}<div class="card mb-3"><div class="card-body d-flex gap-3 flex-wrap align-items-center">
+<div><span class="subheader">Menunggu Persetujuan</span><div class="h1 mb-0">{{.Data.ToApprove}}</div><a href="/deeds?status=IN_REVIEW">Review akta →</a></div>
+<div><span class="subheader">Siap Tanda Tangan</span><div class="h1 mb-0">{{.Data.ReadySign}}</div><a href="/deeds?status=APPROVED">Akta disetujui →</a></div>
+<div><span class="subheader">Permohonan Macet (SLA)</span><div class="h1 mb-0">{{.Data.Stuck}}</div><a href="/requests">Lihat antrean →</a></div>
+</div></div>{{end}}
 {{if or .Data.PendingHandover .Data.HandoverToday}}<div class="card mb-3 border-success"><div class="card-header"><h3 class="card-title">📦 Menunggu Serah</h3><div class="ms-auto"><span class="text-secondary small">Serah hari ini: {{.Data.HandoverToday}}</span></div></div>
 <div class="list-group list-group-flush">{{range .Data.PendingHandover}}<a class="list-group-item" href="/deeds/{{.ID}}"><span class="badge bg-green-lt me-2">Serah</span>{{.Title}} <span class="text-secondary">· akta #{{.ID}} menunggu serah ke klien</span></a>{{end}}{{if not .Data.PendingHandover}}<div class="list-group-item text-secondary">Tidak ada akta menunggu serah. Hari ini sudah diserahkan: {{.Data.HandoverToday}}.</div>{{end}}</div></div>{{end}}
-<div class="row row-deck row-cards mb-3">
-<div class="col-sm-6 col-lg"><div class="card" title="Jumlah seluruh klien terdaftar di kantor ini"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-blue-lt">👥</span><div><div class="subheader">Total Klien</div><div class="h1 mb-0">{{.Data.Clients}}</div></div></div><div class="small text-secondary mt-1">Periode: keseluruhan</div><a href="/clients">Lihat klien</a></div></div></div>
-<div class="col-sm-6 col-lg"><div class="card" title="Permohonan berstatus SUBMITTED / IN_REVIEW / NEED_DOCS"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-yellow-lt">📝</span><div><div class="subheader">Permohonan Aktif</div><div class="h1 mb-0">{{.Pending}}</div></div></div><div class="small text-secondary mt-1">Periode: berjalan</div><a href="/requests?status=SUBMITTED">Lihat antrean</a></div></div></div>
-<div class="col-sm-6 col-lg"><div class="card" title="Akta dibuat pada bulan berjalan"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-green-lt">📜</span><div><div class="subheader">Akta Bulan Ini</div><div class="h1 mb-0">{{.Data.MonthDeeds}}</div></div></div><div class="small text-secondary mt-1">Periode: bulan berjalan</div><a href="/deeds">Lihat akta</a></div></div></div>
-<div class="col-sm-6 col-lg"><div class="card" title="Janji temu terjadwal hari ini"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-azure-lt">📅</span><div><div class="subheader">Jadwal Hari Ini</div><div class="h1 mb-0">{{len .Data.Today}}</div></div></div><div class="small text-secondary mt-1">Periode: hari ini</div><a href="/appointments">Lihat janji</a></div></div></div>
-<div class="col-sm-6 col-lg"><div class="card" title="Total invoice ISSUED/PARTIAL yang belum lunas"><div class="card-body"><div class="d-flex align-items-center gap-2"><span class="avatar bg-red-lt">💰</span><div><div class="subheader">Tagihan Belum Dibayar</div><div class="h1 mb-0">Rp {{.Data.Outstanding}}</div></div></div><div class="small text-secondary mt-1">Periode: berjalan</div><a href="/finance">Ke keuangan</a></div></div></div>
+<div class="sv-grid">
+<div class="sv-card sv-projects"><h3>Permohonan</h3><p class="sv-sub">{{.Pending}} aktif menunggu</p>
+{{range .Data.Projs}}<a class="sv-proj" href="/requests/{{.ID}}"><span class="sv-av" style="background:{{.Color}}">{{.Initial}}</span><span><b>{{.Title}}</b><span>{{if .Assignee}}Oleh {{.Assignee}}{{else}}{{.Client}}{{end}} · {{.Status}}</span></span></a>
+{{else}}<p class="sv-sub">Belum ada permohonan. <a href="/requests">Buat pertama →</a></p>{{end}}
 </div>
-<div class="row g-3">
-<div class="col-lg-8">
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas {{.Data.RangeN}} Bulan Terakhir</h3><div class="ms-auto d-flex gap-1">
-<a class="btn btn-sm {{if ne .Data.Range "12"}}btn-primary{{else}}btn-ghost-secondary{{end}}" href="/app?range=6">6 bln</a>
-<a class="btn btn-sm {{if eq .Data.Range "12"}}btn-primary{{else}}btn-ghost-secondary{{end}}" href="/app?range=12">12 bln</a>
-</div></div>
-<div class="card-body">
+<div>
+<div class="sv-card sv-dark"><h3>{{.Data.ActiveCount}}</h3><p class="sv-sub" style="color:#a5b0cc">Permohonan Aktif</p>
+<div class="sv-bar"><i style="width:{{.Data.PendPct}}%"></i></div>
+<div class="sv-rowline"><span>{{.Pending}} menunggu</span></div>
+</div>
+<div class="sv-card" style="margin-top:16px"><h3>{{.Data.Clients}}</h3><p class="sv-sub">Klien Terdaftar</p>
+<div class="sv-heroes">{{range .Data.Heroes}}<span class="sv-hero" style="background:{{.Color}}" title="{{.Name}}">{{.Initial}}</span>{{end}}{{if gt .Data.HeroExtra 0}}<span class="sv-hero" style="background:#101f3c">+{{.Data.HeroExtra}}</span>{{end}}</div>
+<p class="sv-sub" style="margin-top:10px">Tim &amp; penghadap aktif kantor ini</p>
+</div>
+</div>
+<div>
+<div class="sv-card"><h3>Pendapatan {{.WIBDate}}</h3><p class="sv-sub">Rp {{.Data.Revenue}} bulan berjalan</p>
+{{if .Data.Donut}}<div class="sv-donut" style="background:{{.Data.Conic | css}}"></div>
+<div class="sv-legend">{{range .Data.Donut}}<span><span class="sv-dot" style="background:{{.Color}}"></span>{{.Label}} — {{.Pct}}%</span>{{end}}</div>
+{{else}}<p class="sv-sub">Belum ada data layanan.</p>{{end}}
+</div>
+<div class="sv-card" style="margin-top:16px"><h3>Sorotan</h3>
+<div class="sv-hl"><span>Selesai bulan ini</span><b>{{.Data.DoneMonth}}</b></div>
+<div class="sv-hl"><span>Rata-rata penyelesaian</span><b>{{.Data.AvgDays}} hari</b></div>
+<div class="sv-hl"><span>Akta bulan ini</span><b>{{.Data.MonthDeeds}}</b></div>
+<div class="sv-hl"><span>Piutang berjalan</span><b>Rp {{.Data.Outstanding}}</b></div>
+</div>
+</div>
+<div class="sv-card sv-today"><h3>Agenda Hari Ini</h3><p class="sv-sub">Total {{len .Data.Today}} janji · <a href="/reports">Pusat Laporan</a></p>
+<div class="sv-week">{{range .Data.Week}}<div class="sv-day{{if .IsToday}} on{{end}}">{{.DName}}<b>{{.DNum}}</b></div>{{end}}</div>
+{{range $i, $m := .Data.Today}}<div class="sv-meet{{if eq $i 1}} c2{{else if eq $i 2}} c3{{end}}"><a class="sv-view" href="/appointments">Lihat</a><div class="t">{{$m.At}}</div><div class="d">{{$m.Purpose}}</div><div class="w">Penghadap: {{$m.Client}} · {{$m.Status}}</div></div>
+{{else}}<p class="sv-sub">Tidak ada jadwal hari ini. <a href="/appointments">Buat janji →</a></p>{{end}}
+</div>
+<div class="sv-card" style="grid-column:span 1"><h3>Unggulan</h3>
+{{if .Data.Featured}}{{with .Data.Featured}}<p class="sv-sub">Permohonan terbaru</p><h3 style="font-size:1.15rem">{{.Title}}</h3>
+<p><span class="sv-badge">{{.Status}}</span></p>
+<div class="sv-kv"><div>Penanggung jawab<b>{{if .Assignee}}{{.Assignee}}{{else}}Belum ditetapkan{{end}}</b></div><div>Anggaran<b>{{if gt .Budget 0}}Rp {{.Budget}}{{else if gt .BasePrice 0}}Rp {{.BasePrice}} (dasar){{else}}—{{end}}</b></div><div>Dibuat<b>{{.Created}}</b></div><div>Progres<b>{{.Progress}}%</b></div></div>
+<div class="sv-bar cool"><i style="width:{{.Progress}}%"></i></div>
+<p><a href="/requests/{{.ID}}">Lihat Permohonan →</a></p>
+{{end}}{{else}}<p class="sv-sub">Belum ada permohonan unggulan.</p>{{end}}
+</div>
+<div class="sv-card sv-up"><p class="sv-sub" style="color:#dbeafe">Paket saat ini: <b style="color:#fff">{{.Data.PlanName}}</b></p><h3>Tingkatkan Paket Anda</h3>
+<p>PRO membuka portal bayar &amp; berbagi berkas. ENTERPRISE membuka lintas-kantor.</p>
+<p><a class="sv-btn go" href="/office">Lihat Paket</a> <a class="sv-btn gd" href="/docs">Panduan</a></p>
+</div>
+<div class="sv-card" style="grid-column:span 2"><h3>Aktivitas {{.Data.RangeN}} Bulan Terakhir</h3><p class="sv-sub">Permohonan vs akta disahkan · <a href="/app?range={{if eq .Data.Range "12"}}6{{else}}12{{end}}">Ubah rentang</a></p>
 {{if .Data.Months}}<svg viewBox="0 0 600 180" style="width:100%;height:auto" role="img" aria-label="Grafik aktivitas permohonan dan akta">
 <line x1="20" x2="580" y1="30" y2="30" stroke="#e7ebf2"/><line x1="20" x2="580" y1="70" y2="70" stroke="#e7ebf2"/><line x1="20" x2="580" y1="110" y2="110" stroke="#e7ebf2"/><line x1="20" x2="580" y1="150" y2="150" stroke="#e7ebf2"/>
-<polyline points="{{.Data.ReqPts}}" fill="none" stroke="#206bc4" stroke-width="3" stroke-linejoin="round"/>
-<polyline points="{{.Data.DeedPts}}" fill="none" stroke="#c9a844" stroke-width="3" stroke-linejoin="round"/>
-{{range .Data.ReqDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#206bc4"><title>{{.M}}: {{.V}} permohonan</title></circle>{{end}}
-{{range .Data.DeedDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#c9a844"><title>{{.M}}: {{.V}} akta</title></circle>{{end}}
+<polyline points="{{.Data.ReqPts}}" fill="none" stroke="#7c3aed" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="{{.Data.DeedPts}}" fill="none" stroke="#e9a23b" stroke-width="3" stroke-linejoin="round"/>
+{{range .Data.ReqDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#7c3aed"><title>{{.M}}: {{.V}} permohonan</title></circle>{{end}}
+{{range .Data.DeedDots}}<circle cx="{{.X}}" cy="{{.Y}}" r="4" fill="#e9a23b"><title>{{.M}}: {{.V}} akta</title></circle>{{end}}
 </svg>
 <div class="d-flex justify-content-between small text-secondary px-1">{{range .Data.Months}}<span>{{.}}</span>{{end}}</div>
-<div class="d-flex gap-3 small mt-2"><span><span class="badge" style="background:#206bc4">&nbsp;</span> Permohonan</span><span><span class="badge" style="background:#c9a844">&nbsp;</span> Akta disahkan</span></div>
-{{else}}<div class="empty"><p class="empty-title">Belum ada aktivitas</p><p class="empty-subtitle">Data muncul setelah permohonan pertama dibuat.</p><a class="btn btn-primary" href="/requests">Buat Permohonan</a></div>{{end}}
-</div></div>
-<div class="card"><div class="card-header"><h3 class="card-title">Agenda Hari Ini</h3><div class="ms-auto"><a href="/appointments">Lihat Semua →</a></div></div>
-<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Jam</th><th>Penghadap</th><th>Keperluan</th><th>Status</th></tr></thead><tbody>
-{{range .Data.Today}}<tr><td class="text-secondary">{{.At}}</td><td>{{.Client}}</td><td>{{.Purpose}}</td><td><span class="badge bg-blue-lt">{{.Status}}</span></td></tr>
-{{else}}<tr><td colspan="4" class="text-center text-secondary py-3">Tidak ada jadwal hari ini. <a href="/appointments">Buat janji →</a></td></tr>{{end}}
+<div class="d-flex gap-3 small mt-2"><span><span class="sv-dot" style="background:#7c3aed"></span>Permohonan</span><span><span class="sv-dot" style="background:#e9a23b"></span>Akta disahkan</span></div>
+{{else}}<div class="empty"><p class="empty-title">Belum ada aktivitas</p><p class="empty-subtitle">Data muncul setelah permohonan pertama dibuat.</p><a class="sv-btn primary" href="/requests">Buat Permohonan</a></div>{{end}}
+</div>
+<div class="sv-card"><h3>Invoice Terakhir</h3><p class="sv-sub">Rp {{.Data.Revenue}} bulan ini</p>
+{{range .Data.InvLines}}<div class="sv-hl"><span>{{.At}} · {{.Number}}</span><b>Rp {{.Total}}</b></div>
+{{else}}<p class="sv-sub">Belum ada invoice diterbitkan. <a href="/finance">Ke keuangan →</a></p>{{end}}
+<p style="margin-top:8px"><a href="/finance">Semua invoice →</a></p>
+</div>
+<div class="sv-card" style="grid-column:span 3"><h3>Statistik Permohonan</h3><p class="sv-sub">Diperbarui {{.WIBDate}} · <a href="/requests">Riwayat</a></p>
+<div class="table-responsive"><table class="sv-table"><thead><tr><th>ITEM</th><th>ANGGARAN</th><th>PROGRES</th><th>STATUS</th><th></th></tr></thead><tbody>
+{{range .Data.Projs}}<tr><td><span class="sv-av" style="background:{{.Color}};width:30px;height:30px;font-size:.75rem">{{.Initial}}</span> <b>{{.Title}}</b><br/><span class="sv-sub">{{.Client}}</span></td>
+<td>{{if gt .Budget 0}}Rp {{.Budget}}{{else if gt .BasePrice 0}}Rp {{.BasePrice}}{{else}}—{{end}}</td>
+<td><div class="sv-pbar"><i style="width:{{.Progress}}%"></i></div><span class="sv-sub">{{.Progress}}%</span></td>
+<td><span class="sv-badge{{if eq .Status "COMPLETED"}} green{{else if eq .Status "NEED_DOCS"}} red{{else if eq .Status "IN_REVIEW"}} yellow{{else if eq .Status "SIGNED"}} purple{{else if eq .Status "SUBMITTED"}} gray{{end}}">{{.Status}}</span></td>
+<td><a class="sv-view" href="/requests/{{.ID}}">→</a></td></tr>
+{{else}}<tr><td colspan="5" class="text-center text-secondary py-3">Belum ada data.</td></tr>{{end}}
 </tbody></table></div></div>
+<div class="sv-card sv-promo"><h3>Sudah coba<br/>Invoice Manager?</h3><div class="sv-illus">🧾</div>
+<p class="sv-sub">Terbitkan invoice, pantau piutang, dan terima bukti bayar dari portal.</p>
+<p><a class="sv-btn primary" href="/finance">Coba</a> <a class="sv-btn" href="/docs">Pelajari</a></p></div>
+<div class="sv-card" style="grid-column:span 3"><div class="d-flex justify-content-between align-items-center"><h3>Tugas Aktif</h3><div class="sv-tabs"><a href="/app?trange=day" class="{{if eq .Data.Trange "day"}}on{{end}}">Hari</a><a href="/app?trange=week" class="{{if or (eq .Data.Trange "week") (eq .Data.Trange "")}}on{{end}}">Minggu</a><a href="/app?trange=month" class="{{if eq .Data.Trange "month"}}on{{end}}">Bulan</a></div></div>
+<p class="sv-sub">Jadwal created → tenggat · <a href="/tasks">Semua tugas →</a></p>
+<div class="sv-gantt">{{range .Data.TaskBars}}<div class="sv-grow"><span title="{{.Title}}">{{.Title}}</span><div class="sv-track"><div class="sv-fill{{if .Late}} late{{end}}" style="left:{{.Left}}%;width:{{.Width}}%">{{.Range}}</div></div></div>
+{{else}}<p class="sv-sub">Tidak ada tugas terbuka. <a href="/tasks">Buat tugas →</a></p>{{end}}</div></div>
 </div>
-<div class="col-lg-4">
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Jenis Layanan</h3></div>
-<div class="card-body text-center">
-{{if .Data.Donut}}<div class="mx-auto mb-2" style="width:140px;height:140px;border-radius:50%;background:{{.Data.Conic | css}}"></div>
-<div class="d-flex flex-column gap-1 text-start">{{range .Data.Donut}}<div><span class="badge me-1" style="background:{{.Color}}">&nbsp;</span>{{.Label}} — {{.Pct}}%</div>{{end}}</div>
-{{else}}<p class="text-secondary">Belum ada data layanan.</p>{{end}}
-</div></div>
-{{if .Data.Work}}<div class="card mb-3"><div class="card-header"><h3 class="card-title">Perlu Tindakan</h3></div>
+{{if .Data.Work}}<div class="card mt-3"><div class="card-header"><h3 class="card-title">Perlu Tindakan</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Work}}<a class="list-group-item" href="{{.URL}}"><span class="badge bg-red-lt me-2">{{.Kind}}</span>{{.Text}}</a>{{end}}</div></div>{{end}}
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Aktivitas Terbaru</h3></div>
+<div class="row g-3 mt-1"><div class="col-lg-6"><div class="card"><div class="card-header"><h3 class="card-title">Aktivitas Terbaru</h3></div>
 <div class="list-group list-group-flush">{{range .Data.Feed}}<div class="list-group-item"><div>{{if .URL}}<a href="{{.URL}}">{{.Action}}</a>{{else}}{{.Action}}{{end}} <span class="text-secondary">· {{.Entity}} #{{.EntityID}}</span></div><div class="small text-secondary">{{.Actor}} · {{.At}}</div></div>
-{{else}}<div class="list-group-item text-secondary">Belum ada aktivitas tercatat.</div>{{end}}</div></div>
-<div class="card mb-3"><div class="card-header"><h3 class="card-title">Notifikasi</h3><div class="ms-auto"><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Tandai dibaca</button></form></div></div>
+{{else}}<div class="list-group-item text-secondary">Belum ada aktivitas tercatat.</div>{{end}}</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header"><h3 class="card-title">Notifikasi</h3><div class="ms-auto"><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary" type="submit">Tandai dibaca</button></form></div></div>
 <div class="list-group list-group-flush">{{range .Data.Notifs}}<div class="list-group-item"><div>🔔 {{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
-{{else}}<div class="list-group-item text-secondary">Belum ada notifikasi.</div>{{end}}</div></div>
-</div>
-</div>
+{{else}}<div class="list-group-item text-secondary">Belum ada notifikasi.</div>{{end}}</div></div></div></div>
 {{template "page_close" .}}{{end}}

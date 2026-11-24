@@ -43,3 +43,17 @@ func TestWebsitePermissions(t *testing.T) {
 		t.Fatalf("harus 9 peran, dapat %d", len(Roles()))
 	}
 }
+
+func TestReadOnlyRoles(t *testing.T) {
+	if !ReadOnly(RoleAuditor) || !ReadOnly(RoleClient) {
+		t.Fatal("auditor dan client wajib read-only")
+	}
+	for _, r := range []string{RoleSuperAdmin, RoleOfficeAdmin, RoleNotary, RoleSubstitute, RoleStaff, RoleFinance, RoleDocOperator} {
+		if ReadOnly(r) {
+			t.Fatalf("peran operasional %s tidak boleh read-only", r)
+		}
+	}
+	if ReadOnly("ghost") {
+		t.Fatal("peran tak dikenal tidak boleh diklasifikasikan read-only")
+	}
+}
