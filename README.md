@@ -34,7 +34,7 @@ VALUES (1, 1, 'Admin','admin@contoh.id','<bcrypt-hash>');
 ```
 
 ## Struktur
-`cmd/notaryos` entrypoint · `internal/` 38 paket · `migrations/` 001–034 (021 PPAT, 023 office ketat, 025 indeks, 026 matter/workflow, 027 engine, 028 audit office, 029 template unik, 030 quotation, 031 serah, 032 push, 033 SLA, 034 PPAT-BPN) ·
+`cmd/notaryos` entrypoint · `internal/` 38 paket · `migrations/` 001–035 (021 PPAT, 023 office ketat, 025 indeks, 026 matter/workflow, 027 engine, 028 audit office, 029 template unik, 030 quotation, 031 serah, 032 push, 033 SLA, 034 PPAT-BPN, 035 avatar) ·
 `internal/app/templates/` UI Tabler · `deploy/` nginx+systemd (timer pengingat)+backup DB & berkas ·
 `docs/` USER_MANUAL + panduan (PRD, audit, DEPLOYMENT_GUIDE).
 

@@ -16,7 +16,7 @@ P1 (pengalaman):
 - [ ] Waarmeking terpisah, Dokumen Masuk/Keluar, Estimasi, Laporan khusus (atau putuskan: cakupan kini cukup).
 
 P2 (polish):
-- [ ] Avatar foto profil (kini inisial); upload + crop bila diminta.
+- [x] Avatar foto profil (kini inisial); upload + crop bila diminta. → SELESAI v0.5.18: upload raster ≤10MB + auto-crop persegi tengah + re-encode (migrasi 035, serve privat /avatar, tampil di topbar + /settings, TestSquareCropPNG hijau). Crop manual interaktif tidak dibuat (cukup auto-crop).
 - [x] Mode ringkas sidebar (collapse) — kini drawer responsif saja. → SELESAI v0.5.16: tombol "⫷ Ringkas" sembunyikan sidebar + tombol ☰ floating untuk membuka; preferensi tersimpan di localStorage per browser.
 - [ ] Audit pembaca layar + keyboard penuh.
 

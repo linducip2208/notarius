@@ -108,6 +108,7 @@ type Page struct {
 	WIBDate      string
 	Pending      int
 	PendingTasks int
+	AvatarURL    string
 	Unread       int
 	TopNotifs    []map[string]any
 	Flash        string
@@ -372,12 +373,17 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 	role := mw.RoleOf(r)
 	username, officeName := "", ""
 	pending, pendingTasks, unread := 0, 0, 0
+	avatarURL := ""
 	var topNotifs []map[string]any
 	if id := a.uid(r); id != nil && a.db != nil {
 		_ = a.db.QueryRow(`SELECT u.name, COALESCE(o.name,'') FROM users u LEFT JOIN offices o ON o.id=u.office_id WHERE u.id=?`, *id).Scan(&username, &officeName)
 		office := a.officeOf(r)
 		pending, _, _, _ = a.reqs.Counts(office)
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN'`, office).Scan(&pendingTasks)
+		var av sql.NullInt64
+		if err := a.db.QueryRow(`SELECT avatar_ref FROM users WHERE id=? AND office_id=?`, *id, office).Scan(&av); err == nil && av.Valid && av.Int64 > 0 {
+			avatarURL = "/avatar"
+		}
 		unread = notify.Unread(a.db, *id)
 		topNotifs, _ = notify.List(a.db, *id)
 		if len(topNotifs) > 5 {
@@ -398,7 +404,7 @@ func (a *App) render(w http.ResponseWriter, r *http.Request, name string, title 
 		officeName = actName + " (bertindak)"
 	}
 	brand := a.brandView(a.officeOf(r))
-	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, PendingTasks: pendingTasks, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data, Brand: brand}); err != nil {
+	if err := a.tmpl.ExecuteTemplate(w, name, Page{Title: title, Role: role, UserName: username, OfficeName: officeName, Acting: acting, WIBDate: wib.Format(time.Now()), Pending: pending, PendingTasks: pendingTasks, AvatarURL: avatarURL, Unread: unread, TopNotifs: topNotifs, Flash: flash, CSRF: mw.IssueCSRF(w, r, a.cfg.SessionName, a.cfg.TLSCookie), Data: data, Brand: brand}); err != nil {
 		a.log.Error("render", "page", name, "err", err)
 		http.Error(w, "gagal merender halaman", http.StatusInternalServerError)
 	}
@@ -632,6 +638,8 @@ func (a *App) Router() http.Handler {
 		p.Get("/reports", a.reports)
 		p.Get("/reports/bulanan", a.reportsBulanan)
 		p.Get("/settings", a.settings)
+		p.Post("/settings/avatar", a.avatarUpload)
+		p.Get("/avatar", a.avatarServe)
 		// Website CMS + White Label (standalone per kantor).
 		p.Get("/cms", a.cmsDashboard)
 		p.Get("/cms/branding", a.brandingPage)

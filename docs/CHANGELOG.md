@@ -1,4 +1,11 @@
 # CHANGELOG
+## [0.5.18] — 2026-11-24 — Foto profil pengguna
+- Migrasi 035: `users.avatar_ref` (nullable, tanpa FK keras; runner toleran 1060).
+- Fitur: `POST /settings/avatar` (guard PermViewClient; JPG/PNG/GIF/WebP ≤10MB; auto-crop persegi tengah + re-encode strip metadata via `cms`; simpan via files store ownerType=user; audit `user.avatar`) + `GET /avatar` (milik sendiri, office-scoped, privat).
+- UI: foto tampil di topbar + kartu Foto Profil di /settings (fallback inisial bila kosong); form `multipart` + catatan auto-crop.
+- Test: `TestSquareCropPNG` hijau (6x6 dari 10x6 + fail-open input rusak).
+- Makefile/DEPLOYMENT_GUIDE(c2)/README disinkron ke 035.
+- Go-Live: seperti v0.5.17 + unggah foto di /settings, verifikasi tampil di topbar + crop persegi, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.17] — 2026-11-24 — Drill restore diperbaiki + .gitattributes
 - BUG NYATA drill B-09: `restore.sh` membuat DB `notaryos_restore` dengan kredensial app, tapi `init.sql` hanya grant `notaryos.*` → restore pasti gagal. `init.sql` kini buat + grant kedua DB; `restore.sh` toleran bila DB sudah ada (`|| true`).
 - `.gitattributes`: paksa LF untuk sh/Makefile/sql/go/gohtml/js/css/json/md/yml agar checkout Windows tak merusak kelanjutan baris bash.

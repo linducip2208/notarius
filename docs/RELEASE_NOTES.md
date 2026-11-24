@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.18 (2026-11-24) — FOTO PROFIL PENGGUNA
+Ringkasan: migrasi 035 avatar_ref + unggah auto-crop persegi + serve privat + badge topbar + TestSquareCropPNG hijau + metadata 0.5.18.
+Go-Live: seperti v0.5.17 + uji unggah foto + verifikasi persegi. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.17 (2026-11-24) — DRILL RESTORE DIPERBAIKI
 Ringkasan: grant DB restore + restore.sh toleran + .gitattributes LF + metadata 0.5.17.
 Go-Live: seperti v0.5.16 + drill restore ke notaryos_restore. Detail: docs/DEPLOYMENT_GUIDE.md.
