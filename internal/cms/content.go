@@ -80,15 +80,15 @@ func (s *Store) SaveArticle(officeID int64, a *Article, actorID *int64) (int64, 
 
 // Service is a public service info entry (not the operational `services` table).
 type Service struct {
-	ID                       int64
-	Name, Slug, Description  string
-	ServiceCode              string
-	Content                  string
-	ImageMediaID             sql.NullInt64
-	Position                 int
-	Visible                  bool
-	Locale                   string
-	SEO                      SEO
+	ID                      int64
+	Name, Slug, Description string
+	ServiceCode             string
+	Content                 string
+	ImageMediaID            sql.NullInt64
+	Position                int
+	Visible                 bool
+	Locale                  string
+	SEO                     SEO
 }
 
 // SaveService upserts a service info entry.
@@ -133,12 +133,12 @@ func (s *Store) SaveService(officeID int64, sv *Service) (int64, error) {
 
 // FAQ is one public question/answer (only visible ones render publicly).
 type FAQ struct {
-	ID                 int64
-	Category           string
-	Question, Answer   string
-	Position           int
-	Visible            bool
-	Locale             string
+	ID               int64
+	Category         string
+	Question, Answer string
+	Position         int
+	Visible          bool
+	Locale           string
 }
 
 // SaveFAQ upserts an FAQ entry.

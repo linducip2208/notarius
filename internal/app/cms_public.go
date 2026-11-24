@@ -38,7 +38,7 @@ func (a *App) pubBase(office int64, r *http.Request) map[string]any {
 	return map[string]any{
 		"Brand": a.pubBrand(office), "Nav": nav, "Foot": foot, "Site": st,
 		"Office": map[string]any{"Name": oname, "Phone": ophone, "Email": oemail, "Addr": oaddr, "Site": osite},
-		"Lang": lang, "OtherLang": map[string]any{"en": "id", "id": "en"}[lang], "IsEN": lang == "en",
+		"Lang":   lang, "OtherLang": map[string]any{"en": "id", "id": "en"}[lang], "IsEN": lang == "en",
 		"Announcement": ann, "Maintenance": maint, "LoggedIn": mw.RoleOf(r) != "",
 	}
 }

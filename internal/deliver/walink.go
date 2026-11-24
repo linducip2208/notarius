@@ -1,23 +1,24 @@
 // Package deliver — tambahan sender manual via tautan wa.me.
 //
 // KEPUTUSAN (dibaca dulu sebelum ubah):
-//   (a) SMTP: kode deliver.SMTP + deliver.FromEnv() SUDAH ADA dan dipakai
-//       remind.RunOnce via FromEnv(). Bila env NOTARYOS_SMTP_HOST (dkk) diisi,
-//       pengingat in-app otomatis dihandoff ke relay SMTP — tanpa ubah kode.
-//   (b) Bila env SMTP KOSONG (kondisi repo saat ini: .env/.env.example tidak
-//       mendefinisikan NOTARYOS_SMTP_*), TIDAK ada pengiriman otomatis yang
-//       diklaim. Sebagai gantinya file ini menyediakan helper tautan WA manual:
-//       staf menekan tombol "Kirim pengingat WA" di halaman permohonan,
-//       browser membuka chat wa.me dengan nomor + teks sudah terisi, staf
-//       menekan Kirim di WhatsApp. Jujur: bukan auto-send, tidak butuh API
-//       berbayar (Fonnte/Wablas/dsb), tidak menyimpan kredensial.
+//
+//	(a) SMTP: kode deliver.SMTP + deliver.FromEnv() SUDAH ADA dan dipakai
+//	    remind.RunOnce via FromEnv(). Bila env NOTARYOS_SMTP_HOST (dkk) diisi,
+//	    pengingat in-app otomatis dihandoff ke relay SMTP — tanpa ubah kode.
+//	(b) Bila env SMTP KOSONG (kondisi repo saat ini: .env/.env.example tidak
+//	    mendefinisikan NOTARYOS_SMTP_*), TIDAK ada pengiriman otomatis yang
+//	    diklaim. Sebagai gantinya file ini menyediakan helper tautan WA manual:
+//	    staf menekan tombol "Kirim pengingat WA" di halaman permohonan,
+//	    browser membuka chat wa.me dengan nomor + teks sudah terisi, staf
+//	    menekan Kirim di WhatsApp. Jujur: bukan auto-send, tidak butuh API
+//	    berbayar (Fonnte/Wablas/dsb), tidak menyimpan kredensial.
 //
 // CARA AKTIFKAN:
 //   - WA manual: tanpa env, langsung pakai tombol di halaman permohonan
 //     (butuh data clients.phone / clients.wa_number terisi).
 //   - Email otomatis: isi di .env (lihat .env.example):
-//       NOTARYOS_SMTP_HOST, NOTARYOS_SMTP_PORT (default 587),
-//       NOTARYOS_SMTP_USER, NOTARYOS_SMTP_PASS, NOTARYOS_SMTP_FROM.
+//     NOTARYOS_SMTP_HOST, NOTARYOS_SMTP_PORT (default 587),
+//     NOTARYOS_SMTP_USER, NOTARYOS_SMTP_PASS, NOTARYOS_SMTP_FROM.
 //   - Gateway WA otomatis (berbayar/opsional): isi NOTARYOS_NOTIFY_WEBHOOK
 //     (+ NOTARYOS_NOTIFY_SECRET) dengan URL https publik; payload JSON
 //     bertanda HMAC dikirim best-effort oleh remind.RunOnce.

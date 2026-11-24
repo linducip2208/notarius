@@ -51,9 +51,9 @@ func (a *App) dmsSearchAdvanced(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	type hit struct {
-		ID, Size                    int64
-		Name, MIME, OCR, Ver, WF    string
-		Conf                        string
+		ID, Size                 int64
+		Name, MIME, OCR, Ver, WF string
+		Conf                     string
 	}
 	var out []hit
 	if strings.TrimSpace(q.Get("q")) != "" || q.Get("wf") != "" || q.Get("mime") != "" {
@@ -212,11 +212,11 @@ func (a *App) dmsLibraryExport(w http.ResponseWriter, r *http.Request) {
 // ---- compare versions ----
 
 type cmpVer struct {
-	No              int
-	Note, Hash      string
-	Size            int64
-	CreatedAt       string
-	Ref             string
+	No         int
+	Note, Hash string
+	Size       int64
+	CreatedAt  string
+	Ref        string
 }
 
 func (a *App) dmsCompare(w http.ResponseWriter, r *http.Request) {

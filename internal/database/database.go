@@ -83,7 +83,8 @@ func Migrate(db *sql.DB, files fs.FS, dir string) (int, error) {
 	return applied, nil
 }
 
-func splitStatements(s string) []string {	lines := strings.Split(s, "\n")
+func splitStatements(s string) []string {
+	lines := strings.Split(s, "\n")
 	var b strings.Builder
 	var out []string
 	for _, ln := range lines {

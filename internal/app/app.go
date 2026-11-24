@@ -1443,7 +1443,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
 		"SLAOverdue": slaTop, "DocOverdue": docOver, "MFAWarn": mfaWarn,
-		"WFOverdue": wfOver,
+		"WFOverdue":       wfOver,
 		"PendingHandover": pendingHandover, "HandoverToday": handoverToday,
 	})
 }

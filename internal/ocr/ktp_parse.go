@@ -20,38 +20,38 @@ import (
 // KTPSuggestion is a human-reviewable prefill candidate.
 // Never auto-applied: staff must confirm in UI before touching identities.
 type KTPSuggestion struct {
-	NIK          string
-	NIKValid     bool
-	NIKIssue     string
-	Name         string
-	BirthPlace   string
-	BirthDate    string // DD-MM-YYYY bila terbaca
-	Gender       string // LAKI-LAKI / PEREMPUAN
-	Address      string
-	RT           string
-	RW           string
-	Village      string
-	District     string
-	Religion     string
-	Marital      string
-	Occupation   string
-	Nationality  string
-	ValidUntil   string
-	Confidence   float64 // 0..1 rata-rata field terisi
-	FieldConf    map[string]float64
-	RawText      string
-	NeedsReview  []string
+	NIK         string
+	NIKValid    bool
+	NIKIssue    string
+	Name        string
+	BirthPlace  string
+	BirthDate   string // DD-MM-YYYY bila terbaca
+	Gender      string // LAKI-LAKI / PEREMPUAN
+	Address     string
+	RT          string
+	RW          string
+	Village     string
+	District    string
+	Religion    string
+	Marital     string
+	Occupation  string
+	Nationality string
+	ValidUntil  string
+	Confidence  float64 // 0..1 rata-rata field terisi
+	FieldConf   map[string]float64
+	RawText     string
+	NeedsReview []string
 }
 
 var (
-	reNIK     = regexp.MustCompile(`\b\d{16}\b`)
+	reNIK      = regexp.MustCompile(`\b\d{16}\b`)
 	reNIKLoose = regexp.MustCompile(`NIK\D{0,10}(\d[\d\s\.]{15,25}\d)`)
-	reName    = regexp.MustCompile(`(?i)nama\s*[:\-]?\s*([A-Z][A-Z \.'\-]{2,60})`)
-	reTTL     = regexp.MustCompile(`(?i)tempat[/ ]t[gl]{1,2}l.*?:\s*([A-Z \.]+),\s*(\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4}|[A-Z0-9\-/ ]{4,20})`)
-	reGender  = regexp.MustCompile(`(?i)(LAKI-?LAKI|PEREMPUAN)`)
-	reAddr    = regexp.MustCompile(`(?i)alamat\s*:\s*([A-Z0-9 \.\-/]{3,80})`)
-	reRTRW    = regexp.MustCompile(`(?i)RT\s*/?\s*RW\D{0,5}(\d{1,3})\s*/\s*(\d{1,3})`)
-	reVillage = regexp.MustCompile(`(?i)kel[/ ]desa\s*:\s*([A-Z \.]{2,40})`)
+	reName     = regexp.MustCompile(`(?i)nama\s*[:\-]?\s*([A-Z][A-Z \.'\-]{2,60})`)
+	reTTL      = regexp.MustCompile(`(?i)tempat[/ ]t[gl]{1,2}l.*?:\s*([A-Z \.]+),\s*(\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4}|[A-Z0-9\-/ ]{4,20})`)
+	reGender   = regexp.MustCompile(`(?i)(LAKI-?LAKI|PEREMPUAN)`)
+	reAddr     = regexp.MustCompile(`(?i)alamat\s*:\s*([A-Z0-9 \.\-/]{3,80})`)
+	reRTRW     = regexp.MustCompile(`(?i)RT\s*/?\s*RW\D{0,5}(\d{1,3})\s*/\s*(\d{1,3})`)
+	reVillage  = regexp.MustCompile(`(?i)kel[/ ]desa\s*:\s*([A-Z \.]{2,40})`)
 	reDistrict = regexp.MustCompile(`(?i)kecamatan\s*:\s*([A-Z \.]{2,40})`)
 	reReligion = regexp.MustCompile(`(?i)agama\s*:\s*([A-Z]+)`)
 	reMarital  = regexp.MustCompile(`(?i)status perkawinan\s*:\s*([A-Z ]+)`)
@@ -232,7 +232,7 @@ func (k KTPSuggestion) ToMap() map[string]string {
 		"ktp_kecamatan": k.District, "ktp_agama": k.Religion,
 		"ktp_kawin": k.Marital, "ktp_pekerjaan": k.Occupation,
 		"ktp_kewarganegaraan": k.Nationality, "ktp_berlaku": k.ValidUntil,
-		"ktp_conf": strconv.FormatFloat(k.Confidence, 'f', 2, 64),
+		"ktp_conf":   strconv.FormatFloat(k.Confidence, 'f', 2, 64),
 		"ktp_review": strings.Join(k.NeedsReview, " | "),
 	}
 	return m

@@ -42,10 +42,10 @@ func (a *App) specimens(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, kind, file_id, note, created_at FROM client_specimens WHERE client_id=? ORDER BY id`, cid)
 	type sp struct {
-		ID            int64
-		Kind          string
-		File          int64
-		Note, At      string
+		ID       int64
+		Kind     string
+		File     int64
+		Note, At string
 	}
 	var out []sp
 	if rows != nil {
@@ -110,10 +110,10 @@ func (a *App) bankPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, stmt_date, description, amount, matched_invoice_id FROM bank_mutations WHERE office_id=? ORDER BY stmt_date DESC, id DESC LIMIT 200`, a.officeOf(r))
 	type mu struct {
-		ID             int64
-		Date, Desc     string
-		Amount         string
-		Matched        int64
+		ID         int64
+		Date, Desc string
+		Amount     string
+		Matched    int64
 	}
 	var out []mu
 	if rows != nil {

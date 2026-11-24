@@ -26,7 +26,7 @@ type Branding struct {
 	ButtonStyle                                 string
 	BorderRadius                                int
 	FontFamily                                  string
-	LogoRef, FaviconRef, LoginBG                 string
+	LogoRef, FaviconRef, LoginBG                string
 	FooterText, CopyrightText                   string
 	DefaultLang, Timezone, DateFormat, Currency string
 }
@@ -73,11 +73,11 @@ func cleanColor(v, fb string) string {
 // SiteSettings holds public site + domain configuration (honest, no fake TLS claims).
 type SiteSettings struct {
 	SiteTitle, SiteDesc, DefaultOG string
-	BaseURL, PrimaryDomain        string
-	EnforceHTTPS                 bool
-	DomainVerified               bool
-	LastSeenHost                 string
-	SetupDone                    bool
+	BaseURL, PrimaryDomain         string
+	EnforceHTTPS                   bool
+	DomainVerified                 bool
+	LastSeenHost                   string
+	SetupDone                      bool
 }
 
 type Store struct {
@@ -157,7 +157,7 @@ func DefaultBranding() Branding {
 	return Branding{
 		AppName: "SaktiNotaris", ShortName: "SN",
 		Primary: "#1f6feb", Secondary: "#101f3c", Accent: "#c9a844",
-		SidebarBG: "#101f3c", HeaderBG:    "#ffffff",
+		SidebarBG: "#101f3c", HeaderBG: "#ffffff",
 		ButtonStyle: "rounded", BorderRadius: 8, FontFamily: "system",
 		DefaultLang: "id", Timezone: "Asia/Jakarta", DateFormat: "02 Jan 2006", Currency: "IDR",
 	}

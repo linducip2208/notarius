@@ -271,9 +271,9 @@ func (a *App) cmsArticles(w http.ResponseWriter, r *http.Request) {
 		WHERE a.office_id=? AND a.deleted_at IS NULL AND (a.title LIKE ? OR a.slug LIKE ?)
 		ORDER BY a.updated_at DESC LIMIT 100`, a.officeOf(r), "%"+q.Get("q")+"%", "%"+q.Get("q")+"%")
 	type row struct {
-		ID                    int64
-		Title, Slug, Status    string
-		Cat, Updated           string
+		ID                  int64
+		Title, Slug, Status string
+		Cat, Updated        string
 	}
 	var out []row
 	if rows != nil {
@@ -379,7 +379,8 @@ func articleFromForm(r *http.Request, id int64) *cms.Article {
 		ScheduledAt: sched}
 }
 
-func (a *App) cmsArticleSave(w http.ResponseWriter, r *http.Request) {	if !a.requireWeb(w, r, rbac.PermWebArticles) {
+func (a *App) cmsArticleSave(w http.ResponseWriter, r *http.Request) {
+	if !a.requireWeb(w, r, rbac.PermWebArticles) {
 		return
 	}
 	art := articleFromForm(r, 0)

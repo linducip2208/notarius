@@ -192,16 +192,16 @@ var sectionLayout = map[string]bool{"standard": true, "wide": true, "split": tru
 
 // Section is one homepage/page-builder block with validated settings JSON.
 type Section struct {
-	ID                                     int64
-	PageID                                 int64
-	Type                                   string
-	Title, Subtitle, Content                string
-	ImageMediaID                           sql.NullInt64
-	CTALabel, CTAURL                        string
-	Background, Align, Layout               string
-	Visible                                bool
-	Position                               int
-	Settings                               map[string]any
+	ID                        int64
+	PageID                    int64
+	Type                      string
+	Title, Subtitle, Content  string
+	ImageMediaID              sql.NullInt64
+	CTALabel, CTAURL          string
+	Background, Align, Layout string
+	Visible                   bool
+	Position                  int
+	Settings                  map[string]any
 }
 
 // ValidateSection enforces type/background/align/layout enums, CTA URL safety,

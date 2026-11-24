@@ -2,5 +2,6 @@
 /storage/
 .tmp/
 *.exe
-notaryos
+/bin/notaryos
+/notaryos
 *~

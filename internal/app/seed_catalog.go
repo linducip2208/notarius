@@ -172,10 +172,10 @@ type templateSeed struct{ name, cat, body string }
 
 type workflowStepSeed struct {
 	key, label, requiredRole string
-	requireChecklist        bool
-	requireEvidence         string
-	skippable               bool
-	slaDays                 int // target hari penyelesaian langkah (<=0 = tanpa target)
+	requireChecklist         bool
+	requireEvidence          string
+	skippable                bool
+	slaDays                  int // target hari penyelesaian langkah (<=0 = tanpa target)
 }
 
 type workflowSeed struct {

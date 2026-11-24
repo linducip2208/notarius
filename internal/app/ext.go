@@ -504,9 +504,9 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	// PPAT terkait: 1 query JOIN deed_drafts.request_id (kecil, kolom seperlunya).
 	type ppatRef struct {
-		ID          int64
-		No, Jenis   string
-		Status      string
+		ID        int64
+		No, Jenis string
+		Status    string
 	}
 	var ppatRefs []ppatRef
 	if a.db != nil {
@@ -552,7 +552,7 @@ func (a *App) requestDetail(w http.ResponseWriter, r *http.Request) {
 		"Checklist": checklist, "LinkedDocs": linked, "CheckDone": done, "CheckTotal": total, "CheckPct": pct,
 		"SvcCode": a.svcCodeOf(id),
 		"WAPhone": waPhone, "WAText": waText, "WALink": waLink,
-		"Ppat": ppatRefs,
+		"Ppat":    ppatRefs,
 		"Parties": parties, "PartyClients": partyClients, "PartyRoles": partyRoles,
 		"WF": wfSteps, "WFHas": wfHas, "WFCur": wfCur, "WFStatus": wfStatus,
 		"Quotations": quots, "QuotSvc": quotSvc, "QuotPrice": quotPrice, "QuotDue": quotDefaultDue(),
@@ -1412,7 +1412,7 @@ func (a *App) deedHandover(w http.ResponseWriter, r *http.Request) {
 
 // deedHandoverView adalah satu baris riwayat serah dokumen untuk deed_detail.
 type deedHandoverView struct {
-	ID         int64
+	ID               int64
 	To, At, Note, By string
 }
 
@@ -1866,13 +1866,13 @@ func (a *App) deedDetail(w http.ResponseWriter, r *http.Request) {
 		"CanSign":    rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "APPROVED",
 		"CanArchive": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed) && d.Status == "SIGNED",
 		"Seal":       deedSeal(id), "Sigs": deedSigs(a.db, id),
-		"Timeline": a.deedTimeline(a.officeOf(r), id),
-		"Handovers":  a.deedHandovers(a.officeOf(r), id),
+		"Timeline":    a.deedTimeline(a.officeOf(r), id),
+		"Handovers":   a.deedHandovers(a.officeOf(r), id),
 		"CanHandover": rbac.Has(mw.RoleOf(r), rbac.PermApproveDeed),
-		"Attached": a.deedFiles(a.officeOf(r), id),
-		"CanEdit":  rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
-		"Parties":  a.matterParties(a.officeOf(r), reqID),
-		"Readings": readings, "HasReadingDone": hasDone,
+		"Attached":    a.deedFiles(a.officeOf(r), id),
+		"CanEdit":     rbac.Has(mw.RoleOf(r), rbac.PermEditDeed),
+		"Parties":     a.matterParties(a.officeOf(r), reqID),
+		"Readings":    readings, "HasReadingDone": hasDone,
 	})
 }
 

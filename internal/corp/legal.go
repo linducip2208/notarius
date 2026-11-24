@@ -5,9 +5,9 @@ import "database/sql"
 // Legal holds notarial-assistive corporate registry references (manual entry only).
 // No AHU/OSS integration is claimed — fields are archives of manually checked docs.
 type Legal struct {
-	DeedNo, DeedDate          string
+	DeedNo, DeedDate           string
 	AmendmentNo, AmendmentDate string
-	AHUNo, NPWP, NIB          string
+	AHUNo, NPWP, NIB           string
 }
 
 // LegalOf reads the legal reference fields for a company.

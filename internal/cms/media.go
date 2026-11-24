@@ -45,14 +45,14 @@ func Reencode(mime string, raw []byte) ([]byte, int, int, error) {
 
 // Media is one public library record (bytes live in storage under cms/{office}/).
 type Media struct {
-	ID                       int64
-	Ref                    string
-	OriginalName, MIME       string
-	Size                   int64
-	Width, Height           int
-	Alt, Caption, Folder    string
-	CreatedBy               sql.NullInt64
-	CreatedAt               time.Time
+	ID                   int64
+	Ref                  string
+	OriginalName, MIME   string
+	Size                 int64
+	Width, Height        int
+	Alt, Caption, Folder string
+	CreatedBy            sql.NullInt64
+	CreatedAt            time.Time
 }
 
 var mediaExts = map[string]bool{

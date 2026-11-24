@@ -322,11 +322,11 @@ func (a *App) workflowViewLegacy(officeID, requestID int64) (steps []wfStepView,
 
 // wfStepOverdue adalah satu langkah PENDING yang lewat due_at-nya.
 type wfStepOverdue struct {
-	InstanceID, RequestID       int64
-	ReqTitle, Service           string
-	StepKey, Label              string
-	DueAt                       string
-	LateDays                    int
+	InstanceID, RequestID int64
+	ReqTitle, Service     string
+	StepKey, Label        string
+	DueAt                 string
+	LateDays              int
 }
 
 // wfEscalationTitle membangun judul tugas eskalasi SLA langkah.

@@ -46,9 +46,9 @@ func TestDeedTemplateKeyword(t *testing.T) {
 		{"BUNDEL-PT-OSS", "PT"},
 		{"BUNDEL-CV-NIB", "CV"},
 		{"BUNDEL-AJB-BALIKNAMA", "AJB"},
-		{"KODE-TAK-KENAL", ""},   // kode tak dikenal -> ""
-		{"", ""},                 // kosong aman -> ""
-		{"  ppat-ajb  ", "AJB"},  // normalisasi case+spasi
+		{"KODE-TAK-KENAL", ""},  // kode tak dikenal -> ""
+		{"", ""},                // kosong aman -> ""
+		{"  ppat-ajb  ", "AJB"}, // normalisasi case+spasi
 	}
 	for _, c := range cases {
 		if got := deedTemplateKeyword(c.code); got != c.want {
@@ -98,8 +98,8 @@ func TestServiceDeedKind(t *testing.T) {
 		{"BUNDEL-PT-OSS", "PT"},
 		{"BUNDEL-CV-NIB", "CV"},
 		{"BUNDEL-AJB-BALIKNAMA", "AJB"},
-		{"KODE-TAK-KENAL", ""}, // default tak dikenal -> ""
-		{"", ""},               // kosong aman -> ""
+		{"KODE-TAK-KENAL", ""},  // default tak dikenal -> ""
+		{"", ""},                // kosong aman -> ""
 		{"  ppat-ajb  ", "AJB"}, // normalisasi case+spasi
 	}
 	for _, c := range cases {
@@ -151,8 +151,8 @@ func TestCorpEntityOf(t *testing.T) {
 		{"BUNDEL-PT-OSS", "PT"},
 		{"BUNDEL-CV-NIB", "CV"},
 		{"BUNDEL-AJB-BALIKNAMA", ""}, // paket PPAT -> bukan badan usaha
-		{"KODE-TAK-KENAL", ""}, // tak dikenal -> ""
-		{"", ""},               // kosong aman -> ""
+		{"KODE-TAK-KENAL", ""},       // tak dikenal -> ""
+		{"", ""},                     // kosong aman -> ""
 	}
 	for _, c := range cases {
 		if got := corpEntityOf(c.code); got != c.want {

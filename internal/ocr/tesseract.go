@@ -41,10 +41,11 @@ func (t *TesseractProvider) Name() string { return "local-tesseract" }
 // Tesseract's line confidences are unreliable for identity fields, and every
 // result MUST be human-verified before touching identity records.
 // Extract: enterprise pipeline.
-// 1) Quality gate (resolusi/brightness/kontras/blur) — hasilnya disimpan,
-//    bukan diblok diam-diam. 2) Preprocessing stdlib (upscale 2x +
-//    autocontrast + Otsu) → 3 varian. 3) Voting multi-pass PSM 6/4/3 x
-//    lang ind/ind+eng, pemenang = skor kelengkapan field KTP.
+//  1. Quality gate (resolusi/brightness/kontras/blur) — hasilnya disimpan,
+//     bukan diblok diam-diam. 2) Preprocessing stdlib (upscale 2x +
+//     autocontrast + Otsu) → 3 varian. 3) Voting multi-pass PSM 6/4/3 x
+//     lang ind/ind+eng, pemenang = skor kelengkapan field KTP.
+//
 // Semua WAJIB verifikasi manusia sebelum menyentuh identitas/akta.
 func (t *TesseractProvider) Extract(ctx context.Context, filePath string) (Result, error) {
 	q, qerr := AssessImage(filePath)
@@ -106,7 +107,7 @@ func (t *TesseractProvider) Extract(ctx context.Context, filePath string) (Resul
 	fields["text"] = best
 	fields["ocr_variant"] = bestVariant
 	fields["ocr_psm"] = bestPSM
-	return Result{		DocType:    Classify(filePath),
+	return Result{DocType: Classify(filePath),
 		Fields:     fields,
 		Provider:   t.Name() + "+enterprise-pre",
 		Provenance: t.Version,

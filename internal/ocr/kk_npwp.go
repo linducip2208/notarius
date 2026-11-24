@@ -17,19 +17,19 @@ type KKMember struct {
 
 // KKSuggestion adalah kandidat prefill Kartu Keluarga (review-only).
 type KKSuggestion struct {
-	NoKK       string
-	NoKKValid  bool
-	NoKKIssue  string
-	HeadName   string // nama kepala keluarga
-	Address    string
-	RT         string
-	RW         string
-	Village    string
-	District   string
-	Members    []KKMember
-	Confidence float64
+	NoKK        string
+	NoKKValid   bool
+	NoKKIssue   string
+	HeadName    string // nama kepala keluarga
+	Address     string
+	RT          string
+	RW          string
+	Village     string
+	District    string
+	Members     []KKMember
+	Confidence  float64
 	NeedsReview []string
-	RawText    string
+	RawText     string
 }
 
 var (
@@ -170,19 +170,19 @@ func (k KKSuggestion) ToMap() map[string]string {
 		}
 	}
 	m := map[string]string{
-		"kk_no":       k.NoKK,
-		"kk_no_valid": strconv.FormatBool(k.NoKKValid),
-		"kk_no_issue": k.NoKKIssue,
-		"kk_kepala":   k.HeadName,
-		"kk_alamat":   k.Address,
-		"kk_rt":       k.RT,
-		"kk_rw":       k.RW,
-		"kk_desa":     k.Village,
+		"kk_no":        k.NoKK,
+		"kk_no_valid":  strconv.FormatBool(k.NoKKValid),
+		"kk_no_issue":  k.NoKKIssue,
+		"kk_kepala":    k.HeadName,
+		"kk_alamat":    k.Address,
+		"kk_rt":        k.RT,
+		"kk_rw":        k.RW,
+		"kk_desa":      k.Village,
 		"kk_kecamatan": k.District,
-		"kk_anggota":  strings.Join(parts, "; "),
-		"kk_jumlah":   strconv.Itoa(len(k.Members)),
-		"kk_conf":     fmt.Sprintf("%.2f", k.Confidence),
-		"kk_review":   strings.Join(k.NeedsReview, " | "),
+		"kk_anggota":   strings.Join(parts, "; "),
+		"kk_jumlah":    strconv.Itoa(len(k.Members)),
+		"kk_conf":      fmt.Sprintf("%.2f", k.Confidence),
+		"kk_review":    strings.Join(k.NeedsReview, " | "),
 	}
 	for i, mem := range k.Members {
 		n := strconv.Itoa(i + 1)
@@ -196,15 +196,15 @@ func (k KKSuggestion) ToMap() map[string]string {
 
 // NPWPSuggestion adalah kandidat prefill NPWP (review-only).
 type NPWPSuggestion struct {
-	NPWP       string // digit saja (15 atau 16)
-	Formatted  string // tampilan bertitik untuk 15 digit
-	NPWPValid  bool
-	NPWPIssue  string
-	Name       string // nama wajib pajak
-	Address    string
-	Confidence float64
+	NPWP        string // digit saja (15 atau 16)
+	Formatted   string // tampilan bertitik untuk 15 digit
+	NPWPValid   bool
+	NPWPIssue   string
+	Name        string // nama wajib pajak
+	Address     string
+	Confidence  float64
 	NeedsReview []string
-	RawText    string
+	RawText     string
 }
 
 var (

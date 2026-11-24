@@ -67,8 +67,8 @@ func (a *App) willWizard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.render(w, r, "wasiat_wizard", "Wizard Wasiat", map[string]any{
-		"Req": d,
-		"SvcCode": a.svcCodeOf(reqID),
+		"Req":       d,
+		"SvcCode":   a.svcCodeOf(reqID),
 		"Checklist": checklist, "CheckDone": done, "CheckTotal": len(checklist), "CheckPct": pct,
 		"Wills": wrows,
 	})

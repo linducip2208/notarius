@@ -12,42 +12,42 @@ import (
 //
 // Kontrak helper:
 //
-//	func workflowGate(db *sql.DB, officeID, reqID int64, svcCode, kind string) []string
+//		func workflowGate(db *sql.DB, officeID, reqID int64, svcCode, kind string) []string
 //
-//   - svcCode boleh "" → di-resolve dari service_requests JOIN services.
-//   - kind adalah JENIS GATE: "move" | "approve" | "ppat". Nilai lain/asing
-//     diperlakukan sebagai gate umum (tanpa cek resi BPN); bila bukan nama
-//     gate yang dikenal dan tidak kosong, dipakai juga sebagai petunjuk
-//     deed-kind bila lookup DB tidak menemukan draf akta tertaut.
-//   - Kembalian: daftar alasan blokir (bukan error). Kosong/nil = lolos.
+//	  - svcCode boleh "" → di-resolve dari service_requests JOIN services.
+//	  - kind adalah JENIS GATE: "move" | "approve" | "ppat". Nilai lain/asing
+//	    diperlakukan sebagai gate umum (tanpa cek resi BPN); bila bukan nama
+//	    gate yang dikenal dan tidak kosong, dipakai juga sebagai petunjuk
+//	    deed-kind bila lookup DB tidak menemukan draf akta tertaut.
+//	  - Kembalian: daftar alasan blokir (bukan error). Kosong/nil = lolos.
 //
 // Keputusan desain fail-open vs fail-closed per cek (penting, dibaca dulu):
-//   1. db == nil atau reqID <= 0 → nil (fail-open; handler hilir tetap
-//      memvalidasi eksistensi baris dan mengembalikan 404/400-nya sendiri).
-//   2. Tabel service_workflow_rules HILANG (DB lama pra-026) → nil, fail-open
-//      penuh (perilaku lama dipertahankan). HANYA kasus ini yang fail-open
-//      di level engine.
-//   3. Baris rule untuk svcCode tak ada → default KETAT SEDANG: checklist
-//      diwajibkan (tapi hanya efektif bila template checklist ada — bila
-//      tidak ada item, cek ini lolos sendiri), identitas pihak wajib
-//      VERIFIED, min_parties=1 (selalu terpenuhi klien utama), tanpa syarat
-//      deed_kind dan tanpa resi BPN.
-//   4. Sub-tabel pendukung hilang (matter_parties / identities / checklist /
-//      ppat_register pra-migrasi): cek yang bersangkutan dilewati (fail-open
-//      per-cek) agar kantor dengan DB lama tidak terkunci total. Ini
-//      disengaja dan dicatat di tiap titik.
-//   5. Request/service tidak ditemukan (svcCode tak bisa di-resolve) → nil;
-//      Move/Approve hilir akan menolak dengan error-nya sendiri.
-//   6. Cek resi BPN HANYA untuk gate "ppat" (dan ppatAdvance memfilter blok
-//      ini kecuali target LAPOR_BPN; resi susulan dari form juga memfilter).
-//      Gate "move"/"approve" tidak pernah memblokir soal resi.
-//   7. Cek deed_kind hanya bila rule menetapkan require_deed_kind DAN ada
-//      akta/draf tertaut yang bisa dibandingkan; tanpa draf tertaut → lewat
-//      (requestMove tanpa akta tidak diblokir soal jenis akta).
-//   8. Checklist: item berstatus selain VERIFIED/RECEIVED memblokir. MISSING
-//      dan REJECTED/NEEDS_REVISION dilaporkan sebagai blok terpisah agar
-//      pesan requestMove lama ("masih ada N dokumen berstatus MISSING…")
-//      tetap bisa dipertahankan formatnya oleh pemanggil.
+//  1. db == nil atau reqID <= 0 → nil (fail-open; handler hilir tetap
+//     memvalidasi eksistensi baris dan mengembalikan 404/400-nya sendiri).
+//  2. Tabel service_workflow_rules HILANG (DB lama pra-026) → nil, fail-open
+//     penuh (perilaku lama dipertahankan). HANYA kasus ini yang fail-open
+//     di level engine.
+//  3. Baris rule untuk svcCode tak ada → default KETAT SEDANG: checklist
+//     diwajibkan (tapi hanya efektif bila template checklist ada — bila
+//     tidak ada item, cek ini lolos sendiri), identitas pihak wajib
+//     VERIFIED, min_parties=1 (selalu terpenuhi klien utama), tanpa syarat
+//     deed_kind dan tanpa resi BPN.
+//  4. Sub-tabel pendukung hilang (matter_parties / identities / checklist /
+//     ppat_register pra-migrasi): cek yang bersangkutan dilewati (fail-open
+//     per-cek) agar kantor dengan DB lama tidak terkunci total. Ini
+//     disengaja dan dicatat di tiap titik.
+//  5. Request/service tidak ditemukan (svcCode tak bisa di-resolve) → nil;
+//     Move/Approve hilir akan menolak dengan error-nya sendiri.
+//  6. Cek resi BPN HANYA untuk gate "ppat" (dan ppatAdvance memfilter blok
+//     ini kecuali target LAPOR_BPN; resi susulan dari form juga memfilter).
+//     Gate "move"/"approve" tidak pernah memblokir soal resi.
+//  7. Cek deed_kind hanya bila rule menetapkan require_deed_kind DAN ada
+//     akta/draf tertaut yang bisa dibandingkan; tanpa draf tertaut → lewat
+//     (requestMove tanpa akta tidak diblokir soal jenis akta).
+//  8. Checklist: item berstatus selain VERIFIED/RECEIVED memblokir. MISSING
+//     dan REJECTED/NEEDS_REVISION dilaporkan sebagai blok terpisah agar
+//     pesan requestMove lama ("masih ada N dokumen berstatus MISSING…")
+//     tetap bisa dipertahankan formatnya oleh pemanggil.
 type workflowRule struct {
 	requireChecklist        bool
 	requireVerifiedIdentity bool

@@ -13,10 +13,10 @@ import (
 
 // CustomField is an office-defined metadata slot.
 type CustomField struct {
-	ID                 int64
+	ID                  int64
 	Name, Type, Options string
-	Required           bool
-	Position           int
+	Required            bool
+	Position            int
 }
 
 // CustomFields lists slots in order.

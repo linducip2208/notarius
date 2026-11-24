@@ -156,6 +156,7 @@ func (q Quotation) ReqID() int64 {
 	}
 	return *q.RequestID
 }
+
 // quotationTotal menjumlahkan rincian (tanpa PPN: penawaran adalah estimasi
 // sebelum pajak; PPN 11% dihitung saat konversi invoice via money.PPN).
 func quotationTotal(lines []QuotationLine) int64 {

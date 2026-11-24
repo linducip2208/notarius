@@ -36,9 +36,9 @@ func (a *App) cmsInquiries(w http.ResponseWriter, r *http.Request) {
 	q += ` ORDER BY id DESC LIMIT 200`
 	rows, _ := a.db.Query(q, args...)
 	type inq struct {
-		ID                             int64
+		ID                              int64
 		Name, Contact, Service, Msg, St string
-		At                             string
+		At                              string
 	}
 	var out []inq
 	if rows != nil {
@@ -95,10 +95,10 @@ func (a *App) cmsSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type s struct {
-		ID           int64
-		Weekday      int
-		Day          string
-		Start, End   string
+		ID            int64
+		Weekday       int
+		Day           string
+		Start, End    string
 		Quota, Active int
 	}
 	dayName := map[int]string{0: "Minggu", 1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu"}
@@ -164,8 +164,8 @@ func (a *App) cmsBookings(w http.ResponseWriter, r *http.Request) {
 	rows, _ := a.db.Query(q, args...)
 	type b struct {
 		ID                       int64
-		Date, Start, Name         string
-		Contact, Purpose, Status  string
+		Date, Start, Name        string
+		Contact, Purpose, Status string
 		Appt                     int64
 	}
 	var out []b
@@ -254,10 +254,10 @@ func (a *App) cmsTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, name, title, photo_media_id, position, visible FROM website_team WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
 	type m struct {
-		ID             int64
-		Name, Title    string
-		Photo          int64
-		Pos, Vis       int
+		ID          int64
+		Name, Title string
+		Photo       int64
+		Pos, Vis    int
 	}
 	var out []m
 	if rows != nil {
@@ -318,10 +318,10 @@ func (a *App) cmsGallery(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, media_id, caption, position FROM website_gallery WHERE office_id=? ORDER BY position, id`, a.officeOf(r))
 	type g struct {
-		ID           int64
-		Media        int64
-		Caption      string
-		Pos          int
+		ID      int64
+		Media   int64
+		Caption string
+		Pos     int
 	}
 	var out []g
 	if rows != nil {
@@ -372,7 +372,7 @@ func (a *App) cmsTestimonials(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, _ := a.db.Query(`SELECT id, name, content, status, verify_note, created_at FROM website_testimonials WHERE office_id=? ORDER BY id DESC LIMIT 100`, a.officeOf(r))
 	type t struct {
-		ID                      int64
+		ID                         int64
 		Name, Content, St, Ver, At string
 	}
 	var out []t
@@ -457,10 +457,10 @@ func (a *App) cmsVersions(w http.ResponseWriter, r *http.Request) {
 	q += ` ORDER BY id DESC LIMIT 100`
 	rows, _ := a.db.Query(q, args...)
 	type v struct {
-		ID             int64
-		Kind           string
-		Ref            int64
-		Title, At      string
+		ID        int64
+		Kind      string
+		Ref       int64
+		Title, At string
 	}
 	var out []v
 	if rows != nil {

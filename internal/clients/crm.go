@@ -11,25 +11,25 @@ import (
 // ClientFull is the complete professional profile (nullable new columns).
 type ClientFull struct {
 	Client
-	RegNumber                                   string
-	BirthPlace                                  string
-	BirthDate                                   string
-	Gender, Nationality, Marital                string
-	Occupation, Education, Passport             string
-	IDAddress, Domicile                         string
-	Province, City, District, Village, Postal   string
-	AltPhone, WANumber, Correspondence          string
-	FirstClientDate, Source                     string
-	PIC                                         int64
-	Status                                      string
-	InternalNotes, Labels                      string
+	RegNumber                                 string
+	BirthPlace                                string
+	BirthDate                                 string
+	Gender, Nationality, Marital              string
+	Occupation, Education, Passport           string
+	IDAddress, Domicile                       string
+	Province, City, District, Village, Postal string
+	AltPhone, WANumber, Correspondence        string
+	FirstClientDate, Source                   string
+	PIC                                       int64
+	Status                                    string
+	InternalNotes, Labels                     string
 }
 
 // Stats is the client overview dashboard (all real-time counts).
 type Stats struct {
-	Total, Individual, Corporate, Active       int
-	InProcess, DocsIncomplete, PendingVerify   int
-	Finished, Unpaid                           int
+	Total, Individual, Corporate, Active     int
+	InProcess, DocsIncomplete, PendingVerify int
+	Finished, Unpaid                         int
 }
 
 // maskNIK shows only last 4 (identities store last4 only — full NIK never leaves vault).
@@ -286,12 +286,12 @@ func (s *Store) FindDuplicatesEx(officeID int64, excludeID int64, name, phone, e
 
 // Note is one CRM record.
 type Note struct {
-	ID                       int64
-	Kind, Title, Body        string
-	OccurredAt               string
-	CreatedBy                int64
-	CreatedByName            string
-	CreatedAt                string
+	ID                int64
+	Kind, Title, Body string
+	OccurredAt        string
+	CreatedBy         int64
+	CreatedByName     string
+	CreatedAt         string
 }
 
 // AddNote records a communication/meeting/follow-up/complaint entry.
@@ -438,10 +438,10 @@ func (s *Store) MarkInconsistent(officeID, identityID int64, flag bool) error {
 
 // MergePreview describes what a merge would move (read-only).
 type MergePreview struct {
-	WinnerID, LoserID              int64
-	Requests, Files, Identities    int
-	Appointments, Notes            int
-	Invoices                       int
+	WinnerID, LoserID           int64
+	Requests, Files, Identities int
+	Appointments, Notes         int
+	Invoices                    int
 }
 
 // MergePreview counts relinkable rows for both sides.
@@ -528,7 +528,7 @@ func (s *Store) Completeness(officeID, clientID int64) (int, []CompletenessItem,
 		return 0, nil, err
 	}
 	type check struct {
-		label string
+		label  string
 		weight int
 		ok     bool
 	}
