@@ -628,6 +628,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/templates/{id}/approve", a.templateApprove)
 		p.Post("/clauses", a.clauseSave)
 		p.Get("/reports", a.reports)
+		p.Get("/reports/bulanan", a.reportsBulanan)
 		p.Get("/settings", a.settings)
 		// Website CMS + White Label (standalone per kantor).
 		p.Get("/cms", a.cmsDashboard)
@@ -698,6 +699,9 @@ func (a *App) Router() http.Handler {
 		p.Post("/mfa", a.mfaEnable)
 		p.Get("/portal", a.portal)
 		p.Post("/notifications/read", a.notifRead)
+		p.Post("/push/subscribe", a.pushSubscribe)
+		p.Post("/push/unsubscribe", a.pushUnsubscribe)
+		p.Post("/push/test", a.pushTest)
 		p.Get("/metrics", a.metrics)
 		p.Get("/portal/invoices", a.portalInvoices)
 		p.Post("/portal/pay", a.portalPayConfirm)
@@ -751,6 +755,7 @@ func (a *App) Router() http.Handler {
 		p.Post("/dms/checklists/import", a.dmsChecklistsImport)
 		p.Post("/requests/{id}/checklist", a.dmsChecklistSet)
 		p.Post("/requests/{id}/workflow/step", a.workflowStep)
+		p.Post("/workflow/sla-escalate", a.workflowSLAEscalate)
 		p.Get("/qr", a.qrText)
 		p.Get("/dms/archive/labels", a.dmsLabels)
 		p.Get("/audit", a.auditPage)
@@ -1379,6 +1384,9 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	// langsung. Best-effort: gagal query → widget disembunyikan template.
 	var slaTop []remind.ServiceOverdueItem
 	var docOver []remind.OverdueDoc
+	// Widget SLA langkah 033: langkah PENDING yang lewat due_at-nya
+	// (best-effort: DB lama pra-033 → kosong, disembunyikan template).
+	var wfOver []wfStepOverdue
 	// Widget serah-terima (031): tipe baris + var di luar if agar terbaca
 	// render di bawah (best-effort, disembunyikan template bila kosong).
 	type handoverPending struct {
@@ -1400,6 +1408,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			}
 			docOver = docs
 		}
+		wfOver = a.workflowStepOverdue(office)
 		// Widget serah-terima (031): akta APPROVED/SIGNED tanpa handover
 		// (LIMIT 5, office-scoped) + count serah hari ini (deed_handovers +
 		// legalisasi HANDED_OVER via proxy completed_at hari ini).
@@ -1434,6 +1443,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 		"Donut": donut, "Conic": conic, "Work": pendingWork, "Feed": feed,
 		"PwStale": pwStale, "ToApprove": toApprove, "ReadySign": readySign, "Stuck": stuck,
 		"SLAOverdue": slaTop, "DocOverdue": docOver, "MFAWarn": mfaWarn,
+		"WFOverdue": wfOver,
 		"PendingHandover": pendingHandover, "HandoverToday": handoverToday,
 	})
 }
@@ -2389,6 +2399,7 @@ func (a *App) ppatRegister(w http.ResponseWriter, r *http.Request) {
 	if !a.requireStaff(w, r) {
 		return
 	}
+	office := a.officeOf(r)
 	type row struct {
 		ID               int64
 		No, Date, Jenis  string
@@ -2397,16 +2408,20 @@ func (a *App) ppatRegister(w http.ResponseWriter, r *http.Request) {
 		Status, BPN      string
 		DeedID           int64
 		Days             int
+		DueIn            int
+		Warn             bool
 		Overdue          bool
 	}
 	var rows []row
 	if a.db != nil {
+		// Jatuh tempo resi = tanggal lapor (bpn_date, 034) + 14 hari;
+		// bpn_date NULL (lapor sebelum 034) memakai DATE(created_at).
 		rs, err := a.db.Query(`SELECT id, akta_no, DATE_FORMAT(akta_date,'%d %b %Y'), jenis,
 			COALESCE(penjual,''), COALESCE(pembeli,''),
 			CONCAT(COALESCE(objek_sertifikat,''),' ',COALESCE(objek_luas,''),' ',COALESCE(objek_lokasi,'')),
 			status, COALESCE(bpn_receipt,''), COALESCE(deed_id,0),
-			DATEDIFF(CURDATE(), COALESCE(akta_date, DATE(created_at)))
-			FROM ppat_register WHERE office_id=? ORDER BY id DESC LIMIT 200`, a.officeOf(r))
+			DATEDIFF(CURDATE(), COALESCE(bpn_date, DATE(created_at)))
+			FROM ppat_register WHERE office_id=? ORDER BY id DESC LIMIT 200`, office)
 		if err == nil {
 			defer rs.Close()
 			for rs.Next() {
@@ -2416,14 +2431,59 @@ func (a *App) ppatRegister(w http.ResponseWriter, r *http.Request) {
 				if dt.Valid {
 					x.Date = dt.String
 				}
-				// Pengingat resi BPN: LAPOR_BPN > 14 hari tanpa terbit = overdue.
-				x.Overdue = x.Status == "LAPOR_BPN" && x.Days > 14
+				x.DueIn, x.Warn, x.Overdue = ppatBPNState(x.Status, x.Days)
 				rows = append(rows, x)
 			}
+		}
+		// Auto-tugas pengingat resi: LAPOR_BPN dengan sisa H<=3 tanpa tugas
+		// OPEN "cek resi BPN #id" → buatkan 1 (tiru pola SLA dms.go;
+		// idempoten via judul, best-effort fail-open).
+		made := 0
+		for _, x := range rows {
+			if x.Status != "LAPOR_BPN" || x.DueIn > 3 {
+				continue
+			}
+			title := ppatRemindTitle(x.ID, x.No)
+			var n int
+			if err := a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN' AND title=?`, office, title).Scan(&n); err != nil || n > 0 {
+				continue
+			}
+			due := time.Now().AddDate(0, 0, x.DueIn).Format("2006-01-02")
+			if _, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by) VALUES(?,?,?,?)`,
+				office, title, due, a.uid(r)); err == nil {
+				made++
+			}
+		}
+		if made > 0 {
+			a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.remind", Entity: "ppat_register", EntityID: "self", Detail: strconv.Itoa(made) + " tugas pengingat resi BPN", OfficeID: officePtr(office)})
 		}
 	}
 	deeds, _ := a.deeds.List(a.officeOf(r))
 	a.render(w, r, "ppat", "Register PPAT", map[string]any{"Rows": rows, "Deeds": deeds})
+}
+
+// ppatBPNState memetakan umur resi (hari sejak tanggal lapor) ke badge
+// progresif: H-7..H-0 kuning (Warn), lewat jatuh tempo merah (Overdue).
+// Jatuh tempo = bpn_date + 14 hari (fallback DATE(created_at) bila NULL);
+// days = DATEDIFF(CURDATE(), basis) dari query. Bukan LAPOR_BPN = netral.
+func ppatBPNState(status string, days int) (dueIn int, warn, overdue bool) {
+	dueIn = 14 - days
+	if status != "LAPOR_BPN" {
+		return dueIn, false, false
+	}
+	switch {
+	case dueIn < 0:
+		return dueIn, false, true
+	case dueIn <= 7:
+		return dueIn, true, false
+	}
+	return dueIn, false, false
+}
+
+// ppatRemindTitle adalah judul deterministik tugas pengingat resi satu
+// register PPAT (dipakai untuk cek idempoten + penutupan saat terbit).
+func ppatRemindTitle(id int64, aktaNo string) string {
+	return fmt.Sprintf("cek resi BPN #%d (%s)", id, aktaNo)
 }
 
 func (a *App) ppatCreate(w http.ResponseWriter, r *http.Request) {
@@ -2510,13 +2570,43 @@ func (a *App) ppatAdvance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `nomor resi BPN asli wajib diisi sebelum lapor BPN — tanda "-" tidak diterima sebagai resi`, http.StatusBadRequest)
 		return
 	}
-	_, err := a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END WHERE id=? AND office_id=?`,
-		next, bpn, bpn, id, office)
+	// Tanggal lapor BPN (034): opsional dari form, default hari ini saat naik
+	// ke LAPOR_BPN. Bukan target LAPOR_BPN = bpn_date tidak disentuh.
+	var bpnDate any
+	if next == "LAPOR_BPN" {
+		if v := strings.TrimSpace(r.FormValue("bpn_date")); v != "" {
+			if _, err := time.Parse("2006-01-02", v); err != nil {
+				http.Error(w, "format tanggal lapor BPN tidak valid (pakai YYYY-MM-DD)", http.StatusBadRequest)
+				return
+			}
+			bpnDate = v
+		}
+	}
+	var err error
+	switch {
+	case next == "LAPOR_BPN" && bpnDate != nil:
+		_, err = a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END, bpn_date=? WHERE id=? AND office_id=?`,
+			next, bpn, bpn, bpnDate, id, office)
+	case next == "LAPOR_BPN":
+		_, err = a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END, bpn_date=COALESCE(bpn_date, CURDATE()) WHERE id=? AND office_id=?`,
+			next, bpn, bpn, id, office)
+	default:
+		_, err = a.db.Exec(`UPDATE ppat_register SET status=?, bpn_receipt=CASE WHEN ?<>'' THEN ? ELSE bpn_receipt END WHERE id=? AND office_id=?`,
+			next, bpn, bpn, id, office)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "ppat.advance." + strings.ToLower(next), Entity: "ppat_register", EntityID: strconv.FormatInt(id, 10), OfficeID: officePtr(office)})
+	// Tutup loop pengingat: sertifikat terbit menutup tugas "cek resi BPN #id"
+	// yang masih OPEN (tiru penutupan SLA terminal di dms.go; best-effort).
+	if next == "SERTIFIKAT_TERBIT" {
+		var aktaNo string
+		_ = a.db.QueryRow(`SELECT akta_no FROM ppat_register WHERE id=? AND office_id=?`, id, office).Scan(&aktaNo)
+		_, _ = a.db.Exec(`UPDATE tasks SET status='DONE' WHERE office_id=? AND status='OPEN' AND title=?`,
+			office, ppatRemindTitle(id, aktaNo))
+	}
 	// Tutup loop workflow: PPAT maju → step kunci "akta"/"lapor" DONE
 	// (best-effort, fail-open; tanpa tautan permohonan = lewati diam-diam).
 	if deedID.Valid && deedID.Int64 > 0 && (next == "AKTA_JADI" || next == "LAPOR_BPN") {
@@ -2880,151 +2970,8 @@ func (a *App) reports(w http.ResponseWriter, r *http.Request) {
 		a.forbidden(w, r)
 		return
 	}
-	pending, active, completed := 0, 0, 0
-	var out int64
-	if a.db != nil {
-		pending, active, completed, _ = a.reqs.Counts(a.officeOf(r))
-		out, _ = a.fin.Outstanding(a.officeOf(r))
-	}
-	// Anggaran vs realisasi bulan berjalan per kategori.
-	type brow struct {
-		Category      string
-		Budget, Spent int64
-	}
-	var budgets []brow
-	month := time.Now().Format("2006-01-01")
-	brows, _ := a.db.Query(`SELECT b.category, b.amount, COALESCE((SELECT SUM(e.amount) FROM expenses e
-		WHERE e.office_id=b.office_id AND e.category=b.category AND DATE_FORMAT(e.spent_at,'%Y-%m-01')=b.month),0)
-		FROM budgets b WHERE b.office_id=? AND b.month=? ORDER BY b.category`, a.officeOf(r), month)
-	if brows != nil {
-		defer brows.Close()
-		for brows.Next() {
-			var x brow
-			var bamt, samt string
-			_ = brows.Scan(&x.Category, &bamt, &samt)
-			x.Budget = decWhole(bamt)
-			x.Spent = decWhole(samt)
-			budgets = append(budgets, x)
-		}
-	}
-	// Laba per layanan: hanya invoice yang tertaut permohonan (jujur; sisanya "tanpa tautan").
-	type prow struct {
-		Service      string
-		Count, Total int64
-	}
-	var profits []prow
-	prows, _ := a.db.Query(`SELECT COALESCE(s.name,'(tanpa tautan layanan)'), COUNT(i.id), COALESCE(SUM(i.total),0)
-		FROM invoices i LEFT JOIN service_requests r ON r.id=i.request_id LEFT JOIN services s ON s.id=r.service_id
-		WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY 1 ORDER BY 3 DESC`, a.officeOf(r))
-	if prows != nil {
-		defer prows.Close()
-		for prows.Next() {
-			var x prow
-			var tot string
-			_ = prows.Scan(&x.Service, &x.Count, &tot)
-			x.Total = decWhole(tot)
-			profits = append(profits, x)
-		}
-	}
-	// Rekap per kategori layanan: jumlah permohonan + total invoice + total paid
-	// (3 query GROUP BY kategori layanan, office-scoped).
-	type catRow struct {
-		Category       string
-		Reqs           int64
-		InvTotal, Paid int64
-	}
-	byCatMap := map[string]*catRow{}
-	if a.db != nil {
-		if q1, err := a.db.Query(`SELECT s.category, COUNT(r.id) FROM service_requests r JOIN services s ON s.id=r.service_id WHERE r.office_id=? GROUP BY s.category`, a.officeOf(r)); err == nil && q1 != nil {
-			defer q1.Close()
-			for q1.Next() {
-				var c string
-				var n int64
-				_ = q1.Scan(&c, &n)
-				if _, ok := byCatMap[c]; !ok {
-					byCatMap[c] = &catRow{Category: c}
-				}
-				byCatMap[c].Reqs = n
-			}
-		}
-		if q2, err := a.db.Query(`SELECT s.category, COALESCE(SUM(i.total),0) FROM invoices i JOIN service_requests r ON r.id=i.request_id JOIN services s ON s.id=r.service_id WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY s.category`, a.officeOf(r)); err == nil && q2 != nil {
-			defer q2.Close()
-			for q2.Next() {
-				var c, tot string
-				_ = q2.Scan(&c, &tot)
-				if _, ok := byCatMap[c]; !ok {
-					byCatMap[c] = &catRow{Category: c}
-				}
-				byCatMap[c].InvTotal = decWhole(tot)
-			}
-		}
-		if q3, err := a.db.Query(`SELECT s.category, COALESCE(SUM(i.paid),0) FROM invoices i JOIN service_requests r ON r.id=i.request_id JOIN services s ON s.id=r.service_id WHERE i.office_id=? AND i.status IN ('ISSUED','PARTIAL','PAID') GROUP BY s.category`, a.officeOf(r)); err == nil && q3 != nil {
-			defer q3.Close()
-			for q3.Next() {
-				var c, tot string
-				_ = q3.Scan(&c, &tot)
-				if _, ok := byCatMap[c]; !ok {
-					byCatMap[c] = &catRow{Category: c}
-				}
-				byCatMap[c].Paid = decWhole(tot)
-			}
-		}
-	}
-	var byCat []catRow
-	for _, v := range byCatMap {
-		byCat = append(byCat, *v)
-	}
-	// Top 5 layanan bulan berjalan: nama layanan + jumlah invoice + total dibayar,
-	// filter bulan berjalan, office-scoped.
-	type topRow struct {
-		Service     string
-		Count, Paid int64
-	}
-	var topSvc []topRow
-	if a.db != nil {
-		ym := time.Now().Format("2006-01")
-		if trows, err := a.db.Query(`SELECT COALESCE(s.name,'(tanpa tautan layanan)'), COUNT(i.id), COALESCE(SUM(i.paid),0)
-			FROM invoices i LEFT JOIN service_requests r ON r.id=i.request_id LEFT JOIN services s ON s.id=r.service_id
-			WHERE i.office_id=? AND DATE_FORMAT(i.created_at,'%Y-%m')=? AND i.status IN ('ISSUED','PARTIAL','PAID')
-			GROUP BY 1 ORDER BY 3 DESC LIMIT 5`, a.officeOf(r), ym); err == nil && trows != nil {
-			defer trows.Close()
-			for trows.Next() {
-				var x topRow
-				var paid string
-				_ = trows.Scan(&x.Service, &x.Count, &paid)
-				x.Paid = decWhole(paid)
-				topSvc = append(topSvc, x)
-			}
-		}
-	}
-	// Papan SLA: permohonan terbuka yang melewati target umur layanannya (batasi 20).
-	// ServiceOverdue hanya memakai kolom yang sudah ada (r.created_at untuk umur).
-	var slaOver []remind.ServiceOverdueItem
-	if a.db != nil {
-		if over, err := remind.ServiceOverdue(a.db, a.officeOf(r)); err == nil {
-			if len(over) > 20 {
-				over = over[:20]
-			}
-			slaOver = over
-		}
-	}
-	// Rekap serah bulan berjalan (031): count deed_handovers + legalisasi
-	// HANDED_OVER bulan ini (proxy completed_at bulan berjalan — HANDED_OVER
-	// selalu lewat COMPLETED sehingga completed_at terisi). Best-effort,
-	// query existing di atas tidak diubah.
-	var handoverMonth int64
-	if a.db != nil {
-		ymH := time.Now().Format("2006-01")
-		var dh, lg int64
-		_ = a.db.QueryRow(`SELECT COUNT(*) FROM deed_handovers WHERE office_id=? AND DATE_FORMAT(COALESCE(handed_at,created_at),'%Y-%m')=?`, a.officeOf(r), ymH).Scan(&dh)
-		_ = a.db.QueryRow(`SELECT COUNT(*) FROM legalizations WHERE office_id=? AND status='HANDED_OVER' AND DATE_FORMAT(completed_at,'%Y-%m')=?`, a.officeOf(r), ymH).Scan(&lg)
-		handoverMonth = dh + lg
-	}
-	a.render(w, r, "reports", "Laporan", map[string]any{
-		"Pending": pending, "Active": active, "Completed": completed, "Outstanding": out,
-		"Budgets": budgets, "Profits": profits, "Month": time.Now().Format("2006-01"), "ByCat": byCat,
-		"TopSvc": topSvc, "SLAOver": slaOver, "HandoverMonth": handoverMonth,
-	})
+	// Dataset diambil dari helper bersama (dipakai ulang oleh /reports/bulanan).
+	a.render(w, r, "reports", "Laporan", a.reportDataset(a.officeOf(r)))
 }
 
 func (a *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -3033,7 +2980,15 @@ func (a *App) settings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, _ := a.users.List(a.officeOf(r))
-	a.render(w, r, "settings", "Pengaturan", map[string]any{"Users": list, "Roles": rbac.Roles()})
+	var pushCount int64
+	if id := a.uid(r); id != nil && a.db != nil {
+		pushCount, _ = notify.CountByUser(a.db, *id)
+	}
+	a.render(w, r, "settings", "Pengaturan", map[string]any{
+		"Users": list, "Roles": rbac.Roles(),
+		"VapidPublic": vapidPublicKey(), "PushCount": pushCount,
+		"CanPushTest": rbac.Has(mw.RoleOf(r), rbac.PermManageUsers),
+	})
 }
 
 // portalNextAction maps the 9-stage request status to a client-facing next step.

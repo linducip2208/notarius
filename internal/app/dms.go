@@ -20,10 +20,12 @@ import (
 	"github.com/skip2/go-qrcode"
 	"notaryos/internal/audit"
 	"notaryos/internal/config"
+	"notaryos/internal/dms"
 	"notaryos/internal/files"
 	"notaryos/internal/malware"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/notify"
+	"notaryos/internal/ocr"
 	"notaryos/internal/officex"
 	"notaryos/internal/plan"
 	"notaryos/internal/rbac"
@@ -269,11 +271,28 @@ func (a *App) dmsDetail(w http.ResponseWriter, r *http.Request) {
 	fields, _ := a.dms.CustomFields(a.officeOf(r))
 	fvals, _ := a.dms.FieldValues(id)
 	pendingAppr, totalAppr := a.dms.ApprovalState(id)
+	// Saran kategori otomatis: DocType OCR terbaru (atau tebak nama file
+	// bila OCR masih antre) dipetakan ke kategori kantor yang sudah ada.
+	// Murni saran baca — tidak pernah membuat kategori / mengubah berkas.
+	sugDocType := string(ocr.Classify(m.Name))
+	if len(ocrs) > 0 && strings.TrimSpace(string(ocrs[0].DocType)) != "" {
+		sugDocType = string(ocrs[0].DocType)
+	}
+	var sugCatID int64
+	var sugCatName string
+	var showSug bool
+	if sug, ok := dms.SuggestCategory(cats, sugDocType, m.MIME, m.Name); ok {
+		if m.CatID == 0 || m.CatID != sug.ID {
+			sugCatID, sugCatName, showSug = sug.ID, sug.Name, true
+		}
+	}
+	showSugDash := !showSug && m.CatID == 0
 	a.render(w, r, "dms_detail", "Dokumen #"+strconv.FormatInt(id, 10), map[string]any{
 		"M": m, "Vers": vers, "Rels": rels, "UsedIn": usedIn, "Timeline": tl, "Holds": holds,
 		"Hist": hist, "Access": alog, "OCRs": ocrs, "KKMembers": kkMembers, "Cats": cats, "Locs": locs,
 		"Fields": fields, "FieldVals": fvals, "CanSee": dmsCanSee(mw.RoleOf(r), m.Conf),
 		"ApprPending": pendingAppr, "ApprTotal": totalAppr,
+		"SugCatID": sugCatID, "SugCatName": sugCatName, "ShowSug": showSug, "ShowSugDash": showSugDash,
 	})
 }
 

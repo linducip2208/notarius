@@ -175,6 +175,7 @@ type workflowStepSeed struct {
 	requireChecklist        bool
 	requireEvidence         string
 	skippable               bool
+	slaDays                 int // target hari penyelesaian langkah (<=0 = tanpa target)
 }
 
 type workflowSeed struct {
@@ -187,31 +188,31 @@ type workflowSeed struct {
 func standardWorkflowSeeds() []workflowSeed {
 	return []workflowSeed{
 		{"PT-DIRIAN", "Alur Pendirian PT", []workflowStepSeed{
-			{"Intake", "Penerimaan", "staff", false, "", false},
-			{"Pihak", "Data pihak", "staff", false, "", false},
-			{"Data", "Data perusahaan", "staff", false, "", false},
-			{"Syarat", "Kelengkapan syarat", "staff", true, "", false},
-			{"Draf", "Penyusunan draf", "staff", false, "", false},
-			{"Review", "Reviu notaris", "notary", false, "", false},
-			{"Sahkan", "Pengesahan", "notary", false, "", false},
-			{"Register", "Registrasi AHU", "staff", false, "", true},
-			{"Serah", "Penyerahan", "staff", false, "", false},
+			{"Intake", "Penerimaan", "staff", false, "", false, 1},
+			{"Pihak", "Data pihak", "staff", false, "", false, 2},
+			{"Data", "Data perusahaan", "staff", false, "", false, 2},
+			{"Syarat", "Kelengkapan syarat", "staff", true, "", false, 3},
+			{"Draf", "Penyusunan draf", "staff", false, "", false, 3},
+			{"Review", "Reviu notaris", "notary", false, "", false, 2},
+			{"Sahkan", "Pengesahan", "notary", false, "", false, 2},
+			{"Register", "Registrasi AHU", "staff", false, "", true, 3},
+			{"Serah", "Penyerahan", "staff", false, "", false, 1},
 		}},
 		{"PPAT-AJB", "Alur AJB", []workflowStepSeed{
-			{"Intake", "Penerimaan", "staff", false, "", false},
-			{"Pihak", "Para pihak", "staff", false, "", false},
-			{"Objek", "Verifikasi objek", "staff", true, "", false},
-			{"Resi", "Cek bersih & resi", "staff", true, "", false},
-			{"Akta", "Pembuatan akta", "notary", false, "", false},
-			{"Lapor", "Pelaporan BPN", "staff", false, "BPN_RECEIPT", false},
-			{"Serah", "Penyerahan", "staff", false, "", false},
+			{"Intake", "Penerimaan", "staff", false, "", false, 1},
+			{"Pihak", "Para pihak", "staff", false, "", false, 2},
+			{"Objek", "Verifikasi objek", "staff", true, "", false, 2},
+			{"Resi", "Cek bersih & resi", "staff", true, "", false, 3},
+			{"Akta", "Pembuatan akta", "notary", false, "", false, 3},
+			{"Lapor", "Pelaporan BPN", "staff", false, "BPN_RECEIPT", false, 2},
+			{"Serah", "Penyerahan", "staff", false, "", false, 1},
 		}},
 		{"KUASA", "Alur Surat Kuasa", []workflowStepSeed{
-			{"Intake", "Penerimaan", "staff", false, "", false},
-			{"Pihak", "Para pihak", "staff", false, "", false},
-			{"Draf", "Penyusunan draf", "staff", false, "", false},
-			{"Sahkan", "Pengesahan", "notary", false, "", false},
-			{"Serah", "Penyerahan", "staff", false, "", false},
+			{"Intake", "Penerimaan", "staff", false, "", false, 1},
+			{"Pihak", "Para pihak", "staff", false, "", false, 1},
+			{"Draf", "Penyusunan draf", "staff", false, "", false, 2},
+			{"Sahkan", "Pengesahan", "notary", false, "", false, 1},
+			{"Serah", "Penyerahan", "staff", false, "", false, 1},
 		}},
 	}
 }

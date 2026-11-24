@@ -1,4 +1,10 @@
 # CHANGELOG
+## [0.5.11] — 2026-11-24 — Tautan seed alur kerja + docs deploy PWA/workflow + bersih artefak coverage
+- Cakupan: 2 commit sejak v0.5.10 (9a979ef "Bersihkan artefak coverage nyasar (wf)"; 4dc11f1 "PWA + responsif + tautan seed + docs deploy", 2 files, +10/-1 plus hapus wf 42 baris); tanggal dari git log (2026-11-24).
+- Tautan seed alur kerja: empty-state kartu Alur Kerja di internal/app/templates/pages2.gohtml (satu baris) kini tombol "Pasang paket standar →" (anchor btn-sm btn-outline-primary ke /dms/checklists) gantikan teks instruksi polos — menutup jalan buntu empty workflow selaras CTA empty-state klien/DMS v0.5.9; tanpa ubah logika workflow/RBAC.
+- Docs deploy: docs/DEPLOYMENT_GUIDE.md +9 (poin 12 PWA produksi: wajib HTTPS/secure context, verifikasi instalabilitas curl manifest + MIME + ikon 192/512/maskable + start_url/scope, DevTools Manifest/SW hijau + tombol Install, update SW no-cache + versioning cache saktinotaris-vN; poin 13 workflow engine operasional migrasi 027: pasang template via ⚡ Pasang Standar idempoten office+service_code+version=1, makna status ACTIVE/COMPLETED + PENDING→DONE diaudit workflow.step, backup via deploy/backup/backup.sh tanpa cron tambahan).
+- Bersih artefak: hapus file `wf` (42 baris profil coverage nyasar yang ikut ter-commit di v0.5.10); tanpa ubah kode.
+- Go-Live: seperti v0.5.10 + verifikasi tombol Pasang paket standar dari kartu Alur Kerja kosong, cek poin deploy 12–13, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.10] — 2026-11-24 — Verifikasi typo status + matriks legal + test workflow
 - Typo NEEDS_DOCS→NEED_DOCS (crm.go:131, counter kini benar); normalisasi target requestMove (gate/Move/audit/notif konsisten); klaim rekap SIGNED/ARCHIVED DITOLAK setelah verifikasi (sudah benar).
 - Matriks legal: docs/legal/ 4 file (tanpa fabrikasi pasal, semua NEEDS_LEGAL_REVIEW).

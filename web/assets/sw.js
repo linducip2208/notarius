@@ -61,3 +61,29 @@ self.addEventListener('fetch', (e) => {
     );
   }
 });
+
+// Web Push: tampilkan notifikasi dari payload JSON {title, body, url}.
+// Payload dikirim oleh gateway/CLI manual (lihat docs/ops/WEBPUSH.md) —
+// aplikasi sendiri tidak mengirim Web Push terenkripsi (tanpa sender).
+self.addEventListener('push', (e) => {
+  let data = { title: 'SaktiNotaris', body: 'Ada pembaruan.', url: '/app' };
+  try {
+    if (e.data) data = Object.assign(data, e.data.json());
+  } catch (_) {
+    /* abaikan payload non-JSON, pakai default */
+  }
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/assets/brand/icon-192.png',
+      badge: '/assets/brand/icon-192.png',
+      data: { url: data.url || '/app' },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || '/app';
+  e.waitUntil(clients.openWindow(target));
+});

@@ -29,7 +29,7 @@ Rujukan awal yang sudah dicatat repo: `docs/LEGAL_REQUIREMENTS.md`.
 
 1. Blanko resmi BPN — `/ppat/{id}/blanko` adalah LEMBAR KERJA konsep, BUKAN blanko resmi. Penyalinan ke formulir resmi dilakukan manual oleh PPAT.
 2. Integrasi AHU/OSS otomatis — TIDAK ADA API resmi yang diotorisasi; `/gov` hanya checklist + bukti manual. Jangan hardcode endpoint / klaim sinkronisasi.
-3. Verifikasi BPN otomatis — cek bersih sertifikat & resi BPN adalah pekerjaan manusia; aplikasi hanya menyimpan nomor resi ASLI (fiksi ditolak) + pengingat keterlambatan (>14 hari LAPOR_BPN = overdue).
+3. Verifikasi BPN otomatis — cek bersih sertifikat & resi BPN adalah pekerjaan manusia; aplikasi hanya menyimpan nomor resi + tanggal lapor ASLI (fiksi ditolak) + pengingat progresif (H-7/H-3 kuning, lewat jatuh tempo = tanggal lapor + 14 hari merah) + tugas pengingat otomatis saat H≤3.
 4. Keputusan hukum otomatis — OCR/AI/template tidak pernah mengesahkan; gate (checklist VERIFIED, identitas terverifikasi, min pihak, 2 saksi wasiat) hanya MENAHAN maju, yang menyetujui tetap manusia.
 5. Tarif pajak final — PPN/PPh/BPHTB di aplikasi bersifat pencatatan; angka berlaku ikut konfirmasi finance/konsultan pajak.
 

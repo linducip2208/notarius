@@ -102,6 +102,8 @@
 <div class="col-md-6 mb-2"><label class="form-label">Klasifikasi</label><select class="form-select" name="confidentiality"><option {{if eq .Data.M.Conf "INTERNAL"}}selected{{end}}>INTERNAL</option><option {{if eq .Data.M.Conf "CONFIDENTIAL"}}selected{{end}}>CONFIDENTIAL</option><option {{if eq .Data.M.Conf "RESTRICTED"}}selected{{end}}>RESTRICTED</option><option {{if eq .Data.M.Conf "PUBLIC"}}selected{{end}}>PUBLIC</option></select></div>
 <div class="col-md-6 mb-2 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit">Simpan Metadata</button></div>
 </div></form>
+{{if .Data.ShowSug}}<div class="alert alert-info py-2 small mb-2">Kategori saran: <strong>{{.Data.SugCatName}}</strong>
+<form method="post" action="/documents/{{.Data.M.ID}}/meta" class="d-inline ms-2">{{template "csrf" .}}<input type="hidden" name="display_name" value="{{.Data.M.Disp}}"/><input type="hidden" name="doc_number" value="{{.Data.M.Num}}"/><input type="hidden" name="category_id" value="{{.Data.SugCatID}}"/><input type="hidden" name="doc_date" value="{{.Data.M.DocDate}}"/><input type="hidden" name="expiry_date" value="{{.Data.M.Exp}}"/><input type="hidden" name="confidentiality" value="{{.Data.M.Conf}}"/><button class="btn btn-sm btn-primary" type="submit" onclick="return confirm('Terapkan kategori saran?')">Terapkan</button></form></div>{{else if .Data.ShowSugDash}}<p class="text-secondary small mb-2">Kategori saran: —</p>{{end}}
 {{if .Data.Fields}}<div class="card-body border-top"><h4>Field Kustom</h4>
 <form method="post" action="/documents/{{.Data.M.ID}}/fields"><div class="row">{{template "csrf" .}}
 {{range .Data.Fields}}<div class="col-md-6 mb-2"><label class="form-label">{{.Name}}{{if .Required}} *{{end}}</label>

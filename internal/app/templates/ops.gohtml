@@ -109,7 +109,7 @@
 
 {{define "reports"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Laporan</li></ol></nav>
-<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Laporan Operasional</h3><p class="text-secondary mb-0">Angka real-time dari database — tanpa fabrikasi.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-laporan.jpg" alt="Laporan bisnis" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
+<div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Laporan Operasional</h3><p class="text-secondary mb-2">Angka real-time dari database — tanpa fabrikasi.</p><a class="btn btn-primary no-print" href="/reports/bulanan">🖨 Cetak rekap bulan ini</a></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-laporan.jpg" alt="Laporan bisnis" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
 <div class="row row-deck row-cards">
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Menunggu</div><div class="h1">{{.Data.Pending}}</div></div></div></div>
 <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Aktif</div><div class="h1">{{.Data.Active}}</div></div></div></div>
@@ -138,6 +138,39 @@
 <tbody>{{range .Data.SLAOver}}<tr><td><a href="/requests/{{.ID}}">#{{.ID}} {{.Title}}</a></td><td>{{.Service}}</td><td class="text-secondary small">{{.Code}}</td><td class="text-end">{{.AgeDays}}</td><td class="text-end">{{.SLADays}}</td><td><span class="badge bg-red-lt">{{.Status}}</span></td></tr>{{else}}<tr><td colspan="6" class="text-center text-secondary py-3">Tidak ada permohonan melewati SLA.</td></tr>{{end}}</tbody></table></div></div>
 {{template "page_close" .}}{{end}}
 
+{{define "reports_bulanan"}}{{template "head" .}}{{template "page_open" .}}
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item"><a href="/reports">Laporan</a></li><li class="breadcrumb-item active">Rekap {{.Data.Month}}</li></ol></nav>
+<div class="card"><div class="card-body p-4">
+<div class="text-center mb-3">
+<div><strong>{{.Data.Office.Name}}</strong>{{if .Data.Office.Notary}} · Notaris {{.Data.Office.Notary}}{{end}}</div>
+{{if .Data.Office.Address}}<div class="text-secondary small">{{.Data.Office.Address}}</div>{{end}}
+{{if or .Data.Office.Phone .Data.Office.Email}}<div class="text-secondary small">{{.Data.Office.Phone}}{{if and .Data.Office.Phone .Data.Office.Email}} · {{end}}{{.Data.Office.Email}}</div>{{end}}
+</div>
+<h2 class="text-center mb-1">REKAP BULANAN — {{.Data.Month}}</h2>
+<p class="text-center text-secondary small">Periode {{.Data.Month}} · Dicetak {{.Data.PrintedAt}} · Angka real-time dari database</p>
+<div class="row row-deck row-cards mt-3">
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Permohonan masuk</div><div class="h1">{{.Data.Stats.ReqIn}}</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Permohonan selesai</div><div class="h1">{{.Data.Stats.ReqDone}}</div><div class="small text-secondary">via berita status COMPLETED</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Akta disahkan</div><div class="h1">{{.Data.Stats.DeedsSigned}}</div><div class="small text-secondary">status SIGNED bulan ini</div></div></div></div>
+<div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body"><div class="subheader">Sudah diserahkan</div><div class="h1">{{.Data.Stats.Handovers}}</div><div class="small text-secondary">akta + legalisasi HANDED_OVER</div></div></div></div>
+</div>
+<div class="row row-deck row-cards mt-3">
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Invoice terbit ({{.Data.Month}})</div><div class="h1">{{.Data.Stats.InvIssued}}</div><div class="small text-secondary">Rp {{.Data.Stats.InvIssuedTotal}}</div></div></div></div>
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Invoice lunas ({{.Data.Month}})</div><div class="h1">{{.Data.Stats.InvPaid}}</div><div class="small text-secondary">Rp {{.Data.Stats.InvPaidTotal}}</div></div></div></div>
+<div class="col-sm-6 col-lg-4"><div class="card"><div class="card-body"><div class="subheader">Piutang bulan ini</div><div class="h1">Rp {{.Data.Stats.InvOutstanding}}</div><div class="small text-secondary">total piutang keseluruhan: Rp {{.Data.Outstanding}}</div></div></div></div>
+</div>
+<h3 class="mt-4">Top 5 Layanan Bulan Ini</h3>
+<div class="table-responsive"><table class="table card-table"><thead><tr><th>Layanan</th><th class="text-end">Invoice</th><th class="text-end">Dibayar</th></tr></thead>
+<tbody>{{range .Data.TopSvc}}<tr><td>{{.Service}}</td><td class="text-end">{{.Count}}</td><td class="text-end">{{.Paid}}</td></tr>{{else}}<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada transaksi bulan ini.</td></tr>{{end}}</tbody></table></div>
+<h3 class="mt-4">Melewati SLA ({{if .Data.SLAOver}}{{len .Data.SLAOver}} antrean{{else}}0 antrean{{end}})</h3>
+<div class="table-responsive"><table class="table card-table table-vcenter"><thead><tr><th>Permohonan</th><th>Layanan</th><th>Kode</th><th class="text-end">Umur (hari)</th><th class="text-end">SLA (hari)</th><th>Status</th></tr></thead>
+<tbody>{{range .Data.SLAOver}}<tr><td>#{{.ID}} {{.Title}}</td><td>{{.Service}}</td><td class="text-secondary small">{{.Code}}</td><td class="text-end">{{.AgeDays}}</td><td class="text-end">{{.SLADays}}</td><td><span class="badge bg-red-lt">{{.Status}}</span></td></tr>{{else}}<tr><td colspan="6" class="text-center text-secondary py-3">Tidak ada permohonan melewati SLA.</td></tr>{{end}}</tbody></table></div>
+<div class="row mt-4"><div class="col-6 text-center"><br/><br/><br/>_________________________<br/><span class="text-secondary small">Pimpinan / Notaris</span></div>
+<div class="col-6 text-center"><br/><br/><br/>_________________________<br/><span class="text-secondary small">Staf pelaporan</span></div></div>
+<div class="d-flex gap-2 mt-4 no-print"><button class="btn btn-primary" type="button" onclick="window.print()">Cetak</button><a class="btn btn-outline-primary" href="/reports">Kembali ke laporan</a></div>
+</div></div>
+{{template "page_close" .}}{{end}}
+
 {{define "settings"}}{{template "head" .}}{{template "page_open" .}}
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">Dashboard</a></li><li class="breadcrumb-item active">Pengaturan</li></ol></nav>
 <div class="card mb-3"><div class="row g-0 align-items-center"><div class="col"><div class="card-body"><h3 class="card-title mb-1">Pengaturan & Keamanan</h3><p class="text-secondary mb-0">Pengguna, peran, tautan portal klien, dan MFA TOTP.</p></div></div><div class="col-auto d-none d-md-block"><img src="/assets/landing/notarius-feat-keamanan.jpg" alt="Keamanan akun" style="object-fit:cover;height:110px;width:220px;border-radius:0 8px 8px 0"/></div></div></div>
@@ -156,6 +189,57 @@
 <div class="col-md-1 mb-2"><button class="btn btn-primary w-100" type="submit">OK</button></div></form></div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Peran tersedia</h3></div><div class="card-body">{{range .Data.Roles}}<span class="badge bg-azure-lt me-1">{{.}}</span>{{end}}</div></div>
 <div class="card mt-3"><div class="card-header"><h3 class="card-title">Keamanan Akun</h3></div><div class="card-body"><a class="btn btn-outline-primary" href="/mfa">Aktifkan / Kelola MFA (TOTP)</a></div></div>
+<div class="card mt-3"><div class="card-header"><h3 class="card-title">Notifikasi Push</h3></div><div class="card-body">
+<p class="text-secondary">Aktifkan notifikasi browser di perangkat ini. Langganan tersimpan per akun (Anda punya {{.Data.PushCount}} perangkat terdaftar).</p>
+<input type="hidden" id="push-csrf" value="{{.CSRF}}"/>
+<div id="push-box" data-vapid="{{.Data.VapidPublic}}">
+{{if .Data.VapidPublic}}
+<p><button class="btn btn-outline-primary" id="push-toggle" type="button">Aktifkan notifikasi</button>
+{{if .Data.CanPushTest}}<button class="btn btn-ghost-secondary ms-2" id="push-test" type="button">Kirim uji</button>{{end}}</p>
+<p class="text-secondary small mb-0" id="push-status">Memeriksa dukungan browser…</p>
+<pre class="mt-2 small d-none" id="push-preview" style="white-space:pre-wrap"></pre>
+<script>
+(function(){
+var box=document.getElementById('push-box'); if(!box) return;
+var st=document.getElementById('push-status'), tg=document.getElementById('push-toggle'),
+    ts=document.getElementById('push-test'), pv=document.getElementById('push-preview');
+var csrf=document.getElementById('push-csrf').value;
+function b64(s){var b=s.replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';var r=atob(b),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o;}
+function post(path,body){return fetch(path+'?csrf='+encodeURIComponent(csrf),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){return {s:r.status,j:j};});});}
+if(!('serviceWorker' in navigator)||!('PushManager' in window)){st.textContent='Browser ini tidak mendukung Web Push.';tg.disabled=true;return;}
+navigator.serviceWorker.register('/sw.js').then(function(reg){
+  function refresh(sub){
+    if(sub){tg.textContent='Nonaktifkan notifikasi';st.textContent='Notifikasi aktif di perangkat ini.';}
+    else{tg.textContent='Aktifkan notifikasi';st.textContent='Notifikasi belum aktif di perangkat ini.';}
+  }
+  reg.pushManager.getSubscription().then(refresh);
+  tg.onclick=function(){
+    reg.pushManager.getSubscription().then(function(sub){
+      if(sub){sub.unsubscribe().then(function(){return post('/push/unsubscribe',{endpoint:sub.endpoint});}).then(function(){refresh(null);});return;}
+      Notification.requestPermission().then(function(p){
+        if(p!=='granted'){st.textContent='Izin notifikasi ditolak browser.';return;}
+        reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(box.dataset.vapid)}).then(function(ns){
+          var k=ns.toJSON().keys||{};
+          return post('/push/subscribe',{endpoint:ns.endpoint,p256dh:k.p256dh||'',auth:k.auth||''});
+        }).then(function(r){if(r.j&&r.j.ok){refresh(true);}else{st.textContent='Gagal menyimpan: '+((r.j&&r.j.error)||r.s);}});
+      });
+    });
+  };
+  if(ts){ts.onclick=function(){
+    st.textContent='Mengirim uji…';pv.classList.add('d-none');
+    post('/push/test',{}).then(function(r){
+      var j=r.j||{};
+      pv.textContent=JSON.stringify(j,null,2);pv.classList.remove('d-none');
+      st.textContent=j.ok?('Uji selesai: '+j.subscriptions+' langganan Anda; Web Push terenkripsi TIDAK dikirim aplikasi (lihat alasan di bawah) — notifikasi in-app (bel header) sudah ditulis sebagai bukti.'):'Uji gagal: '+(j.error||r.s);
+    });
+  };}
+}).catch(function(){st.textContent='Service worker gagal dimuat.';tg.disabled=true;});
+})();
+</script>
+{{else}}
+<div class="alert alert-warning mb-0">VAPID belum dikonfigurasi server (env <code>NOTARYOS_VAPID_PUBLIC</code> kosong) — tombol nonaktif. Minta administrator mengisi kunci VAPID; lihat <code>docs/ops/WEBPUSH.md</code>.</div>
+{{end}}
+</div></div>
 {{template "page_close" .}}{{end}}
 
 {{define "wills"}}{{template "head" .}}{{template "page_open" .}}

@@ -1,3 +1,9 @@
+# RELEASE_NOTES — v0.5.11 (2026-11-24) — TAUTAN SEED ALUR KERJA + DOCS DEPLOY PWA/WORKFLOW
+Ringkasan: sejak v0.5.10 ada 2 commit (9a979ef, 4dc11f1; 2026-11-24): (1) empty workflow kini tombol Pasang paket standar → ke /dms/checklists (satu baris pages2.gohtml, tanpa ubah logika/RBAC); (2) DEPLOYMENT_GUIDE +9 — PWA produksi (HTTPS, verifikasi manifest/MIME/ikon, DevTools hijau + Install, SW no-cache + versioning cache) + workflow operasional 027 (seed idempoten, makna ACTIVE/COMPLETED/PENDING→DONE, backup tanpa cron); (3) hapus artefak coverage `wf` nyasar dari v0.5.10.
+Go-Live: seperti v0.5.10 + verifikasi tombol seed dari kartu Alur Kerja kosong, cek poin deploy 12–13, lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
+Batasan produksi tetap: wajib tinjauan notaris (B-06) + TLS publik + backup GPG + backup berkas teruji + pen-test sebelum data sungguhan.
+Repo: https://github.com/linducip2208/notarius
+
 # RELEASE_NOTES — v0.5.10 (2026-11-24) — VERIFIKASI TYPO STATUS + MATRIKS LEGAL + TEST WORKFLOW
 Ringkasan: NEEDS_DOCS→NEED_DOCS (counter benar); normalisasi target requestMove; klaim rekap SIGNED/ARCHIVED ditolak setelah verifikasi (sudah benar); 4 file docs/legal (tanpa fabrikasi pasal, semua NEEDS_LEGAL_REVIEW); 6 test workflow baru (coverage workflow 95,9%).
 Go-Live: seperti v0.5.9 + uji 1 permohonan IN_REVIEW lengkap. Detail: docs/DEPLOYMENT_GUIDE.md.

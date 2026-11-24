@@ -17,9 +17,11 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"notaryos/internal/audit"
@@ -70,12 +72,32 @@ func (a *App) seedWorkflowTemplates(officeID int64) int {
 
 // ensureWorkflowSteps memasukkan step template secara idempoten
 // (INSERT IGNORE atas uq_wf_step). False bila tabel 027 belum ada.
+// SLA 033: sla_days ikut ditulis; baris existing yang masih NULL
+// di-backfill agar seed ulang tidak perlu hapus template.
 func (a *App) ensureWorkflowSteps(tplID int64, s workflowSeed) bool {
 	for i, st := range s.steps {
-		if _, err := a.db.Exec(`INSERT IGNORE INTO workflow_steps(template_id, step_key, label, sort_order, required_role, require_checklist, require_evidence, skippable)
-			VALUES(?,?,?,?,?,?,?,?)`, tplID, st.key, st.label, i+1, st.requiredRole,
-			boolToInt(st.requireChecklist), nullStrOpt(st.requireEvidence), boolToInt(st.skippable)); err != nil {
-			return false
+		var sla any
+		if st.slaDays > 0 {
+			sla = st.slaDays
+		}
+		if _, err := a.db.Exec(`INSERT IGNORE INTO workflow_steps(template_id, step_key, label, sort_order, required_role, require_checklist, require_evidence, skippable, sla_days)
+			VALUES(?,?,?,?,?,?,?,?,?)`, tplID, st.key, st.label, i+1, st.requiredRole,
+			boolToInt(st.requireChecklist), nullStrOpt(st.requireEvidence), boolToInt(st.skippable), sla); err != nil {
+			if !isUnknownColumn(err) {
+				return false
+			}
+			// DB lama pra-migrasi 033: tulis tanpa sla_days (fail-open).
+			if _, err2 := a.db.Exec(`INSERT IGNORE INTO workflow_steps(template_id, step_key, label, sort_order, required_role, require_checklist, require_evidence, skippable)
+				VALUES(?,?,?,?,?,?,?,?)`, tplID, st.key, st.label, i+1, st.requiredRole,
+				boolToInt(st.requireChecklist), nullStrOpt(st.requireEvidence), boolToInt(st.skippable)); err2 != nil {
+				return false
+			}
+			continue
+		}
+		if st.slaDays > 0 {
+			// Best-effort: DB yang di-seed sebelum migrasi 033 masih NULL.
+			_, _ = a.db.Exec(`UPDATE workflow_steps SET sla_days=? WHERE template_id=? AND step_key=? AND (sla_days IS NULL OR sla_days<>?)`,
+				st.slaDays, tplID, st.key, st.slaDays)
 		}
 	}
 	return true
@@ -110,23 +132,52 @@ func (a *App) ensureWorkflowInstance(officeID, requestID int64) error {
 	if have > 0 {
 		return nil
 	}
-	rows, err := a.db.Query(`SELECT step_key FROM workflow_steps WHERE template_id=? ORDER BY sort_order, step_key`, tplID)
-	if err != nil {
-		if isTableMissing(err) {
-			return nil
+	type stepDef struct {
+		key string
+		sla sql.NullInt64
+	}
+	var defs []stepDef
+	if rows, qerr := a.db.Query(`SELECT step_key, sla_days FROM workflow_steps WHERE template_id=? ORDER BY sort_order, step_key`, tplID); qerr == nil {
+		for rows.Next() {
+			var d stepDef
+			if err := rows.Scan(&d.key, &d.sla); err == nil {
+				defs = append(defs, d)
+			}
 		}
-		return err
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	} else if isTableMissing(qerr) {
+		return nil // tabel 027 hilang (DB lama): lewati diam-diam
+	} else if isUnknownColumn(qerr) {
+		// DB lama pra-migrasi 033: tanpa sla_days (due_at dikosongkan).
+		rows, err := a.db.Query(`SELECT step_key FROM workflow_steps WHERE template_id=? ORDER BY sort_order, step_key`, tplID)
+		if err != nil {
+			if isTableMissing(err) {
+				return nil
+			}
+			return err
+		}
+		for rows.Next() {
+			var d stepDef
+			if err := rows.Scan(&d.key); err == nil {
+				defs = append(defs, d)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	} else {
+		return qerr
+	}
+	if len(defs) == 0 {
+		return nil // tanpa langkah: jangan bentuk instance setengah jadi
 	}
 	var keys []string
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err == nil {
-			keys = append(keys, k)
-		}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil || len(keys) == 0 {
-		return err
+	for _, d := range defs {
+		keys = append(keys, d.key)
 	}
 	tx, err := a.db.Begin()
 	if err != nil {
@@ -139,10 +190,23 @@ func (a *App) ensureWorkflowInstance(officeID, requestID int64) error {
 		return err
 	}
 	instID, _ := res.LastInsertId()
-	for _, k := range keys {
-		if _, err := tx.Exec(`INSERT IGNORE INTO workflow_step_states(instance_id, step_key, status)
-			VALUES(?,?,'PENDING')`, instID, k); err != nil {
-			return err
+	for _, d := range defs {
+		var execErr error
+		if d.sla.Valid && d.sla.Int64 > 0 {
+			// SLA 033: due_at = CURDATE + target hari langkah.
+			_, execErr = tx.Exec(`INSERT IGNORE INTO workflow_step_states(instance_id, step_key, status, due_at)
+				VALUES(?,?,'PENDING',DATE_ADD(CURDATE(), INTERVAL ? DAY))`, instID, d.key, d.sla.Int64)
+			if execErr != nil && isUnknownColumn(execErr) {
+				// DB lama pra-033: tulis tanpa due_at (fail-open).
+				_, execErr = tx.Exec(`INSERT IGNORE INTO workflow_step_states(instance_id, step_key, status)
+					VALUES(?,?,'PENDING')`, instID, d.key)
+			}
+		} else {
+			_, execErr = tx.Exec(`INSERT IGNORE INTO workflow_step_states(instance_id, step_key, status)
+				VALUES(?,?,'PENDING')`, instID, d.key)
+		}
+		if execErr != nil {
+			return execErr
 		}
 	}
 	return tx.Commit()
@@ -152,14 +216,70 @@ func (a *App) ensureWorkflowInstance(officeID, requestID int64) error {
 type wfStepView struct {
 	Key, Label, Status, RequiredRole string
 	Skippable, Current               bool
+	DueAt                            string // 033: jatuh tempo langkah ("" bila tanpa target)
+	Overdue                          bool   // 033: due_at < hari ini dan belum DONE
 }
 
 // workflowView memuat instance + step terurut (states PENDING default bila
 // belum ada baris). has=false bila tak ada instance / tabel 027 hilang.
+// SLA 033: due_at dibaca best-effort (DB lama pra-033 → DueAt kosong).
 func (a *App) workflowView(officeID, requestID int64) (steps []wfStepView, current, status string, has bool) {
 	if a.db == nil {
 		return nil, "", "", false
 	}
+	var instID int64
+	var cur sql.NullString
+	var st string
+	if err := a.db.QueryRow(`SELECT id, current_step, status FROM workflow_instances
+		WHERE office_id=? AND request_id=?`, officeID, requestID).Scan(&instID, &cur, &st); err != nil {
+		return nil, "", "", false
+	}
+	rows, err := a.db.Query(`SELECT ws.step_key, ws.label,
+		COALESCE(wss.status,'PENDING'), ws.required_role, ws.skippable,
+		DATE_FORMAT(wss.due_at,'%Y-%m-%d')
+		FROM workflow_steps ws LEFT JOIN workflow_step_states wss
+		ON wss.instance_id=? AND wss.step_key=ws.step_key
+		WHERE ws.template_id=(SELECT template_id FROM workflow_instances WHERE id=?)
+		ORDER BY ws.sort_order, ws.step_key`, instID, instID)
+	if err != nil {
+		if !isUnknownColumn(err) {
+			return nil, "", "", false
+		}
+		// DB lama pra-033: tanpa due_at.
+		return a.workflowViewLegacy(officeID, requestID)
+	}
+	defer rows.Close()
+	today := time.Now().Format("2006-01-02")
+	for rows.Next() {
+		var v wfStepView
+		var skip int
+		var due sql.NullString
+		if err := rows.Scan(&v.Key, &v.Label, &v.Status, &v.RequiredRole, &skip, &due); err != nil {
+			return nil, "", "", false
+		}
+		v.Skippable = skip == 1
+		if due.Valid && strings.TrimSpace(due.String) != "" {
+			v.DueAt = strings.TrimSpace(due.String)
+			v.Overdue = v.DueAt < today && !strings.EqualFold(strings.TrimSpace(v.Status), "DONE")
+		}
+		steps = append(steps, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", "", false
+	}
+	if cur.Valid {
+		current = cur.String
+		for i := range steps {
+			if steps[i].Key == current {
+				steps[i].Current = true
+			}
+		}
+	}
+	return steps, current, st, true
+}
+
+// workflowViewLegacy memuat kartu Alur Kerja tanpa kolom 033 (DB lama).
+func (a *App) workflowViewLegacy(officeID, requestID int64) (steps []wfStepView, current, status string, has bool) {
 	var instID int64
 	var cur sql.NullString
 	var st string
@@ -198,6 +318,92 @@ func (a *App) workflowView(officeID, requestID int64) (steps []wfStepView, curre
 		}
 	}
 	return steps, current, st, true
+}
+
+// wfStepOverdue adalah satu langkah PENDING yang lewat due_at-nya.
+type wfStepOverdue struct {
+	InstanceID, RequestID       int64
+	ReqTitle, Service           string
+	StepKey, Label              string
+	DueAt                       string
+	LateDays                    int
+}
+
+// wfEscalationTitle membangun judul tugas eskalasi SLA langkah.
+// Murni tanpa DB agar mudah diuji; SENGAJA stabil (tanpa umur hari) supaya
+// dedup 1x via COUNT(title) tetap cocok keesokan harinya.
+func wfEscalationTitle(requestID int64, stepKey, label string) string {
+	return fmt.Sprintf("Eskalasi SLA langkah %s req #%d (%s)",
+		strings.TrimSpace(stepKey), requestID, strings.TrimSpace(label))
+}
+
+// workflowStepOverdue memindai langkah PENDING yang due_at-nya lewat
+// (due_at < CURDATE). Fail-open: nil bila DB nil / tabel 027 hilang /
+// kolom 033 belum ada — widget dashboard menyembunyikan diri.
+func (a *App) workflowStepOverdue(officeID int64) []wfStepOverdue {
+	if a.db == nil || officeID <= 0 {
+		return nil
+	}
+	rows, err := a.db.Query(`SELECT wss.instance_id, wi.request_id, sr.title, svc.name,
+		wss.step_key, ws.label, DATE_FORMAT(wss.due_at,'%Y-%m-%d'), DATEDIFF(CURDATE(), wss.due_at)
+		FROM workflow_step_states wss
+		JOIN workflow_instances wi ON wi.id=wss.instance_id
+		JOIN service_requests sr ON sr.id=wi.request_id
+		JOIN services svc ON svc.id=sr.service_id
+		JOIN workflow_steps ws ON ws.template_id=wi.template_id AND ws.step_key=wss.step_key
+		WHERE wi.office_id=? AND wss.status='PENDING'
+		AND wss.due_at IS NOT NULL AND wss.due_at < CURDATE()
+		ORDER BY wss.due_at LIMIT 20`, officeID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []wfStepOverdue
+	for rows.Next() {
+		var o wfStepOverdue
+		if err := rows.Scan(&o.InstanceID, &o.RequestID, &o.ReqTitle, &o.Service,
+			&o.StepKey, &o.Label, &o.DueAt, &o.LateDays); err != nil {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out
+}
+
+// workflowSLAEscalate membuat tugas eskalasi untuk tiap langkah overdue.
+// Pola konsisten dengan SLA dokumen (dms.go: hitung OPEN dulu, buat bila
+// nol) + retensi (ops_growth.go: 1x per ref, ref bertaut): judul stabil +
+// ref_type='request' sehingga klik kedua / hari berikut tidak ganda selama
+// tugas masih OPEN. Langkah yang sudah DONE menutup tugasnya (lihat
+// workflowStep di bawah, meniru dms.go menutup tugas SLA di status terminal).
+func (a *App) workflowSLAEscalate(w http.ResponseWriter, r *http.Request) {
+	if !a.requireStaff(w, r) {
+		return
+	}
+	office := a.officeOf(r)
+	over := a.workflowStepOverdue(office)
+	made := 0
+	for _, o := range over {
+		title := wfEscalationTitle(o.RequestID, o.StepKey, o.Label)
+		var n int
+		_ = a.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE office_id=? AND status='OPEN' AND ref_type='request' AND ref_id=? AND title=?`,
+			office, o.RequestID, title).Scan(&n)
+		if n > 0 {
+			continue
+		}
+		if _, err := a.db.Exec(`INSERT INTO tasks(office_id, title, due_date, created_by, ref_type, ref_id)
+			VALUES(?,?,CURDATE(),?, 'request', ?)`, office, title, a.uid(r), o.RequestID); err == nil {
+			made++
+		}
+	}
+	if made > 0 {
+		a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "workflow.sla.escalate",
+			Entity: "office", EntityID: strconv.FormatInt(office, 10),
+			Detail: strconv.Itoa(made) + " tugas eskalasi SLA langkah"})
+		http.Redirect(w, r, "/tasks?flash=Tugas+eskalasi+SLA+dibuat+"+strconv.Itoa(made), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/tasks?flash=Tidak+ada+langkah+overdue+baru+(sudah+ada+tugas+OPEN)", http.StatusSeeOther)
 }
 
 // workflowActorName menyelesaikan nama aktor untuk audit auto-step:
@@ -491,6 +697,12 @@ func (a *App) workflowStep(w http.ResponseWriter, r *http.Request) {
 		}
 		flash = "Langkah+" + curKey + "+selesai,+lanjut+ke+" + next
 	}
+	// SLA 033: langkah selesai menutup tugas eskalasinya yang masih OPEN
+	// (meniru dms.go menutup tugas SLA di status terminal; best-effort agar
+	// tak menggagalkan advance bila kolom 033 belum ada).
+	_, _ = tx.Exec(`UPDATE tasks SET status='DONE' WHERE office_id=? AND status='OPEN'
+		AND ref_type='request' AND ref_id=? AND title LIKE ?`,
+		office, id, "Eskalasi SLA langkah "+curKey+" req #"+strconv.FormatInt(id, 10)+"%")
 	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
