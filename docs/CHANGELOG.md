@@ -1,4 +1,8 @@
 # CHANGELOG
+## [0.5.17] — 2026-11-24 — Drill restore diperbaiki + .gitattributes
+- BUG NYATA drill B-09: `restore.sh` membuat DB `notaryos_restore` dengan kredensial app, tapi `init.sql` hanya grant `notaryos.*` → restore pasti gagal. `init.sql` kini buat + grant kedua DB; `restore.sh` toleran bila DB sudah ada (`|| true`).
+- `.gitattributes`: paksa LF untuk sh/Makefile/sql/go/gohtml/js/css/json/md/yml agar checkout Windows tak merusak kelanjutan baris bash.
+- Go-Live: seperti v0.5.16 + jalankan drill restore ke `notaryos_restore` lalu verifikasi counts. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.16] — 2026-11-24 — Mode ringkas sidebar + putusan P1
 - Sidebar: tombol "⫷ Ringkas" + tombol ☰ floating; preferensi localStorage. P2 tertutup.
 - Putusan P1 terdokumentasi: label nilai grafik + modul Waarmeking/Masuk-Keluar/Estimasi/Laporan-khusus dinyatakan CUKUP dengan modul kini.

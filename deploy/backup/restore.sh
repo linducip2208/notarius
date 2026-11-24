@@ -8,8 +8,10 @@ set -euo pipefail
 SRC="${1:?backup file required}"
 TARGET="${2:-${DB_NAME:-notaryos}_restore}"
 export MYSQL_PWD="${DB_PASS:?DB_PASS belum diset}"
+# DB drill (default notaryos_restore) dibuat oleh deploy/mysql/init.sql;
+# CREATE di sini hanya pengaman bila init.sql lama belum dijalankan ulang.
 mysql -h "${DB_HOST:-127.0.0.1}" -P "${DB_PORT:-3306}" -u "${DB_USER:?DB_USER belum diset}" \
-  -e "CREATE DATABASE IF NOT EXISTS \`$TARGET\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  -e "CREATE DATABASE IF NOT EXISTS \`$TARGET\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
 gpg --decrypt "$SRC" | gunzip | mysql -h "${DB_HOST:-127.0.0.1}" -P "${DB_PORT:-3306}" -u "${DB_USER:?DB_USER belum diset}" "$TARGET"
 echo "restored to $TARGET — verifying…"
 mysql -h "${DB_HOST:-127.0.0.1}" -P "${DB_PORT:-3306}" -u "${DB_USER:?DB_USER belum diset}" "$TARGET" \

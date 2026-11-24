@@ -1,0 +1,13 @@
+# Paksa LF untuk skrip shell (CRLF merusak kelanjutan baris `\` di bash)
+# dan file build/DB agar konsisten lintas Windows/Linux.
+*.sh text eol=lf
+Makefile text eol=lf
+*.sql text eol=lf
+*.go text eol=lf
+*.gohtml text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
