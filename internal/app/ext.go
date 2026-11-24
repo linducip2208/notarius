@@ -27,6 +27,7 @@ import (
 	"notaryos/internal/docx"
 	"notaryos/internal/finance"
 	"notaryos/internal/gov"
+	"notaryos/internal/malware"
 	"notaryos/internal/mfa"
 	mw "notaryos/internal/middleware"
 	"notaryos/internal/money"
@@ -310,6 +311,25 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 				a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.quality.warn", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: "grade=C score=" + strconv.FormatFloat(q.Score, 'f', 0, 64)})
 			}
 		}()
+	}
+	// Auto-scan ClamAV best-effort (fail-open): bila CLAMAV_ADDR diset, pindai
+	// unggahan; bila TERINFEKSI catat audit + peringatkan via flash, tapi
+	// berkas tetap tersimpan agar staf yang memutuskan (tak ada hapus otomatis).
+	if addr := strings.TrimSpace(os.Getenv("CLAMAV_ADDR")); addr != "" {
+		if _, rc, gerr := a.uploads.Get(a.officeOf(r), id); gerr == nil {
+			func() {
+				defer rc.Close()
+				sc := malware.Scanner{Addr: addr, Timeout: 5 * time.Second}
+				res, serr := sc.Scan(io.LimitReader(rc, 64<<20))
+				if serr != nil {
+					return // daemon mati/tak terjangkau: fail-open, staf pakai tombol Pindai
+				}
+				if res.Infected {
+					flash = "Berkas tersimpan TAPI TERINFEKSI (" + res.Signature + ") — karantina manual, jangan dibagikan"
+					a.audit.Record(audit.Entry{ActorID: a.uid(r), Action: "file.upload.infected", Entity: "file", EntityID: strconv.FormatInt(id, 10), Detail: res.Signature})
+				}
+			}()
+		}
 	}
 	http.Redirect(w, r, "/clients/"+strconv.FormatInt(clientID, 10)+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
 }
@@ -2288,7 +2308,7 @@ func (a *App) tasksPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+	if !a.requireWrite(w, r) {
 		return
 	}
 	_ = r.ParseForm()
@@ -2330,7 +2350,7 @@ func (a *App) taskCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) taskDone(w http.ResponseWriter, r *http.Request) {
-	if !a.requireStaff(w, r) {
+	if !a.requireWrite(w, r) {
 		return
 	}
 	_ = r.ParseForm()

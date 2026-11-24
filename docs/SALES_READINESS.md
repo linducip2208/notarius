@@ -1,4 +1,4 @@
-# SALES_READINESS — SaktiNotaris v0.5.11 (2026-11-24)
+# SALES_READINESS — SaktiNotaris v0.5.13 (2026-11-24)
 
 Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penahan di bawah ditutup.
 
@@ -6,10 +6,23 @@ Status: SIAP JUAL BETA / PILOT. Belum siap klaim "produksi penuh" sampai 4 penah
 
 - `Makefile migrate`: dilengkapi 001-034 (sebelumnya berhenti di 020).
   Boot aplikasi tetap migrasi otomatis via `schema_migrations`; target make hanya untuk DB kosong/manual.
-- `project/progress.json|features.json|roadmap.json`: disinkron ke `0.5.11` (sebelumnya tertinggal di `0.3.0`).
+- `project/progress.json|features.json|roadmap.json`: disinkron ke `0.5.13`.
 - `cmd/notaryos/main.go`: warning saat boot bila `COOKIE_SECURE=false` atau `APP_BASE_URL` kosong.
 - `.env.example`: anotasi produksi untuk `COOKIE_SECURE=true`.
 - Dokumen ini + checklist go-live eksplisit (pengganti klaim implisit "100%").
+
+## 1b. Delta v0.5.12 (dashboard Seven) + v0.5.13 (hardening)
+
+- `/app` ditulis ulang gaya referensi Seven (clean-room, tanpa aset tema berbayar):
+  daftar Permohonan, kartu gelap aktif, Pendapatan+donat, Sorotan jujur,
+  Agenda + strip minggu, Unggulan, banner tier, grafik aktivitas, tabel
+  statistik (anggaran nyata + progres checklist), promo invoice, Gantt tugas
+  (tab Hari/Minggu/Bulan fungsional). Semua angka query nyata.
+- Guard tulis: `rbac.ReadOnly` + `requireWrite` menutup celah tulis auditor di
+  taskCreate/taskDone/protocolStatus/retentionTask/dmsBulk/dmsMerge/
+  dmsRestoreVersion; bulk-verify wajib `PermVerifyIdentity` (unit hijau).
+- Upload: auto-scan ClamAV best-effort bila `CLAMAV_ADDR` diset (cap 64MB,
+  fail-open; TERINFEKSI → audit + flash karantina, tanpa hapus otomatis).
 
 ## 2. Tier jualan (sudah di-enforce di kode `internal/plan`)
 

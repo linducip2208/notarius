@@ -20,12 +20,12 @@ Matriks `rolePerms` (9 peran, 40+ permission) benar dan diuji
 | `govAdvance`/`ppatAdvance`/`legalisasiAdvance` | `PermGovSubmit/Legalize/ManageRepert` | IMPLEMENTED_AND_VERIFIED |
 | `dmsVerify` | `PermVerifyIdentity` + office-check | IMPLEMENTED_AND_VERIFIED |
 | `backupNow/backupPurgePlaintext/remindersRun/officeSave/licenseSave` | `PermManageOffice` | IMPLEMENTED_AND_VERIFIED |
-| `POST /tasks` (`taskCreate`, `ext.go:2290`) | TANPA guard — peran `client`/`auditor` bisa menulis task | NOT_IMPLEMENTED (HIGH) |
-| `POST /tasks/{id}/done` (`taskDone`) | office-scoped, TANPA cek peran | PARTIALLY_IMPLEMENTED (MEDIUM) |
-| `protocolStatus` (tulis status protokol) | hanya `PermViewProtocol` (izin baca untuk aksi tulis) | PARTIALLY_IMPLEMENTED (MEDIUM) |
-| `retentionTask` (tulis task retensi) | hanya `PermViewClient` (terlalu luas) | PARTIALLY_IMPLEMENTED (MEDIUM) |
-| `dmsBulk verify/approve`, `dmsMerge`, `dmsRestoreVersion` | hanya `requireStaff` (=`PermViewClient`); jalur `verify` tak cek `PermVerifyIdentity` | PARTIALLY_IMPLEMENTED (MEDIUM) |
-| `cmsVersionRollback` | `requireWebAny` (izin VIEW untuk rollback tulis) | PARTIALLY_IMPLEMENTED (MEDIUM) |
+| `POST /tasks` (`taskCreate`, `ext.go:2290`) | `requireWrite` (tolak auditor+klien) sejak v0.5.12 | IMPLEMENTED_AND_VERIFIED (HIGH→tertutup) |
+| `POST /tasks/{id}/done` (`taskDone`) | `requireWrite` sejak v0.5.12 | IMPLEMENTED_AND_VERIFIED (MEDIUM→tertutup) |
+| `protocolStatus` (tulis status protokol) | `PermViewProtocol` + tolak `ReadOnly` (auditor) sejak v0.5.12 | IMPLEMENTED_AND_VERIFIED (MEDIUM→tertutup) |
+| `retentionTask` (tulis task retensi) | `PermViewClient` + tolak `ReadOnly` sejak v0.5.12 | IMPLEMENTED_AND_VERIFIED (MEDIUM→tertutup) |
+| `dmsBulk verify/approve`, `dmsMerge`, `dmsRestoreVersion` | `requireWrite`; jalur `verify` wajib `PermVerifyIdentity` sejak v0.5.12 | IMPLEMENTED_AND_VERIFIED (MEDIUM→tertutup) |
+| `cmsVersionRollback` | verifikasi ulang: `requireWebAny` hanya pintu masuk; di dalam wajib `PermWebPagesUpdate`/`PermWebArticles` — sudah ketat, bukan temuan | IMPLEMENTED_AND_VERIFIED |
 
 ## 2. Office-scope query — IMPLEMENTED_AND_VERIFIED (klaim "24 query" valid)
 
@@ -57,6 +57,10 @@ tulis agar fail-closed atomik.
 - Celah: `malware.Scanner` (ClamAV) hanya dipakai manual via
   `POST /documents/{id}/scan` (`dms.go:529`) — TIDAK dirangkai ke jalur
   upload → auto-scan: NOT_CONNECTED (MEDIUM).
+- TERTUTUP v0.5.13: `fileUpload` menjalankan auto-scan best-effort bila
+  `CLAMAV_ADDR` diset (cap 64MB, timeout 5 dtk, fail-open); TERINFEKSI →
+  audit `file.upload.infected` + flash karantina manual; tak ada hapus
+  otomatis. Tanpa `CLAMAV_ADDR` tak ada klaim "bersih".
 
 ## 5. Rate limit — IMPLEMENTED_AND_VERIFIED
 
@@ -86,10 +90,10 @@ tetapi lockout akun mengkompensasi (LOW).
 
 | # | Temuan | Severity | Status |
 |---|---|---|---|
-| 1 | `POST /tasks` tanpa guard peran | HIGH | NOT_IMPLEMENTED |
-| 2 | `taskDone`/tulis retensi/protokol/rollback/CMS guard terlalu luas | MEDIUM | PARTIALLY_IMPLEMENTED |
-| 3 | `dmsBulk verify` lewati `PermVerifyIdentity` | MEDIUM | PARTIALLY_IMPLEMENTED |
-| 4 | Upload tanpa auto malware-scan | MEDIUM | NOT_CONNECTED |
+| 1 | `POST /tasks` tanpa guard peran | HIGH | TERTUTUP v0.5.12 (`requireWrite`) |
+| 2 | `taskDone`/tulis retensi/protokol/rollback/CMS guard terlalu luas | MEDIUM | TERTUTUP v0.5.12 (rollback terbukti sudah ketat) |
+| 3 | `dmsBulk verify` lewati `PermVerifyIdentity` | MEDIUM | TERTUTUP v0.5.12 |
+| 4 | Upload tanpa auto malware-scan | MEDIUM | TERTUTUP v0.5.13 (best-effort, fail-open) |
 | 5 | Masking PII belum menyeluruh (UU PDP) | MEDIUM | NEEDS_LEGAL_REVIEW |
 | 6 | `RequirePerm` tak dipakai; UPDATE tanpa `AND office_id=?` | LOW | IMPLEMENTED_BUT_BROKEN |
 | 7 | CSP `unsafe-inline`; login 20/mnt; stub `clients.gohtml` | LOW | IMPLEMENTED_AND_VERIFIED |

@@ -1,4 +1,9 @@
 # CHANGELOG
+## [0.5.13] — 2026-11-24 — Kunci guard tugas + auto-scan ClamAV + sinkron audit
+- Guard: `taskCreate`/`taskDone` beralih ke `requireWrite` (auditor tertutup; GET /tasks tetap 200 sesuai matriks izin — yang dikunci hanya POST tulis).
+- Upload: auto-scan ClamAV best-effort di `fileUpload` bila `CLAMAV_ADDR` diset (timeout 5 dtk, cap 64MB, fail-open; TERINFEKSI → audit `file.upload.infected` + flash karantina manual, tanpa hapus otomatis); komentar paket `malware` diluruskan.
+- Audit & versi: `SECURITY_AUDIT` temuan 1–4 ditandai TERTUTUP; `project/*.json` → `0.5.13`; `SALES_READINESS` delta v0.5.12/13.
+- Go-Live: seperti v0.5.12 + verifikasi auditor ditolak POST /tasks & /tasks/{id}/done (403), unggah 1 berkas dengan CLAMAV_ADDR diset (audit scan), lalu uji 1 permohonan. Detail: docs/DEPLOYMENT_GUIDE.md.
 ## [0.5.12] — 2026-11-24 — Dashboard gaya Seven + kunci guard tulis auditor
 - Dashboard /app ditulis ulang menyerupai referensi Seven (clean-room, tanpa aset tema berbayar): strip atas + tombol Klien/Permohonan Baru, daftar Permohonan, kartu gelap Permohonan Aktif, Klien + avatar tim, Pendapatan + donat, Sorotan jujur (selesai bulan ini, rata-rata hari, akta, piutang), Agenda Hari Ini + strip minggu, kartu Unggulan, banner Upgrade Paket (tier nyata LITE/PRO/ENTERPRISE), grafik aktivitas + Invoice Terakhir, tabel Statistik Permohonan (anggaran nyata + progres checklist + status), promo Invoice Manager, peta Gantt Tugas Aktif (bentang created→tenggat, tab Hari/Minggu/Bulan fungsional). Semua angka dari query nyata, fail-open seperti sebelumnya. Kartu Perlu Tindakan/Serah & peringatan MFA/password dipertahankan.
 - Guard tulis (temu audit SECURITY_AUDIT): `rbac.ReadOnly` (auditor+klien) + `requireWrite`; diterapkan di protocolStatus, retentionTask, dmsBulk, dmsMerge, dmsRestoreVersion; jalur bulk-verify kini wajib PermVerifyIdentity. Unit TestReadOnlyRoles hijau; build/vet/test internal hijau; template 27 file lolos parse.
