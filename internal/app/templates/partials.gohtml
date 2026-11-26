@@ -17,132 +17,259 @@
 <script defer>(function(){if(!('serviceWorker' in navigator))return;var KEY='sn-pwa-dismiss-v1',COOL=14*24*60*60*1000,defEvt=null,installEl=null,updateEl=null,doneReload=false;function standalone(){try{if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)return true;if(navigator.standalone)return true;}catch(e){}return false;}function dismissed(){try{var v=parseInt(localStorage.getItem(KEY)||'0',10)||0;return(Date.now()-v)<COOL;}catch(e){return false;}}function remember(){try{localStorage.setItem(KEY,String(Date.now()));}catch(e){}}function ready(fn){if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn,{once:true});}else{fn();}}function closeInstall(save){if(installEl&&installEl.parentNode){installEl.parentNode.removeChild(installEl);}installEl=null;if(save)remember();}function renderInstall(){if(defEvt===null||installEl||updateEl||standalone()||dismissed())return;if(!document.body)return;installEl=document.createElement('div');installEl.id='sn-pwa-install';installEl.className='sn-pwa';installEl.setAttribute('role','dialog');installEl.setAttribute('aria-live','polite');installEl.setAttribute('aria-label','Pasang aplikasi');var t=document.createElement('span');t.textContent='Pasang aplikasi agar cepat dibuka?';var go=document.createElement('button');go.type='button';go.className='sn-go';go.textContent='Pasang';var no=document.createElement('button');no.type='button';no.className='sn-no';no.textContent='Nanti';no.setAttribute('aria-label','Tutup tawaran pasang aplikasi');go.onclick=function(){if(defEvt){try{defEvt.prompt();}catch(e){}try{defEvt.userChoice.then(function(){closeInstall(true);defEvt=null;}).catch(function(){closeInstall(true);defEvt=null;});}catch(e){closeInstall(true);defEvt=null;}}else{closeInstall(true);}};no.onclick=function(){closeInstall(true);defEvt=null;};installEl.appendChild(t);installEl.appendChild(go);installEl.appendChild(no);document.body.appendChild(installEl);}function renderUpdate(){if(updateEl||!document.body)return;updateEl=document.createElement('div');updateEl.id='sn-pwa-update';updateEl.className='sn-pwa';updateEl.setAttribute('role','status');updateEl.setAttribute('aria-live','polite');var t=document.createElement('span');t.textContent='Versi baru tersedia \u2014 Muat ulang?';var go=document.createElement('button');go.type='button';go.className='sn-go';go.textContent='Muat ulang';var no=document.createElement('button');no.type='button';no.className='sn-no';no.textContent='Nanti';go.onclick=function(){window.location.reload();};no.onclick=function(){if(updateEl&&updateEl.parentNode){updateEl.parentNode.removeChild(updateEl);}updateEl=null;};updateEl.appendChild(t);updateEl.appendChild(go);updateEl.appendChild(no);document.body.appendChild(updateEl);}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();defEvt=e;ready(renderInstall);});try{navigator.serviceWorker.addEventListener('controllerchange',function(){if(doneReload)return;doneReload=true;ready(renderUpdate);});}catch(e){}window.addEventListener('appinstalled',function(){closeInstall(true);defEvt=null;});})();</script>
 <link rel="stylesheet" href="/assets/vendor/tabler.min.css"/>
 <link rel="stylesheet" href="/assets/notarius/tokens.css"/>
-<style>:root{--wl-primary:{{.Brand.Primary}};--wl-secondary:{{.Brand.Secondary}};--wl-accent:{{.Brand.Accent}};--wl-header:{{.Brand.HeaderBG}};--wl-radius:{{.Brand.ButtonRadius}}}body{font-family:{{css .Brand.FontStack}}}.btn-primary{background:var(--wl-primary);border-color:var(--wl-primary)}.navbar-brand,.page-title{color:var(--wl-secondary)}.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
+<link rel="stylesheet" href="/assets/notarius/tillora.css"/>
+<style>:root{--wl-primary:{{.Brand.Primary}};--wl-secondary:{{.Brand.Secondary}};--wl-accent:{{.Brand.Accent}};--wl-header:{{.Brand.HeaderBG}};--wl-radius:{{.Brand.ButtonRadius}};--app-primary:var(--wl-primary);--app-primary-hover:var(--wl-primary)}body{font-family:{{css .Brand.FontStack}}}.btn-primary{background:var(--wl-primary);border-color:var(--wl-primary)}.navbar-brand,.page-title{color:var(--wl-secondary)}.skip-link{position:absolute;left:-9999px;top:0;z-index:1050}.skip-link:focus{left:8px;top:8px}</style>
 <style>@media (max-width:576px){td .d-flex,td form.d-flex{flex-wrap:wrap}.btn{white-space:normal;text-align:center}h1.page-title,.page-title{font-size:1.25rem}}</style>
-<style>@media print{.no-print,.navbar-vertical,#sidebar-menu{display:none!important}form,.btn,button{display:none!important}.page-wrapper{margin:0!important}.page-body .container-xl{max-width:100%!important}body{background:#fff!important}table{font-size:11pt}thead{display:table-header-group}tr{page-break-inside:avoid}h1,h2,h3{page-break-after:avoid}.table-responsive{overflow:visible!important}.card{box-shadow:none!important}@page{margin:12mm}}</style>
+<style>@media print{.no-print,.app-topbar,.topbar-nav,#snTopNav{display:none!important}form,.btn,button{display:none!important}.app-main{margin:0!important}.page-body .container-xl,.app-container{max-width:100%!important}body{background:#fff!important}table{font-size:11pt}thead{display:table-header-group}tr{page-break-inside:avoid}h1,h2,h3{page-break-after:avoid}.table-responsive{overflow:visible!important}.card{box-shadow:none!important}@page{margin:12mm}}</style>
 <script src="/assets/vendor/tabler.min.js"></script>
 <!-- htmx tidak dipakai (tidak ada atribut hx-* di template mana pun); sengaja tidak dimuat -->
 </head>{{end}}
 
-{{define "sidebar"}}<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background:{{.Brand.SidebarBG}}" aria-label="Navigasi utama">
-<div class="container-fluid">
-<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"><span class="navbar-toggler-icon"></span></button>
-<h1 class="navbar-brand navbar-brand-autodark mt-2">{{if .Brand.LogoURL}}<img src="{{.Brand.LogoURL}}" alt="{{.Brand.AppName}}" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/>{{else}}<img src="/assets/brand/saktinotaris-logo-b.png" alt="{{.Brand.AppName}}" style="height:34px;width:34px;object-fit:cover;object-position:center;border-radius:8px;vertical-align:middle"/>{{end}} <span class="text-white">{{.Brand.AppName}}</span></h1>
-{{if .Acting}}<div class="px-3"><div class="alert alert-warning py-2 mb-2 small">Mode lintas-kantor AKTIF ({{.OfficeName}}). <form method="post" action="/offices/act" class="d-inline">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning" type="submit">Keluar mode</button></form></div></div>{{end}}
-<div class="collapse navbar-collapse" id="sidebar-menu">
-<form method="get" action="/search" class="px-3 mb-2" role="search"><input class="form-control" name="q" placeholder="Cari klien/akta…" aria-label="Pencarian cepat"/></form>
-<ul class="navbar-nav pt-lg-3" id="mainnav">
-<li class="nav-item"><span class="nav-link disabled text-uppercase small">Workspace</span></li>
-<li class="nav-item"><a class="nav-link" href="/app">🏠 Dashboard</a></li>
-<li class="nav-item"><a class="nav-link" href="/appointments">📅 Janji Temu</a></li>
-<li class="nav-item"><a class="nav-link" href="/tasks">☰ Tugas{{if .PendingTasks}}<span class="badge bg-yellow text-dark ms-auto">{{.PendingTasks}}</span>{{end}}</a></li>
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Dokumen (DMS)</span></li>
-<li class="nav-item"><a class="nav-link" href="/dms">📊 Overview DMS</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/library">📁 Library</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/search">🔍 Pencarian</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/ocr">⚙ Antrean OCR</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/duplicates">⧉ Duplikat</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/archive">🗄 Arsip Fisik</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/retention">⏳ Retensi & Hold</a></li>
-{{if can .Role "template.manage"}}<li class="nav-item"><a class="nav-link" href="/dms/categories">🏷 Kategori</a></li>
-<li class="nav-item"><a class="nav-link" href="/dms/checklists">☑ Checklist</a></li>{{end}}
-{{if can .Role "client.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Manajemen Klien</span></li>
-<li class="nav-item"><a class="nav-link" href="/clients">👥 Daftar Klien{{if .Pending}}<span class="badge bg-yellow text-dark ms-auto">{{.Pending}}</span>{{end}}</a></li>
-<li class="nav-item"><a class="nav-link" href="/portal">🖥 Portal Klien</a></li>{{end}}
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Layanan Notaris</span></li>
-<li class="nav-item"><a class="nav-link" href="/requests">🧾 Permohonan{{if .Pending}}<span class="badge bg-red ms-auto">{{.Pending}}</span>{{end}}</a></li>
-<li class="nav-item"><a class="nav-link" href="/deeds">📝 Akta</a></li>
-{{if can .Role "template.manage"}}<li class="nav-item"><a class="nav-link" href="/templates">📄 Template</a></li>{{end}}
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Register & Protokol</span></li>
-{{if can .Role "repertorium.manage"}}<li class="nav-item"><a class="nav-link" href="/repertorium">📚 Repertorium</a></li>{{end}}
-{{if can .Role "protocol.view"}}<li class="nav-item"><a class="nav-link" href="/protocols">🗄 Arsip Protokol</a></li>{{end}}
-{{if can .Role "legalization.process"}}<li class="nav-item"><a class="nav-link" href="/legalisasi">✅ Legalisasi</a></li>{{end}}
-{{if or (can .Role "deed.approve") (eq .Role "auditor")}}<li class="nav-item"><a class="nav-link" href="/wills">🕊 Wasiat</a></li>{{end}}
-<li class="nav-item"><a class="nav-link" href="/gov">🏛 AHU &amp; OSS</a></li>
-{{if can .Role "repertorium.manage"}}<li class="nav-item"><a class="nav-link" href="/ppat">🏠 Register PPAT</a></li>{{end}}
-{{if can .Role "finance.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Keuangan</span></li>
-<li class="nav-item"><a class="nav-link" href="/finance">💰 Invoice</a></li>
-<li class="nav-item"><a class="nav-link" href="/expenses">💸 Pengeluaran</a></li>
-<li class="nav-item"><a class="nav-link" href="/tariffs">🏷 Tarif</a></li>{{end}}
-{{if can .Role "reports.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Laporan</span></li>
-<li class="nav-item"><a class="nav-link" href="/reports">📊 Laporan</a></li>
-<li class="nav-item"><a class="nav-link" href="/audit">📜 Audit Log</a></li>{{end}}
-{{if can .Role "website.view"}}<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Website CMS</span></li>
-<li class="nav-item"><a class="nav-link" href="/cms">🌐 Website</a></li>
-<li class="nav-item"><a class="nav-link" href="/cms/pages">📄 Halaman</a></li>
-<li class="nav-item"><a class="nav-link" href="/cms/articles">📰 Artikel</a></li>
-<li class="nav-item"><a class="nav-link" href="/cms/media">🖼 Media</a></li>
-{{if can .Role "website.branding.manage"}}<li class="nav-item"><a class="nav-link" href="/cms/branding">🎨 Branding</a></li>{{end}}
-{{if can .Role "website.seo.manage"}}<li class="nav-item"><a class="nav-link" href="/cms/site">🔍 SEO & Domain</a></li>{{end}}{{end}}
-<li class="nav-item"><span class="nav-link disabled text-uppercase small mt-2">Pengaturan</span></li>
-{{if can .Role "office.manage"}}<li class="nav-item"><a class="nav-link" href="/office">🏢 Kantor</a></li>{{end}}
-<li class="nav-item"><a class="nav-link" href="/settings">⚙ Pengaturan</a></li>
-{{if eq .Role "super_admin"}}<li class="nav-item"><a class="nav-link" href="/offices">🏢 Multi-Kantor</a></li>{{end}}
-{{if can .Role "users.manage"}}<li class="nav-item"><a class="nav-link" href="/roles">🔑 Role & Permission</a></li>{{end}}
+{{define "sidebar"}}<header class="app-topbar" aria-label="Header utama">
+<div class="app-container topbar-main">
+<button class="topbar-icon-btn d-xl-none" type="button" data-bs-toggle="collapse" data-bs-target="#snTopNav" aria-controls="snTopNav" aria-label="Buka menu navigasi">☰</button>
+<a class="topbar-brand" href="/app" aria-label="Beranda">{{if .Brand.LogoURL}}<img src="{{.Brand.LogoURL}}" alt="{{.Brand.AppName}}" width="34" height="34" style="border-radius:9px;object-fit:cover"/>{{else}}<img src="/assets/brand/saktinotaris-logo-b.png" alt="{{.Brand.AppName}}" width="34" height="34" style="border-radius:9px;object-fit:cover"/>{{end}}<span class="brand-text"><span class="brand-name">{{.Brand.AppName}}</span><span class="brand-sub">Notary OS</span></span></a>
+<span class="topbar-divider d-none d-md-block" aria-hidden="true"></span>
+<div class="dropdown store-selector d-none d-md-block">
+<button class="store-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Kantor aktif"><span class="store-icon">🏢</span><span class="store-label"><span>{{if .OfficeName}}{{.OfficeName}}{{else}}Semua Kantor{{end}}{{if .Acting}} · lintas{{end}}</span><small><span class="live-dot"></span>{{.Role}} · {{.UserName}}</small></span><span class="store-caret">▾</span></button>
+<ul class="dropdown-menu store-menu"><li class="dd-heading">Kantor</li>
+<li><a class="dropdown-item store-option" href="/office"><span class="dd-icon">🏢</span><span class="flex-grow-1"><strong>{{if .OfficeName}}{{.OfficeName}}{{else}}Kantor saya{{end}}</strong><small>Profil &amp; lisensi</small></span></a></li>
+{{if eq .Role "super_admin"}}<li><a class="dropdown-item store-option" href="/offices"><span class="dd-icon">🏢</span><span class="flex-grow-1"><strong>Multi-Kantor</strong><small>Bertindak lintas-kantor</small></span></a></li>{{end}}
+{{if .Acting}}<li><hr class="dropdown-divider"/></li><li><form method="post" action="/offices/act" class="px-2 pb-1">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning w-100" type="submit">Keluar mode lintas</button></form></li>{{end}}
 </ul>
-<div class="my-2 px-3 text-secondary small">Peran: {{.Role}} · {{.UserName}}</div>
-<form method="post" action="/logout" class="px-3 pb-2">{{template "csrf" .}}<button class="btn btn-outline-danger w-100" type="submit">Keluar</button></form>
-<div class="px-3 pb-3"><button class="btn btn-ghost-secondary w-100" id="sn-mini-btn" type="button" title="Ringkas sidebar">⫷ Ringkas</button></div>
+</div>
+<form method="get" action="/search" class="topbar-search d-none d-lg-flex" role="search"><span aria-hidden="true">🔍</span><input class="form-control" name="q" placeholder="Cari klien, akta, menu…" autocomplete="off" aria-label="Pencarian"/><span class="search-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span></form>
+<div class="topbar-actions">
+<span class="register-status d-none d-xxl-inline-flex" title="Status layanan"><span class="pulse"></span>{{if .Pending}}{{.Pending}} antre{{else}}Siap{{end}}</span>
+<div class="dropdown d-none d-sm-block">
+<button class="btn-quick" type="button" data-bs-toggle="dropdown" aria-expanded="false">+ Buat</button>
+<div class="dropdown-menu dropdown-menu-end create-menu"><div class="dd-heading">Buat baru</div><div class="create-grid">
+{{if can .Role "client.create"}}<a class="create-item" href="/clients/new"><span class="create-icon tone-primary">👥</span><span><strong>Klien</strong><small>Daftar baru</small></span></a>{{end}}
+<a class="create-item" href="/requests"><span class="create-icon tone-cyan">🧾</span><span><strong>Permohonan</strong><small>Layanan baru</small></span></a>
+{{if can .Role "deed.draft"}}<a class="create-item" href="/deeds"><span class="create-icon tone-violet">📝</span><span><strong>Draft akta</strong><small>Mulai minuta</small></span></a>{{end}}
+{{if can .Role "finance.manage"}}<a class="create-item" href="/finance"><span class="create-icon tone-success">💰</span><span><strong>Invoice</strong><small>Tagihan baru</small></span></a>{{end}}
+</div></div>
+</div>
+<a class="topbar-icon-btn" href="/tasks" title="Tugas">☰{{if .PendingTasks}}<span class="badge-dot"></span>{{end}}</a>
+<div class="dropdown">
+<button class="topbar-icon-btn position-relative" type="button" data-bs-toggle="dropdown" title="Notifikasi" aria-label="Notifikasi">🔔{{if .Unread}}<span class="badge-dot"></span>{{end}}</button>
+<div class="dropdown-menu dropdown-menu-end notif-menu"><div class="notif-head"><span class="notif-title">Notifikasi{{if .Unread}} ({{.Unread}}){{end}}</span><form method="post" action="/notifications/read">{{template "csrf" .}}<button class="notif-action" type="submit">Tandai dibaca</button></form></div>
+<div class="notif-list">{{range .TopNotifs}}<div class="notif-item"><span class="create-icon tone-primary">🔔</span><span class="notif-text">{{.Title}}<span class="notif-time">{{.Body}}</span></span></div>{{else}}<div class="notif-item"><span class="notif-text">Tidak ada notifikasi.</span></div>{{end}}</div>
 </div>
 </div>
-</aside>{{end}}
+<div class="dropdown topbar-profile">
+<button class="profile-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{if .AvatarURL}}<span class="profile-avatar"><img src="{{.AvatarURL}}" alt="Foto profil"/></span>{{else}}<span class="profile-avatar"><img src="/assets/brand/saktinotaris-logo-b.png" alt=""/></span>{{end}}<span class="profile-name d-none d-xl-block">{{.UserName}}<small>{{.Role}}</small></span></button>
+<div class="dropdown-menu dropdown-menu-end profile-menu">
+<div class="profile-card">{{if .AvatarURL}}<span class="profile-avatar lg"><img src="{{.AvatarURL}}" alt=""/></span>{{else}}<span class="profile-avatar lg"><img src="/assets/brand/saktinotaris-logo-b.png" alt=""/></span>{{end}}<div class="min-w-0"><strong>{{.UserName}}</strong><small>{{.Role}}{{if .OfficeName}} · {{.OfficeName}}{{end}}</small><span class="profile-role">{{.Role}}</span></div></div>
+<div class="profile-links">
+<a class="dropdown-item" href="/mfa">🔒 Keamanan (MFA)</a>
+<a class="dropdown-item" href="/office">🏢 Profil Kantor</a>
+<a class="dropdown-item" href="/settings">⚙ Pengaturan</a>
+</div>
+<div class="profile-foot"><a href="/settings">Profil</a><form method="post" action="/logout" class="d-inline">{{template "csrf" .}}<button type="submit" style="all:unset;cursor:pointer;width:100%">Keluar</button></form></div>
+</div>
+</div>
+</div>
+</div>
+<nav class="topbar-nav" aria-label="Navigasi utama"><div class="app-container">
+<div id="snTopNav" class="sn-topnav-collapse">
+<ul class="nav-menu" id="mainnav">
+<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">🏠<span>Dashboard</span></a>
+<ul class="dropdown-menu nav-dropdown"><li class="dd-heading">Overview</li>
+<li><a class="dropdown-item nav-dd-item" href="/app"><span class="dd-icon">🏠</span><span><strong>Dashboard</strong><small>Antrean, akta &amp; agenda</small></span></a></li>
+<li><a class="dropdown-item nav-dd-item" href="/appointments"><span class="dd-icon">📅</span><span><strong>Janji Temu</strong><small>Jadwal pembacaan</small></span></a></li>
+<li><a class="dropdown-item nav-dd-item" href="/tasks"><span class="dd-icon">☰</span><span><strong>Tugas</strong><small>{{if .PendingTasks}}{{.PendingTasks}} terbuka{{else}}Todo tim{{end}}</small></span></a></li>
+</ul></li>
+<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">🧾<span>Layanan</span></a>
+<div class="dropdown-menu mega-menu has-feature"><div class="mega-grid" style="--mega-cols: 2;">
+<div class="mega-col"><div class="mega-title">Permohonan &amp; Akta</div>
+<a class="mega-link" href="/requests"><span class="mega-icon">🧾</span><span class="mega-text"><strong>Permohonan</strong><span>{{if .Pending}}{{.Pending}} menunggu{{else}}Semua layanan{{end}}</span></span></a>
+<a class="mega-link" href="/deeds"><span class="mega-icon">📝</span><span class="mega-text"><strong>Akta</strong><span>Minuta &amp; pengesahan</span></span></a>
+{{if can .Role "template.manage"}}<a class="mega-link" href="/templates"><span class="mega-icon">📄</span><span class="mega-text"><strong>Template</strong><span>Klausul baku</span></span></a>{{end}}
+</div>
+<div class="mega-col"><div class="mega-title">Khusus</div>
+{{if can .Role "legalization.process"}}<a class="mega-link" href="/legalisasi"><span class="mega-icon">✅</span><span class="mega-text"><strong>Legalisasi</strong><span>Register &amp; waarmerking</span></span></a>{{end}}
+{{if or (can .Role "deed.approve") (eq .Role "auditor")}}<a class="mega-link" href="/wills"><span class="mega-icon">🕊</span><span class="mega-text"><strong>Wasiat</strong><span>Register wasiat</span></span></a>{{end}}
+</div>
+<a class="mega-feature" href="/requests"><span class="mega-feature-icon">⚡</span><span class="mega-feature-title">{{if .Pending}}{{.Pending}} permohonan menunggu{{else}}Mulai layanan baru{{end}}</span><span class="mega-feature-text">Dari permohonan → akta → repertorium otomatis. SLA dijaga sistem.</span><span class="mega-feature-cta">Buka antrean →</span></a>
+</div></div></li>
+<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">🗄<span>Register</span></a>
+<div class="dropdown-menu mega-menu"><div class="mega-grid" style="--mega-cols: 2;">
+<div class="mega-col"><div class="mega-title">Register &amp; Protokol</div>
+{{if can .Role "repertorium.manage"}}<a class="mega-link" href="/repertorium"><span class="mega-icon">📚</span><span class="mega-text"><strong>Repertorium</strong><span>Buku harian notaris</span></span></a>{{end}}
+{{if can .Role "protocol.view"}}<a class="mega-link" href="/protocols"><span class="mega-icon">🗄</span><span class="mega-text"><strong>Arsip Protokol</strong><span>Minuta tersimpan</span></span></a>{{end}}
+{{if can .Role "repertorium.manage"}}<a class="mega-link" href="/ppat"><span class="mega-icon">🏠</span><span class="mega-text"><strong>Register PPAT</strong><span>Akta tanah</span></span></a>{{end}}
+<a class="mega-link" href="/gov"><span class="mega-icon">🏛</span><span class="mega-text"><strong>AHU &amp; OSS</strong><span>Badan hukum &amp; izin</span></span></a>
+</div>
+</div></div></li>
+<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">📁<span>Dokumen</span></a>
+<div class="dropdown-menu mega-menu has-feature"><div class="mega-grid" style="--mega-cols: 2;">
+<div class="mega-col"><div class="mega-title">DMS</div>
+<a class="mega-link" href="/dms"><span class="mega-icon">📊</span><span class="mega-text"><strong>Overview DMS</strong><span>Status &amp; kesehatan arsip</span></span></a>
+<a class="mega-link" href="/dms/library"><span class="mega-icon">📁</span><span class="mega-text"><strong>Library</strong><span>Semua berkas</span></span></a>
+<a class="mega-link" href="/dms/search"><span class="mega-icon">🔍</span><span class="mega-text"><strong>Pencarian</strong><span>Full-text dokumen</span></span></a>
+<a class="mega-link" href="/dms/ocr"><span class="mega-icon">⚙</span><span class="mega-text"><strong>Antrean OCR</strong><span>Ekstraksi teks</span></span></a>
+</div>
+<div class="mega-col"><div class="mega-title">Kearsipan</div>
+<a class="mega-link" href="/dms/duplicates"><span class="mega-icon">⧉</span><span class="mega-text"><strong>Duplikat</strong><span>Deteksi ganda</span></span></a>
+<a class="mega-link" href="/dms/archive"><span class="mega-icon">🗄</span><span class="mega-text"><strong>Arsip Fisik</strong><span>Lokasi boks</span></span></a>
+<a class="mega-link" href="/dms/retention"><span class="mega-icon">⏳</span><span class="mega-text"><strong>Retensi &amp; Hold</strong><span>Jadwal retensi</span></span></a>
+{{if can .Role "template.manage"}}<a class="mega-link" href="/dms/categories"><span class="mega-icon">🏷</span><span class="mega-text"><strong>Kategori</strong><span>Klasifikasi arsip</span></span></a>
+<a class="mega-link" href="/dms/checklists"><span class="mega-icon">☑</span><span class="mega-text"><strong>Checklist</strong><span>Syarat layanan</span></span></a>{{end}}
+</div>
+<a class="mega-feature" href="/dms/search"><span class="mega-feature-icon">🔍</span><span class="mega-feature-title">Cari dokumen cepat</span><span class="mega-feature-text">OCR + full-text + filter kategori. Shortcut: Ctrl K.</span><span class="mega-feature-cta">Buka pencarian →</span></a>
+</div></div></li>
+{{if can .Role "client.view"}}<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">👥<span>Klien</span></a>
+<ul class="dropdown-menu nav-dropdown"><li class="dd-heading">Manajemen klien</li>
+<li><a class="dropdown-item nav-dd-item" href="/clients"><span class="dd-icon">👥</span><span><strong>Daftar Klien</strong><small>{{if .Pending}}{{.Pending}} verifikasi{{else}}Perorangan &amp; badan{{end}}</small></span></a></li>
+<li><a class="dropdown-item nav-dd-item" href="/portal"><span class="dd-icon">🖥</span><span><strong>Portal Klien</strong><small>Akses &amp; berbagi</small></span></a></li>
+</ul></li>{{end}}
+{{if can .Role "finance.view"}}<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">💰<span>Keuangan</span></a>
+<div class="dropdown-menu mega-menu"><div class="mega-grid" style="--mega-cols: 2;">
+<div class="mega-col"><div class="mega-title">Tagihan</div>
+<a class="mega-link" href="/finance"><span class="mega-icon">💰</span><span class="mega-text"><strong>Invoice</strong><span>Tagihan &amp; piutang</span></span></a>
+<a class="mega-link" href="/expenses"><span class="mega-icon">💸</span><span class="mega-text"><strong>Pengeluaran</strong><span>Biaya operasional</span></span></a>
+</div>
+<div class="mega-col"><div class="mega-title">Master</div>
+<a class="mega-link" href="/tariffs"><span class="mega-icon">🏷</span><span class="mega-text"><strong>Tarif</strong><span>PNBP &amp; jasa</span></span></a>
+</div>
+</div></div></li>{{end}}
+{{if can .Role "reports.view"}}<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">📊<span>Laporan</span></a>
+<ul class="dropdown-menu nav-dropdown"><li class="dd-heading">Analitik</li>
+<li><a class="dropdown-item nav-dd-item" href="/reports"><span class="dd-icon">📊</span><span><strong>Laporan</strong><small>Operasional &amp; keuangan</small></span></a></li>
+<li><a class="dropdown-item nav-dd-item" href="/audit"><span class="dd-icon">📜</span><span><strong>Audit Log</strong><span>Jejak aktivitas</span></span></a></li>
+</ul></li>{{end}}
+<li class="nav-item dropdown"><a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">⚙<span>Admin</span></a>
+<div class="dropdown-menu mega-menu"><div class="mega-grid" style="--mega-cols: 2;">
+<div class="mega-col"><div class="mega-title">Kantor</div>
+{{if can .Role "office.manage"}}<a class="mega-link" href="/office"><span class="mega-icon">🏢</span><span class="mega-text"><strong>Kantor</strong><span>Profil &amp; lisensi</span></span></a>{{end}}
+<a class="mega-link" href="/settings"><span class="mega-icon">⚙</span><span class="mega-text"><strong>Pengaturan</strong><span>Pengguna &amp; umum</span></span></a>
+{{if eq .Role "super_admin"}}<a class="mega-link" href="/offices"><span class="mega-icon">🏢</span><span class="mega-text"><strong>Multi-Kantor</strong><span>Lintas kantor</span></span></a>{{end}}
+{{if can .Role "users.manage"}}<a class="mega-link" href="/roles"><span class="mega-icon">🔑</span><span class="mega-text"><strong>Role &amp; Permission</strong><span>Akses tim</span></span></a>{{end}}
+</div>
+{{if can .Role "website.view"}}<div class="mega-col"><div class="mega-title">Website CMS</div>
+<a class="mega-link" href="/cms"><span class="mega-icon">🌐</span><span class="mega-text"><strong>Website</strong><span>Kelola situs</span></span></a>
+<a class="mega-link" href="/cms/pages"><span class="mega-icon">📄</span><span class="mega-text"><strong>Halaman</strong><span>Konten statis</span></span></a>
+<a class="mega-link" href="/cms/articles"><span class="mega-icon">📰</span><span class="mega-text"><strong>Artikel</strong><span>Publikasi</span></span></a>
+<a class="mega-link" href="/cms/media"><span class="mega-icon">🖼</span><span class="mega-text"><strong>Media</strong><span>File &amp; gambar</span></span></a>
+{{if can .Role "website.branding.manage"}}<a class="mega-link" href="/cms/branding"><span class="mega-icon">🎨</span><span class="mega-text"><strong>Branding</strong><span>Logo &amp; warna</span></span></a>{{end}}
+{{if can .Role "website.seo.manage"}}<a class="mega-link" href="/cms/site"><span class="mega-icon">🔍</span><span class="mega-text"><strong>SEO &amp; Domain</strong><span>Optimasi situs</span></span></a>{{end}}
+</div>{{end}}
+</div></div></li>
+</ul>
+</div>
+</div></nav>
+{{if .Acting}}<div class="app-container"><div class="alert alert-warning py-2 mt-2 mb-0 small">Mode lintas-kantor AKTIF ({{.OfficeName}}). <form method="post" action="/offices/act" class="d-inline">{{template "csrf" .}}<button class="btn btn-sm btn-outline-warning" type="submit">Keluar mode</button></form></div></div>{{end}}
+</header>{{end}}
 
 {{define "csrf"}}<input type="hidden" name="csrf" value="{{.CSRF}}"/>{{end}}
 
 {{define "flash"}}{{if .Flash}}<div class="alert alert-success" role="alert">{{.Flash}}</div>{{end}}{{end}}
 
-{{define "page_open"}}<body>
+{{define "page_open"}}<body data-page="{{.Title}}">
 <a class="skip-link btn btn-primary" href="#konten">Lewati ke konten utama</a>
-<style>#sn-open{display:none;position:fixed;left:12px;top:12px;z-index:1060;border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;font-size:1rem;cursor:pointer;box-shadow:0 2px 8px rgba(16,24,40,.12)}body.sn-mini #sn-open{display:block}body.sn-mini .navbar-vertical{display:none}@media print{#sn-open{display:none!important}}</style>
-<button id="sn-open" type="button" title="Buka menu" aria-label="Buka menu navigasi">☰</button>
-<div class="page">
+<style>
+/* Responsif Tillora-nav: HP jadi drawer vertikal, desktop horizontal */
+.sn-topnav-collapse{display:block}
+@media (max-width:1199.98px){
+.topbar-nav{height:auto;padding:0}
+.topbar-nav .app-container{padding-inline:1rem}
+.sn-topnav-collapse{display:none;padding:.5rem 0 1rem}
+.sn-topnav-collapse.open{display:block}
+.nav-menu{flex-direction:column;align-items:stretch;height:auto;gap:2px}
+.nav-item{width:100%}
+.nav-link{width:100%;justify-content:flex-start}
+.topbar-nav .dropdown-menu,.nav-menu .dropdown-menu,.nav-item .dropdown-menu{position:static;opacity:1;visibility:visible;transform:none;display:none;width:100%;box-shadow:none;margin-top:4px}
+.topbar-nav .dropdown-menu.show,.nav-menu .dropdown-menu.show,.nav-item .dropdown-menu.show{display:block}
+.mega-menu,.mega-menu.has-feature{width:100%}
+.has-feature .mega-grid,.mega-grid{grid-template-columns:minmax(0,1fr)}
+.mega-feature{min-height:0}
+}
+@media print{.app-topbar,.topbar-nav,.no-print{display:none!important}form,.btn,button{display:none!important}.app-main{margin:0!important}body{background:#fff!important}table{font-size:11pt}thead{display:table-header-group}tr{page-break-inside:avoid}h1,h2,h3{page-break-after:avoid}.table-responsive{overflow:visible!important}.card{box-shadow:none!important}@page{margin:12mm}}
+</style>
+<div class="app-shell">
 {{template "sidebar" .}}
-<div class="page-wrapper">
-<header class="navbar navbar-expand-md d-print-none"><div class="container-xl d-flex align-items-center gap-2 py-2">
-<nav aria-label="breadcrumb" class="d-none d-lg-block"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/app">Beranda</a></li><li class="breadcrumb-item active">{{.Title}}</li></ol></nav>
-<form method="get" action="/search" class="flex-fill d-none d-md-block" role="search"><div class="input-icon"><span class="input-icon-addon" aria-hidden="true">🔍</span><input class="form-control" name="q" placeholder="Cari menu, klien, atau dokumen…" aria-label="Pencarian menu, klien, atau dokumen"/></div></form>
-<div class="dropdown">
-<button class="btn btn-primary" type="button" data-bs-toggle="dropdown">+ Buat</button>
-<div class="dropdown-menu dropdown-menu-end">
-{{if can .Role "client.create"}}<a class="dropdown-item" href="/clients/new">👥 Klien Baru</a>{{end}}
-<a class="dropdown-item" href="/requests">🧾 Permohonan Baru</a>
-{{if can .Role "deed.draft"}}<a class="dropdown-item" href="/deeds">📝 Draft Akta</a>{{end}}
-{{if can .Role "legalization.process"}}<a class="dropdown-item" href="/legalisasi">✅ Register Baru</a>{{end}}
-{{if can .Role "finance.manage"}}<a class="dropdown-item" href="/finance">💰 Invoice Baru</a>{{end}}
+<main class="app-main" id="konten"><div class="app-container">
+<div class="page-header"><div><nav aria-label="Breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/app">🏠 Beranda</a></li><li class="breadcrumb-item active" aria-current="page">{{.Title}}</li></ol></nav>
+<h1 class="page-title">{{.Title}}</h1></div>
+<div class="page-actions"><form method="get" action="/search" class="d-lg-none" role="search"><div class="input-group"><input class="form-control" name="q" placeholder="Cari…" aria-label="Pencarian"/><button class="btn btn-primary" type="submit">🔍</button></div></form></div>
 </div>
-</div>
-<a class="btn btn-ghost-secondary" href="/tasks" title="Tugas" aria-label="Daftar tugas">☰</a>
-<div class="dropdown">
-<a href="#" class="btn btn-ghost-secondary position-relative" data-bs-toggle="dropdown" title="Notifikasi" aria-label="Notifikasi" aria-haspopup="true">🔔{{if .Unread}}<span class="badge bg-red position-absolute top-0 start-100 translate-middle">{{.Unread}}</span>{{end}}</a>
-<div class="dropdown-menu dropdown-menu-end" style="width:320px">
-<div class="dropdown-header">Notifikasi</div>
-{{range .TopNotifs}}<div class="dropdown-item-text"><div>{{.Title}}</div><div class="small text-secondary">{{.Body}}</div></div>
-{{else}}<div class="dropdown-item-text text-secondary">Tidak ada notifikasi.</div>{{end}}
-<div class="dropdown-divider"></div>
-<form method="post" action="/notifications/read" class="px-3 pb-2">{{template "csrf" .}}<button class="btn btn-sm btn-ghost-secondary w-100" type="submit">Tandai semua dibaca</button></form>
-</div>
-</div>
-<div class="dropdown">
-<a href="#" class="d-flex align-items-center gap-2 text-decoration-none text-body" data-bs-toggle="dropdown">{{if .AvatarURL}}<img src="{{.AvatarURL}}" class="avatar avatar-rounded" style="object-fit:cover" alt="Foto profil"/>{{else}}<span class="avatar avatar-rounded">{{if .UserName}}{{slice .UserName 0 1}}{{else}}?{{end}}</span>{{end}}<span class="d-none d-md-block"><strong>{{.UserName}}</strong><br/><span class="small text-secondary">{{.Role}}</span></span></a>
-<div class="dropdown-menu dropdown-menu-end">
-<a class="dropdown-item" href="/mfa">Keamanan (MFA)</a>
-<a class="dropdown-item" href="/office">Profil Kantor</a>
-<div class="dropdown-divider"></div>
-<form method="post" action="/logout">{{template "csrf" .}}<button class="dropdown-item text-danger" type="submit">Keluar</button></form>
-</div>
-</div>
-</div></header>
-<div class="page-header d-print-none"><div class="container-xl"><h2 class="page-title">{{.Title}}</h2></div></div>
-<main class="page-body" id="konten"><div class="container-xl">
 {{template "flash" .}}{{end}}
 
 {{define "page_close"}}</div></main>
+<footer class="app-footer"><div class="app-container d-flex flex-wrap align-items-center justify-content-between gap-2"><span>© {{.Brand.AppName}} · Notary OS · oleh <strong>Lindu Cipta</strong></span><span class="d-flex gap-3 align-items-center"><a href="#" id="sn-buy-link">Beli aplikasi ini · Rp 8 jt</a><a href="/docs">Panduan</a><a href="/settings">Pengaturan</a><span class="footer-status"><span class="live-dot"></span>Semua sistem normal</span></span></div></footer>
+</div>
+<style>
+.sn-buy-fab{position:fixed;right:16px;bottom:16px;z-index:1500;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 12px 32px -8px rgba(22,163,74,.6)}
+.sn-buy-fab small{font-weight:600;opacity:.9}
+.sn-buy-modal{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(11,21,48,.6);backdrop-filter:blur(3px)}
+.sn-buy-modal.open{display:flex}
+.sn-buy-card{width:min(94vw,440px);background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px -12px rgba(11,21,48,.5)}
+.sn-buy-head{background:linear-gradient(135deg,#0B1530,#1B2A52);color:#fff;padding:20px}
+.sn-buy-head h3{margin:0;color:#fff;font-size:1.2rem}
+.sn-buy-head p{margin:4px 0 0;color:#cbd5e1;font-size:.85rem}
+.sn-buy-body{padding:20px}
+.sn-buy-price{display:flex;align-items:baseline;gap:8px;margin:4px 0 12px}
+.sn-buy-price strong{font-size:1.8rem;color:#0B1530}
+.sn-buy-price span{font-size:.85rem;color:#64748b}
+.sn-buy-list{margin:0 0 16px;padding:0;list-style:none;font-size:.88rem;color:#334155}
+.sn-buy-list li{padding:6px 0;border-bottom:1px dashed #e2e8f0}
+.sn-buy-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sn-buy-wa{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#16a34a;color:#fff;text-decoration:none;font-weight:800;border-radius:12px;padding:12px;min-width:180px}
+.sn-buy-close{flex:1;background:#f1f5f9;color:#0B1530;border:0;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;min-width:120px}
+.sn-buy-foot{padding:0 20px 18px;font-size:.78rem;color:#64748b}
+@media print{.sn-buy-fab,.sn-buy-modal{display:none!important}}
+</style>
+<button class="sn-buy-fab" id="snBuyFab" type="button" aria-haspopup="dialog">💬 <span>Beli aplikasi ini<br/><small>Rp 8 jt · Lindu Cipta</small></span></button>
+<div class="sn-buy-modal" id="snBuyModal" role="dialog" aria-modal="true" aria-label="Pembelian aplikasi">
+<div class="sn-buy-card">
+<div class="sn-buy-head"><h3>Beli Aplikasi Ini</h3><p>SaktiNotaris · Sistem Manajemen Kantor Notaris · oleh <strong>Lindu Cipta</strong></p></div>
+<div class="sn-buy-body">
+<div class="sn-buy-price"><strong>Rp 8.000.000</strong><span>sekali bayar · satu kantor</span></div>
+<ul class="sn-buy-list">
+<li>✅ Full source + panduan instalasi</li>
+<li>✅ Semua modul: akta, DMS, keuangan, portal, CMS</li>
+<li>✅ Hubungi: <strong>0812-9605-2010</strong> (WA)</li>
+<li>✅ Penjual: <strong>Lindu Cipta</strong></li>
+</ul>
+<div class="sn-buy-actions">
+<a class="sn-buy-wa" href="https://wa.me/6281296052010?text=Halo%20Lindu%20Cipta,%20saya%20ingin%20membeli%20aplikasi%20SaktiNotaris%20(Rp%208%20jt)." target="_blank" rel="noopener">Chat WA 0812-9605-2010</a>
+<button class="sn-buy-close" id="snBuyClose" type="button">Nanti</button>
+</div>
+</div>
+<div class="sn-buy-foot">Klik di luar kotak atau tekan Esc untuk menutup. Pop-up otomatis muncul 1x per 7 hari.</div>
 </div>
 </div>
 <script src="/assets/vendor/tabler.min.js"></script>
 <script src="/assets/notarius/ui.js"></script>
 <script>
-(function(){var p=location.pathname;document.querySelectorAll('#mainnav a.nav-link').forEach(function(a){var h=a.getAttribute('href');if(h&&h!=='#'&&(p===h||(h!=='/'&&p.indexOf(h)===0))){a.style.background='#c9a844';a.style.color='#101f3c';a.style.borderRadius='8px';a.style.fontWeight='700';}});})();
+(function(){
+/* Aktif ala Tillora: pill gradient pada parent + item aktif */
+var p=location.pathname;
+function mark(sel,activeCls){document.querySelectorAll(sel).forEach(function(a){var h=a.getAttribute('href');if(h&&h!=='#'&&(p===h||(h!=='/'&&h.length>1&&p.indexOf(h)===0))){a.classList.add(activeCls||'active');var li=a.closest('.nav-item.dropdown');if(li){var t=li.querySelector(':scope > .nav-link');if(t)t.classList.add('active');}}});}
+mark('#mainnav a.mega-link');mark('#mainnav a.nav-dd-item');
+/* Ctrl+K fokus ke search Tillora */
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){var s=document.querySelector('.topbar-search input');if(s){e.preventDefault();s.focus();}}});
+/* Hamburger mobile */
+var btn=document.querySelector('[data-bs-target="#snTopNav"]');
+if(btn){btn.addEventListener('click',function(){var t=document.getElementById('snTopNav');if(t)t.classList.toggle('open');});}
+/* Theme toggle ringan (light/dark) */
+try{var m=JSON.parse(localStorage.getItem('posretail.theme')||'{}').mode;if(m)document.documentElement.setAttribute('data-bs-theme',m);}catch(e){}
+/* Pop-up pembelian: Lindu Cipta · Rp 8 jt · 081296052010 */
+(function(){
+var KEY='sn-buy-dismiss-v1',COOL=7*24*60*60*1000;
+var modal=document.getElementById('snBuyModal'),fab=document.getElementById('snBuyFab'),close=document.getElementById('snBuyClose'),foot=document.getElementById('sn-buy-link');
+function dismissed(){try{return(Date.now()-parseInt(localStorage.getItem(KEY)||'0',10))<COOL;}catch(e){return false;}}
+function open(){if(modal)modal.classList.add('open');}
+function hide(save){if(modal)modal.classList.remove('open');if(save){try{localStorage.setItem(KEY,String(Date.now()));}catch(e){}}}
+if(fab)fab.addEventListener('click',function(){open();});
+if(close)close.addEventListener('click',function(){hide(true);});
+if(foot)foot.addEventListener('click',function(e){e.preventDefault();open();});
+if(modal)modal.addEventListener('click',function(e){if(e.target===modal)hide(true);});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')hide(true);});
+if(!dismissed()){setTimeout(function(){if(modal&&!modal.classList.contains('open'))open();},8000);}
+})();
+})();
 </script>
 </body>
 </html>{{end}}

@@ -1,17 +1,48 @@
 [Unit]
-Description=NOTARYOS Notary Office Management
-After=network.target mysql.service
+Description=NOTARYOS — Sistem Manajemen Kantor Notaris Indonesia
+Documentation=https://github.com/notaryos/notaryos
+After=network.target mysql.service mariadb.service mysqld.service
+Wants=network-online.target mysql.service mariadb.service
+# Catatan aaPanel: MySQL dikelola panel (nama service bisa beda: mysql/mysqld/mariadb),
+# jadi pakai Wants (opsional), bukan Requires — service tetap start walau nama service DB beda.
 
 [Service]
 Type=simple
 User=notaryos
+Group=notaryos
 WorkingDirectory=/opt/notaryos
-EnvironmentFile=/etc/notaryos/env
+EnvironmentFile=-/etc/notaryos/env
 ExecStart=/opt/notaryos/bin/notaryos
 Restart=on-failure
-RestartSec=5
+RestartSec=5s
+
+# Batas resource wajar untuk VPS kecil
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Log ke journald (lihat: journalctl -u notaryos -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=notaryos
+
+# Hardening (biner hanya butuh: socket TCP :8080, MySQL, ./storage, ./migrations, ./web/assets)
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=false
+# Tulis hanya ke storage + /tmp privat. Sesuaikan bila STORAGE_DIR di luar /opt/notaryos.
+ReadWritePaths=/opt/notaryos/storage /tmp
+# Bila STORAGE_DIR=/var/lib/notaryos, ganti baris di atas dengan:
+# ReadWritePaths=/var/lib/notaryos /tmp
 
 [Install]
 WantedBy=multi-user.target
